@@ -1,11 +1,14 @@
 import { NavLink } from "react-router-dom";
-import { Store, Search, X } from "lucide-react";
+import { Store, Search, X, Globe } from "lucide-react";
 import * as Icons from "lucide-react";
 import { NAV_ITEMS } from "../../utils/constants";
 import { useAuth } from "../../context/AuthContext";
+import { useLanguage } from "../../context/LanguageContext";
 
-function NavItem({ item, onClick }) {
+function NavItem({ item, onClick, t }) {
   const Icon = Icons[item.icon] || Icons.Circle;
+  const translationKey = item.label.toLowerCase().replace(/ & /g, "_").replace(/ /g, "_");
+  
   return (
     <NavLink
       to={item.path}
@@ -22,7 +25,7 @@ function NavItem({ item, onClick }) {
       {({ isActive }) => (
         <>
           <Icon size={18} className={isActive ? "text-primary" : "text-neutral"} />
-          <span>{item.label}</span>
+          <span>{t(translationKey)}</span>
         </>
       )}
     </NavLink>
@@ -31,6 +34,8 @@ function NavItem({ item, onClick }) {
 
 export default function Sidebar({ open, onClose }) {
   const { user } = useAuth();
+  const { t, lang, switchLanguage } = useLanguage();
+
   return (
     <>
       {/* Mobile backdrop */}
@@ -74,7 +79,7 @@ export default function Sidebar({ open, onClose }) {
             />
             <input
               type="text"
-              placeholder="Search...  ⌘S"
+              placeholder={`${t("search")}...  ⌘S`}
               className="w-full h-8 bg-background border border-border rounded-btn pl-8 pr-3 text-[13px] text-text-secondary placeholder:text-text-secondary focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
@@ -87,20 +92,34 @@ export default function Sidebar({ open, onClose }) {
               !item.roles || !user || item.roles.includes(user.role)
             );
             if (!visibleItems.length) return null;
+            
+            const sectionKey = section.section.toLowerCase().replace(/ /g, "_");
+            
             return (
               <div key={section.section}>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-text-secondary px-3 mb-1">
-                  {section.section}
+                  {t(sectionKey)}
                 </p>
                 <div className="space-y-0.5">
                   {visibleItems.map((item) => (
-                    <NavItem key={item.path} item={item} onClick={() => onClose?.()} />
+                    <NavItem key={item.path} item={item} onClick={() => onClose?.()} t={t} />
                   ))}
                 </div>
               </div>
             );
           })}
         </nav>
+
+        {/* Language Toggle at Bottom */}
+        <div className="p-4 border-t border-border">
+          <button 
+            onClick={() => switchLanguage(lang === "en" ? "rw" : "en")}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-background border border-border rounded-card text-[13px] font-medium text-text-primary hover:bg-surface transition-colors"
+          >
+            <Globe size={14} />
+            {lang === "en" ? "Kinyarwanda" : "English"}
+          </button>
+        </div>
       </aside>
     </>
   );

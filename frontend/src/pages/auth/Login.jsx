@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Mail, Eye, EyeOff, Store, Loader2 } from "lucide-react";
+import { Mail, Eye, EyeOff, Store, Loader2, Globe } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { useLanguage } from "../../context/LanguageContext";
 import toast from "react-hot-toast";
 
 export default function Login() {
   const { user, login } = useAuth();
+  const { t, lang, switchLanguage } = useLanguage();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
@@ -22,16 +24,27 @@ export default function Login() {
     setLoading(true);
     try {
       const u = await login(email, password);
-      toast.success(`Welcome back, ${u.name.split(" ")[0]}!`);
+      toast.success(`${t("welcome_back")}, ${u.name.split(" ")[0]}!`);
     } catch (err) {
-      setError(err.response?.data?.error || "Login failed. Check your credentials.");
+      setError(err.response?.data?.error || t("login_failed"));
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex relative">
+      {/* Language Switcher */}
+      <div className="absolute top-6 right-6 z-50">
+        <button 
+          onClick={() => switchLanguage(lang === "en" ? "rw" : "en")}
+          className="flex items-center gap-2 px-3 py-1.5 bg-surface border border-border rounded-badge text-[13px] font-medium text-text-primary hover:bg-background transition-colors"
+        >
+          <Globe size={14} />
+          {lang === "en" ? "Kinyarwanda" : "English"}
+        </button>
+      </div>
+
       {/* Left panel */}
       <div className="hidden lg:flex flex-col justify-between w-[480px] shrink-0 p-12"
            style={{ backgroundColor: "#006C49" }}>
@@ -81,8 +94,8 @@ export default function Login() {
             <span className="text-[16px] font-bold text-text-primary">KNOTTY SYSTEM</span>
           </div>
 
-          <h2 className="text-[24px] font-bold text-text-primary mb-1">Welcome back</h2>
-          <p className="text-[14px] text-text-secondary mb-8">Sign in to your account</p>
+          <h2 className="text-[24px] font-bold text-text-primary mb-1">{t("welcome_back")}</h2>
+          <p className="text-[14px] text-text-secondary mb-8">{t("sign_in_account")}</p>
 
           {error && (
             <div className="mb-4 px-3 py-2.5 bg-danger/10 border border-danger/20 rounded-card flex items-center gap-2">
@@ -93,7 +106,7 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-[13px] font-medium text-text-primary mb-1">Email address</label>
+              <label className="block text-[13px] font-medium text-text-primary mb-1">{t("email")}</label>
               <div className="relative">
                 <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
                 <input
@@ -105,7 +118,7 @@ export default function Login() {
             </div>
 
             <div>
-              <label className="block text-[13px] font-medium text-text-primary mb-1">Password</label>
+              <label className="block text-[13px] font-medium text-text-primary mb-1">{t("password")}</label>
               <div className="relative">
                 <input
                   type={showPass ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
@@ -121,14 +134,14 @@ export default function Login() {
 
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" className="rounded border-border text-primary focus:ring-primary" />
-              <span className="text-[13px] text-text-secondary">Remember me</span>
+              <span className="text-[13px] text-text-secondary">{t("remember_me")}</span>
             </label>
 
             <button
               type="submit" disabled={loading}
               className="w-full h-11 bg-primary text-white rounded-btn text-[14px] font-semibold hover:bg-primary-dark transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
             >
-              {loading ? <><Loader2 size={15} className="animate-spin" /> Signing in…</> : "Sign In"}
+              {loading ? <><Loader2 size={15} className="animate-spin" /> {t("signing_in")}</> : t("sign_in")}
             </button>
           </form>
         </div>
