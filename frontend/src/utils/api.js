@@ -205,8 +205,10 @@ function handle(method, url, body) {
       "accounts@valano.rw": { id:3, name:"Uwimana Angélique",    email:"accounts@valano.rw", role:"manager", branch_id:2,    branch_name:"Kimironko" },
       "worker1@valano.rw":  { id:4, name:"Marie Uwamahoro",      email:"worker1@valano.rw",  role:"worker",  branch_id:1,    branch_name:"Nyabugogo" },
     };
-    const u = USERS[body?.email];
-    if (!u || body?.password !== "rukundo2007") throw { response:{ status:401, data:{ error:"Invalid email or password" } } };
+    const email = body?.email?.trim().toLowerCase();
+    const password = body?.password?.trim();
+    const u = USERS[email];
+    if (!u || password !== "rukundo2007") throw { response:{ status:401, data:{ error:"Invalid email or password" } } };
     addAudit(u.name, "LOGIN", "user", `Logged in as ${u.role}`);
     return { user:u, accessToken:"demo-token", refreshToken:"demo-refresh" };
   }
