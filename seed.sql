@@ -1,5 +1,5 @@
 -- VALANO SHOP — Seed Data
--- Passwords are bcrypt hash of "valano123"
+-- Passwords are bcrypt hash of "rukundo2007" for admin, and "valano123" for others
 
 BEGIN;
 
@@ -9,9 +9,9 @@ INSERT INTO branches (name, location, phone) VALUES
   ('City Branch',  'Kigali - Kimironko Market', '+250788000002')
 ON CONFLICT DO NOTHING;
 
--- Users (password = "valano123")
+-- Users (password = "rukundo2007")
 INSERT INTO users (name, email, password_hash, role, branch_id, phone, monthly_target, commission_rate) VALUES
-  ('Niyomugabo Emmanuel', 'owner@valano.rw',     '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBaXMGJ0eDuBau', 'owner',      1, '+250780000001', 5000000, 0),
+  ('Rukundo joseph', 'rukundojosephtuyishime@gmail.com', '$2a$12$pqAP/gTVtss0cQuzuEMpdOTk5TRlOTLHgUR/pZ5QuXml07pFCXyza', 'admin',      1, '+250780000001', 5000000, 0),
   ('Habimana Jean Pierre','manager@valano.rw',   '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBaXMGJ0eDuBau', 'manager',    1, '+250780000002', 3000000, 2),
   ('Uwimana Angélique',   'accounts@valano.rw',  '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBaXMGJ0eDuBau', 'accountant', 1, '+250780000003', 0, 0),
   ('Uwamahoro Marie',     'worker1@valano.rw',   '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBaXMGJ0eDuBau', 'worker',     1, '+250780000004', 1500000, 3),

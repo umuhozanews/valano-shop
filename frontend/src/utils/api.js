@@ -148,18 +148,18 @@ let AUDIT = [
   { id:2,  user_name:"Marie Uwamahoro",      action:"SALE_CREATED",      entity_type:"sale",        details:"Invoice VL-2026-011 — RWF 20,000",        created_at:daysAgo(0) },
   { id:3,  user_name:"Jean Pierre Habimana", action:"STOCK_UPDATED",     entity_type:"stock",       details:"Hoodie Fleece qty changed 8→11",          created_at:daysAgo(1) },
   { id:4,  user_name:"Alice Mukamana",       action:"SALE_CREATED",      entity_type:"sale",        details:"Invoice VL-2026-010 — RWF 315,000",       created_at:daysAgo(1) },
-  { id:5,  user_name:"Niyomugabo Emmanuel",   action:"WORKER_CREATED",    entity_type:"worker",      details:"Patrick Nkurunziza added as worker",      created_at:daysAgo(2) },
+  { id:5,  user_name:"Rukundo joseph",   action:"WORKER_CREATED",    entity_type:"worker",      details:"Patrick Nkurunziza added as worker",      created_at:daysAgo(2) },
   { id:6,  user_name:"Jean Pierre Habimana", action:"SALE_VOIDED",       entity_type:"sale",        details:"Invoice VL-2026-008 voided",              created_at:daysAgo(2) },
   { id:7,  user_name:"Alice Mukamana",       action:"STOCK_TRANSFER",    entity_type:"stock",       details:"Bomber Jacket 5 units: Nyabugogo→Kimironko",created_at:daysAgo(3) },
-  { id:8,  user_name:"Niyomugabo Emmanuel",  action:"PROCUREMENT_CREATED",entity_type:"procurement",details:"Order from Yiwu Fashion World Co.",       created_at:daysAgo(3) },
+  { id:8,  user_name:"Rukundo joseph",  action:"PROCUREMENT_CREATED",entity_type:"procurement",details:"Order from Yiwu Fashion World Co.",       created_at:daysAgo(3) },
   { id:9,  user_name:"Jean Pierre Habimana", action:"LOGIN",             entity_type:"user",        details:"Logged in from Nyabugogo",                created_at:daysAgo(4) },
   { id:10, user_name:"Alice Mukamana",       action:"EXPENSE_CREATED",   entity_type:"expense",     details:"Shop maintenance — RWF 35,000",           created_at:daysAgo(4) },
-  { id:11, user_name:"Niyomugabo Emmanuel",  action:"SUPPLIER_UPDATED",  entity_type:"supplier",    details:"Yiwu Fashion World Co. notes updated",    created_at:daysAgo(5) },
+  { id:11, user_name:"Rukundo joseph",  action:"SUPPLIER_UPDATED",  entity_type:"supplier",    details:"Yiwu Fashion World Co. notes updated",    created_at:daysAgo(5) },
   { id:12, user_name:"Jean Pierre Habimana", action:"STOCK_CREATED",     entity_type:"stock",       details:"Track Suit Set added — 10 units",         created_at:daysAgo(5) },
 ];
 
 const addAudit = (user_name, action, entity_type, details) => {
-  AUDIT.unshift({ id: nextId(AUDIT), user_name: user_name || "Niyomugabo Emmanuel", action, entity_type, details, created_at: nowIso() });
+  AUDIT.unshift({ id: nextId(AUDIT), user_name: user_name || "Rukundo joseph", action, entity_type, details, created_at: nowIso() });
 };
 
 // ─── Dashboard helpers ────────────────────────────────────────────────────────
@@ -200,13 +200,13 @@ function handle(method, url, body) {
   // ── AUTH ──────────────────────────────────────────────────────────────────
   if (path === "/auth/login") {
     const USERS = {
-      "owner@valano.rw":    { id:1, name:"Niyomugabo Emmanuel",   email:"owner@valano.rw",    role:"admin",   branch_id:null, branch_name:"All Branches" },
+      "rukundojosephtuyishime@gmail.com":    { id:1, name:"Rukundo joseph",   email:"rukundojosephtuyishime@gmail.com",    role:"admin",   branch_id:null, branch_name:"All Branches" },
       "manager@valano.rw":  { id:2, name:"Jean Pierre Habimana", email:"manager@valano.rw",  role:"manager", branch_id:1,    branch_name:"Nyabugogo" },
       "accounts@valano.rw": { id:3, name:"Uwimana Angélique",    email:"accounts@valano.rw", role:"manager", branch_id:2,    branch_name:"Kimironko" },
       "worker1@valano.rw":  { id:4, name:"Marie Uwamahoro",      email:"worker1@valano.rw",  role:"worker",  branch_id:1,    branch_name:"Nyabugogo" },
     };
     const u = USERS[body?.email];
-    if (!u || body?.password !== "valano123") throw { response:{ status:401, data:{ error:"Invalid email or password" } } };
+    if (!u || body?.password !== "rukundo2007") throw { response:{ status:401, data:{ error:"Invalid email or password" } } };
     addAudit(u.name, "LOGIN", "user", `Logged in as ${u.role}`);
     return { user:u, accessToken:"demo-token", refreshToken:"demo-refresh" };
   }
@@ -241,7 +241,7 @@ function handle(method, url, body) {
       const bname = branchName(body.branch_id);
       const item = { id, ...body, branch_id:parseInt(body.branch_id), branch_name:bname, barcode:`VL-${bnum}`, created_at:nowIso() };
       STOCK.push(item);
-      addAudit("Niyomugabo Emmanuel","STOCK_CREATED","stock",`${item.name} added — ${item.quantity} units at ${bname}`);
+      addAudit("Rukundo joseph","STOCK_CREATED","stock",`${item.name} added — ${item.quantity} units at ${bname}`);
       return enrichStock(item);
     }
     if (r1 === "transfer" && method === "POST") {
@@ -249,7 +249,7 @@ function handle(method, url, body) {
       const item = STOCK.find(x=>x.id===parseInt(item_id));
       if (item) { item.quantity = Math.max(0, item.quantity - parseInt(quantity)); }
       const fbName = branchName(from_branch); const tbName = branchName(to_branch);
-      addAudit("Niyomugabo Emmanuel","STOCK_TRANSFER","stock",`${item?.name} ${quantity} units: ${fbName}→${tbName}`);
+      addAudit("Rukundo joseph","STOCK_TRANSFER","stock",`${item?.name} ${quantity} units: ${fbName}→${tbName}`);
       return { ok:true };
     }
     if (r2 === "history" && method === "GET") return [
@@ -267,14 +267,14 @@ function handle(method, url, body) {
       if (idx !== -1) {
         const bname = branchName(body.branch_id || STOCK[idx].branch_id);
         STOCK[idx] = { ...STOCK[idx], ...body, branch_id:parseInt(body.branch_id||STOCK[idx].branch_id), branch_name:bname };
-        addAudit("Niyomugabo Emmanuel","STOCK_UPDATED","stock",`${STOCK[idx].name} updated`);
+        addAudit("Rukundo joseph","STOCK_UPDATED","stock",`${STOCK[idx].name} updated`);
         return enrichStock(STOCK[idx]);
       }
     }
     if (r1 && method === "DELETE") {
       const item = STOCK.find(x=>x.id===parseInt(r1));
       STOCK = STOCK.filter(x=>x.id!==parseInt(r1));
-      addAudit("Niyomugabo Emmanuel","STOCK_DELETED","stock",`${item?.name} removed`);
+      addAudit("Rukundo joseph","STOCK_DELETED","stock",`${item?.name} removed`);
       return { ok:true };
     }
   }
@@ -290,11 +290,11 @@ function handle(method, url, body) {
       const id = nextId(SALES);
       const inv = `VL-2026-${String(id).padStart(3,"0")}`;
       const total = (body.items||[]).reduce((s,i)=>s+(i.unit_price||0)*(i.quantity||0),0);
-      const sale = { id, invoice_number:inv, customer_name:body.customer_name||"Walk-in", worker_name:"Niyomugabo Emmanuel", branch_name:"Nyabugogo", items_count:(body.items||[]).length, payment_method:body.payment_method||"cash", total_amount:total, created_at:nowIso(), is_voided:false, invoice_id:id };
+      const sale = { id, invoice_number:inv, customer_name:body.customer_name||"Walk-in", worker_name:"Rukundo joseph", branch_name:"Nyabugogo", items_count:(body.items||[]).length, payment_method:body.payment_method||"cash", total_amount:total, created_at:nowIso(), is_voided:false, invoice_id:id };
       SALES.unshift(sale);
       // Also add to invoices
       INVOICES.unshift({ id:nextId(INVOICES), invoice_number:inv, customer_name:sale.customer_name, branch_name:"Nyabugogo", total_amount:total, issued_at:nowIso(), status:"paid" });
-      addAudit("Niyomugabo Emmanuel","SALE_CREATED","sale",`Invoice ${inv} — RWF ${total.toLocaleString()}`);
+      addAudit("Rukundo joseph","SALE_CREATED","sale",`Invoice ${inv} — RWF ${total.toLocaleString()}`);
       return { invoice_number:inv, id };
     }
     if (r2 === "void" && method === "POST") {
@@ -302,7 +302,7 @@ function handle(method, url, body) {
       if (idx !== -1) { SALES[idx] = { ...SALES[idx], is_voided:true, void_reason:body.void_reason }; }
       const invIdx = INVOICES.findIndex(x=>x.invoice_number===SALES[idx]?.invoice_number);
       if (invIdx !== -1) INVOICES[invIdx].status = "voided";
-      addAudit("Niyomugabo Emmanuel","SALE_VOIDED","sale",`Invoice ${SALES[idx]?.invoice_number} voided`);
+      addAudit("Rukundo joseph","SALE_VOIDED","sale",`Invoice ${SALES[idx]?.invoice_number} voided`);
       return { ok:true };
     }
     if (r1 && method === "GET") {
@@ -326,19 +326,19 @@ function handle(method, url, body) {
       const id = nextId(PROCUREMENT);
       const order = { id, ...body, supplier_id:parseInt(body.supplier_id), supplier_name:sup?.name||"Unknown", items_count:(body.items||[]).length, items_cost:(body.items||[]).reduce((s,i)=>(s+(parseFloat(i.unit_cost)||0)*(parseInt(i.quantity)||0))*(parseFloat(body.exchange_rate)||1),0), status:"ordered" };
       PROCUREMENT.unshift(order);
-      addAudit("Niyomugabo Emmanuel","PROCUREMENT_CREATED","procurement",`Order #${id} from ${order.supplier_name}`);
+      addAudit("Rukundo joseph","PROCUREMENT_CREATED","procurement",`Order #${id} from ${order.supplier_name}`);
       return order;
     }
     if (r2 === "status" && method === "PUT") {
       const idx = PROCUREMENT.findIndex(x=>x.id===parseInt(r1));
       if (idx !== -1) PROCUREMENT[idx].status = body.status;
-      addAudit("Niyomugabo Emmanuel","PROCUREMENT_UPDATED","procurement",`Order #${r1} status → ${body.status}`);
+      addAudit("Rukundo joseph","PROCUREMENT_UPDATED","procurement",`Order #${r1} status → ${body.status}`);
       return { ok:true };
     }
     if (r2 === "stock-in" && method === "POST") {
       const idx = PROCUREMENT.findIndex(x=>x.id===parseInt(r1));
       if (idx !== -1) PROCUREMENT[idx].status = "stocked";
-      addAudit("Niyomugabo Emmanuel","STOCK_IN","procurement",`Order #${r1} stocked in at ${branchName(body.branch_id)}`);
+      addAudit("Rukundo joseph","STOCK_IN","procurement",`Order #${r1} stocked in at ${branchName(body.branch_id)}`);
       return { ok:true };
     }
     if (r1 && method === "GET") {
@@ -354,7 +354,7 @@ function handle(method, url, body) {
       const id = nextId(WORKERS);
       const w = { id, ...body, branch_id:parseInt(body.branch_id), branch_name:branchName(body.branch_id), is_active:true, monthly_sales:0, monthly_revenue:0 };
       WORKERS.push(w);
-      addAudit("Niyomugabo Emmanuel","WORKER_CREATED","worker",`${w.name} added as ${w.role}`);
+      addAudit("Rukundo joseph","WORKER_CREATED","worker",`${w.name} added as ${w.role}`);
       return w;
     }
     if (r2 === "performance" && method === "GET") {
@@ -365,13 +365,13 @@ function handle(method, url, body) {
     }
     if (r2 === "deactivate" && method === "PUT") {
       const idx = WORKERS.findIndex(x=>x.id===parseInt(r1));
-      if (idx !== -1) { WORKERS[idx].is_active = false; addAudit("Niyomugabo Emmanuel","WORKER_DEACTIVATED","worker",`${WORKERS[idx].name} deactivated`); }
+      if (idx !== -1) { WORKERS[idx].is_active = false; addAudit("Rukundo joseph","WORKER_DEACTIVATED","worker",`${WORKERS[idx].name} deactivated`); }
       return { ok:true };
     }
     if (r1 && method === "GET")  return WORKERS.find(x=>x.id===parseInt(r1)) || WORKERS[0];
     if (r1 && method === "PUT")  {
       const idx = WORKERS.findIndex(x=>x.id===parseInt(r1));
-      if (idx !== -1) { WORKERS[idx] = { ...WORKERS[idx], ...body, branch_id:parseInt(body.branch_id||WORKERS[idx].branch_id), branch_name:branchName(body.branch_id||WORKERS[idx].branch_id) }; addAudit("Niyomugabo Emmanuel","WORKER_UPDATED","worker",`${WORKERS[idx].name} updated`); }
+      if (idx !== -1) { WORKERS[idx] = { ...WORKERS[idx], ...body, branch_id:parseInt(body.branch_id||WORKERS[idx].branch_id), branch_name:branchName(body.branch_id||WORKERS[idx].branch_id) }; addAudit("Rukundo joseph","WORKER_UPDATED","worker",`${WORKERS[idx].name} updated`); }
       return WORKERS[idx];
     }
   }
@@ -386,7 +386,7 @@ function handle(method, url, body) {
       const id = nextId(CUSTOMERS);
       const c = { id, ...body, segment:"new", total_orders:0, total_spent:0, last_purchase:null };
       CUSTOMERS.push(c);
-      addAudit("Niyomugabo Emmanuel","CUSTOMER_CREATED","customer",`${c.name} added`);
+      addAudit("Rukundo joseph","CUSTOMER_CREATED","customer",`${c.name} added`);
       return c;
     }
     if (r1 && method === "GET") {
@@ -401,18 +401,18 @@ function handle(method, url, body) {
     if (!r1 && method === "POST") {
       const s = { id:nextId(SUPPLIERS), ...body, orders_count:0, total_rwf:0, reliability_pct:100 };
       SUPPLIERS.push(s);
-      addAudit("Niyomugabo Emmanuel","SUPPLIER_CREATED","supplier",`${s.name} added`);
+      addAudit("Rukundo joseph","SUPPLIER_CREATED","supplier",`${s.name} added`);
       return s;
     }
     if (r1 && method === "PUT") {
       const idx = SUPPLIERS.findIndex(x=>x.id===parseInt(r1));
-      if (idx !== -1) { SUPPLIERS[idx] = { ...SUPPLIERS[idx], ...body }; addAudit("Niyomugabo Emmanuel","SUPPLIER_UPDATED","supplier",`${SUPPLIERS[idx].name} updated`); }
+      if (idx !== -1) { SUPPLIERS[idx] = { ...SUPPLIERS[idx], ...body }; addAudit("Rukundo joseph","SUPPLIER_UPDATED","supplier",`${SUPPLIERS[idx].name} updated`); }
       return SUPPLIERS[idx];
     }
     if (r1 && method === "DELETE") {
       const s = SUPPLIERS.find(x=>x.id===parseInt(r1));
       SUPPLIERS = SUPPLIERS.filter(x=>x.id!==parseInt(r1));
-      addAudit("Niyomugabo Emmanuel","SUPPLIER_DELETED","supplier",`${s?.name} removed`);
+      addAudit("Rukundo joseph","SUPPLIER_DELETED","supplier",`${s?.name} removed`);
       return { ok:true };
     }
   }
@@ -425,7 +425,7 @@ function handle(method, url, body) {
     }
     if (r2 === "status" && method === "PUT") {
       const idx = INVOICES.findIndex(x=>x.id===parseInt(r1));
-      if (idx !== -1) { INVOICES[idx].status = body.status; addAudit("Niyomugabo Emmanuel","INVOICE_UPDATED","invoice",`Invoice ${INVOICES[idx].invoice_number} marked ${body.status}`); }
+      if (idx !== -1) { INVOICES[idx].status = body.status; addAudit("Rukundo joseph","INVOICE_UPDATED","invoice",`Invoice ${INVOICES[idx].invoice_number} marked ${body.status}`); }
       return { ok:true };
     }
   }
@@ -439,15 +439,15 @@ function handle(method, url, body) {
     }
     if (!r1 && method === "POST") {
       const id = nextId(EXPENSES);
-      const e = { id, ...body, amount:parseFloat(body.amount), branch_name:branchName(body.branch_id), recorder_name:"Niyomugabo Emmanuel" };
+      const e = { id, ...body, amount:parseFloat(body.amount), branch_name:branchName(body.branch_id), recorder_name:"Rukundo joseph" };
       EXPENSES.unshift(e);
-      addAudit("Niyomugabo Emmanuel","EXPENSE_CREATED","expense",`${e.category} — RWF ${parseFloat(e.amount).toLocaleString()}`);
+      addAudit("Rukundo joseph","EXPENSE_CREATED","expense",`${e.category} — RWF ${parseFloat(e.amount).toLocaleString()}`);
       return e;
     }
     if (r1 && method === "DELETE") {
       const e = EXPENSES.find(x=>x.id===parseInt(r1));
       EXPENSES = EXPENSES.filter(x=>x.id!==parseInt(r1));
-      addAudit("Niyomugabo Emmanuel","EXPENSE_DELETED","expense",`${e?.category} expense removed`);
+      addAudit("Rukundo joseph","EXPENSE_DELETED","expense",`${e?.category} expense removed`);
       return { ok:true };
     }
   }

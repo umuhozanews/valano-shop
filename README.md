@@ -71,12 +71,13 @@ npm run dev
 
 ## Default Login Credentials
 
-| Role       | Email                  | Password    |
-|------------|------------------------|-------------|
-| Owner      | owner@valano.rw        | valano123   |
-| Manager    | manager@valano.rw      | valano123   |
-| Accountant | accounts@valano.rw     | valano123   |
-| Worker     | worker1@valano.rw      | valano123   |
+| Role       | Email                            | Password      |
+|------------|----------------------------------|---------------|
+| Admin      | rukundojosephtuyishime@gmail.com | rukundo2007   |
+| Manager    | manager@valano.rw                | valano123     |
+| Accountant | accounts@valano.rw               | valano123     |
+| Worker     | worker1@valano.rw                | valano123     |
+
 
 ---
 

@@ -35,7 +35,7 @@ const NOTIF_PREFS = [
 
 export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState("business");
-  const [business, setBusiness] = useState({ name:"VALANO SHOP", owner:"Niyomugabo Emmanuel", phone:"0788000111", email:"info@valano.rw", city:"Kigali", currency:"RWF" });
+  const [business, setBusiness] = useState({ name:"VALANO SHOP", owner:"Rukundo joseph", phone:"0788000111", email:"info@valano.rw", city:"Kigali", currency:"RWF" });
   const [branches, setBranches] = useState(BRANCHES_INIT);
   const [showBranchModal, setShowBranchModal] = useState(false);
   const [branchForm, setBranchForm] = useState({ name:"", address:"", manager:"", phone:"" });
