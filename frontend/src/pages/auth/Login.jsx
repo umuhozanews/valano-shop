@@ -34,7 +34,7 @@ export default function Login() {
     <div className="min-h-screen flex">
       {/* Left panel */}
       <div className="hidden lg:flex flex-col justify-between w-[480px] shrink-0 p-12"
-           style={{ backgroundColor: "#006C49" }}>
+           style={{ backgroundColor: "#1e3a8a" }}>
         {/* Decorative shapes */}
         <div className="absolute top-0 left-0 w-[480px] h-full overflow-hidden pointer-events-none">
           <div className="absolute top-[-60px] left-[-60px] w-[200px] h-[200px] rounded-full bg-white/5" />
