@@ -34,7 +34,7 @@ export default function Login() {
     <div className="min-h-screen flex">
       {/* Left panel */}
       <div className="hidden lg:flex flex-col justify-between w-[480px] shrink-0 p-12"
-           style={{ backgroundColor: "#1e3a8a" }}>
+           style={{ backgroundColor: "#006C49" }}>
         {/* Decorative shapes */}
         <div className="absolute top-0 left-0 w-[480px] h-full overflow-hidden pointer-events-none">
           <div className="absolute top-[-60px] left-[-60px] w-[200px] h-[200px] rounded-full bg-white/5" />
@@ -47,7 +47,7 @@ export default function Login() {
             <div className="w-10 h-10 bg-white/20 rounded-btn flex items-center justify-center">
               <Store size={20} className="text-white" />
             </div>
-            <span className="text-white text-[22px] font-bold tracking-tight">VALANO SHOP</span>
+            <span className="text-white text-[22px] font-bold tracking-tight">KNOTTY SYSTEM</span>
           </div>
           <p className="text-white/70 text-[14px]">Business Management System</p>
         </div>
@@ -78,11 +78,11 @@ export default function Login() {
             <div className="w-8 h-8 bg-primary rounded-btn flex items-center justify-center">
               <Store size={16} className="text-white" />
             </div>
-            <span className="text-[16px] font-bold text-text-primary">VALANO SHOP</span>
+            <span className="text-[16px] font-bold text-text-primary">KNOTTY SYSTEM</span>
           </div>
 
           <h2 className="text-[24px] font-bold text-text-primary mb-1">Welcome back</h2>
-          <p className="text-[14px] text-text-secondary mb-8">Sign in to your account (v1.0.1)</p>
+          <p className="text-[14px] text-text-secondary mb-8">Sign in to your account</p>
 
           {error && (
             <div className="mb-4 px-3 py-2.5 bg-danger/10 border border-danger/20 rounded-card flex items-center gap-2">

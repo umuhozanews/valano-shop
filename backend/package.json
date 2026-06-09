@@ -1,7 +1,7 @@
 {
   "name": "valano-shop-backend",
   "version": "1.0.0",
-  "description": "VALANO SHOP Business Management System — Backend",
+  "description": "KNOTTY SYSTEM Business Management System — Backend",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

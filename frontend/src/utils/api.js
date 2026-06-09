@@ -215,7 +215,7 @@ function handle(method, url, body) {
   if (r0 === "auth") return { ok:true };
 
   // ── SETTINGS ─────────────────────────────────────────────────────────────
-  if (path === "/settings") return { branches: BRANCHES, business_name:"VALANO SHOP", currency:"RWF" };
+  if (path === "/settings") return { branches: BRANCHES, business_name:"KNOTTY SYSTEM", currency:"RWF" };
 
   // ── DASHBOARD ─────────────────────────────────────────────────────────────
   if (r0 === "dashboard") {

@@ -28,7 +28,7 @@ app.use("/api", routes);
 app.use(errorHandler);
 
 app.listen(PORT, () => {
-  console.log(`VALANO SHOP backend → http://localhost:${PORT} [${process.env.NODE_ENV || "development"}]`);
+  console.log(`KNOTTY SYSTEM backend → http://localhost:${PORT} [${process.env.NODE_ENV || "development"}]`);
   startCronJobs();
 });
 

@@ -55,7 +55,7 @@ export default function Sidebar({ open, onClose }) {
             <div className="w-8 h-8 bg-primary rounded-btn flex items-center justify-center shrink-0">
               <Store size={16} className="text-white" />
             </div>
-            <span className="text-[15px] font-bold text-text-primary tracking-tight">VALANO SHOP</span>
+            <span className="text-[15px] font-bold text-text-primary tracking-tight">KNOTTY SYSTEM</span>
           </div>
           <button
             onClick={onClose}

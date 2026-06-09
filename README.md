@@ -1,4 +1,4 @@
-# VALANO SHOP — Business Management System
+# KNOTTY SYSTEM — Business Management System
 
 A full-stack business management system for a clothing import/wholesale business in Kigali, Rwanda.
 
