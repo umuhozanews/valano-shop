@@ -16,18 +16,33 @@ function computeStatus(quantity, threshold) {
 // ─── KNOTTY FASHION DATA (Shop) ──────────────────────────────────────────────
 
 let FASHION_STOCK = [
-  { id:1, name:"Winter Puffer Jacket", category:"Jackets", size:"M", color:"Black", quantity:24, cost_price_rwf:18000, sell_price_rwf:35000, low_stock_threshold:5, barcode:"VL-001" },
-  { id:2, name:"Slim Fit Chinos", category:"Trousers", size:"32", color:"Khaki", quantity:3, cost_price_rwf:9500, sell_price_rwf:18000, low_stock_threshold:5, barcode:"VL-002" },
-  { id:3, name:"Classic White Shirt", category:"Shirts", size:"L", color:"White", quantity:0, cost_price_rwf:7000, sell_price_rwf:14000, low_stock_threshold:5, barcode:"VL-003" },
+  { id:1,  name:"Winter Puffer Jacket", category:"Jackets",     size:"M",        color:"Black",    quantity:24, cost_price_rwf:18000, sell_price_rwf:35000, low_stock_threshold:5,  barcode:"VL-00001", created_at:daysAgo(30) },
+  { id:2,  name:"Slim Fit Chinos",      category:"Trousers",    size:"32",       color:"Khaki",    quantity:3,  cost_price_rwf:9500,  sell_price_rwf:18000, low_stock_threshold:5,  barcode:"VL-00002", created_at:daysAgo(28) },
+  { id:3,  name:"Floral Summer Dress",  category:"Dresses",     size:"S",        color:"Red",      quantity:18, cost_price_rwf:12000, sell_price_rwf:25000, low_stock_threshold:5,  barcode:"VL-00003", created_at:daysAgo(25) },
+  { id:4,  name:"Classic White Shirt",  category:"Shirts",      size:"L",        color:"White",    quantity:0,  cost_price_rwf:7000,  sell_price_rwf:14000, low_stock_threshold:5,  barcode:"VL-00004", created_at:daysAgo(22) },
+  { id:5,  name:"Hoodie Fleece",        category:"Hoodies",     size:"XL",       color:"Navy",     quantity:11, cost_price_rwf:14000, sell_price_rwf:28000, low_stock_threshold:5,  barcode:"VL-00005", created_at:daysAgo(20) },
+  { id:6,  name:"Leather Ankle Boots",  category:"Shoes",       size:"40",       color:"Brown",    quantity:8,  cost_price_rwf:22000, sell_price_rwf:45000, low_stock_threshold:3,  barcode:"VL-00006", created_at:daysAgo(18) },
+  { id:7,  name:"Cargo Trousers",       category:"Trousers",    size:"34",       color:"Olive",    quantity:15, cost_price_rwf:11000, sell_price_rwf:22000, low_stock_threshold:5,  barcode:"VL-00007", created_at:daysAgo(16) },
+  { id:8,  name:"Polo T-Shirt",         category:"Shirts",      size:"M",        color:"Sky Blue", quantity:4,  cost_price_rwf:6000,  sell_price_rwf:12000, low_stock_threshold:5,  barcode:"VL-00008", created_at:daysAgo(14) },
+  { id:9,  name:"Wrap Midi Dress",      category:"Dresses",     size:"M",        color:"Purple",   quantity:9,  cost_price_rwf:13000, sell_price_rwf:27000, low_stock_threshold:3,  barcode:"VL-00009", created_at:daysAgo(12) },
+  { id:10, name:"Denim Jacket",         category:"Jackets",     size:"L",        color:"Blue",     quantity:6,  cost_price_rwf:20000, sell_price_rwf:40000, low_stock_threshold:3,  barcode:"VL-00010", created_at:daysAgo(10) },
 ];
 
 let FASHION_SALES = [
-  { id:1, invoice_number:"FSH-2026-001", customer_name:"Eric N.", worker_name:"Marie U.", items_count:2, payment_method:"cash", total_amount:70000, created_at:daysAgo(1), is_voided:false },
-  { id:2, invoice_number:"FSH-2026-002", customer_name:"Walk-in", worker_name:"Marie U.", items_count:1, payment_method:"momo", total_amount:18000, created_at:daysAgo(2), is_voided:false },
+  { id:1,  invoice_number:"VL-2026-001", customer_name:"Celestine Nyirahabimana", worker_name:"Jean Pierre Habimana", items_count:5, payment_method:"mtn_momo", total_amount:145000, created_at:daysAgo(1), is_voided:false },
+  { id:2,  invoice_number:"VL-2026-002", customer_name:"Walk-in",                  worker_name:"Marie Uwamahoro",       items_count:2, payment_method:"cash",     total_amount:52000,  created_at:daysAgo(1), is_voided:false },
+  { id:3,  invoice_number:"VL-2026-003", customer_name:"Alliance Fashion Shop",    worker_name:"Alice Mukamana",        items_count:8, payment_method:"mtn_momo", total_amount:280000, created_at:daysAgo(2), is_voided:false },
+  { id:4,  invoice_number:"VL-2026-004", customer_name:"Olivier Hakizimana",       worker_name:"Eric Ndayisabye",       items_count:3, payment_method:"cash",     total_amount:78000,  created_at:daysAgo(2), is_voided:false },
+  { id:5,  invoice_number:"VL-2026-005", customer_name:"Walk-in",                  worker_name:"Alice Mukamana",        items_count:1, payment_method:"airtel",   total_amount:25000,  created_at:daysAgo(3), is_voided:false },
+  { id:6,  invoice_number:"VL-2026-006", customer_name:"Style Hub Boutique",       worker_name:"Jean Pierre Habimana",  items_count:10,payment_method:"mtn_momo", total_amount:420000, created_at:daysAgo(3), is_voided:false },
+  { id:7,  invoice_number:"VL-2026-007", customer_name:"Sandrine Uwera",           worker_name:"Marie Uwamahoro",       items_count:2, payment_method:"cash",     total_amount:46000,  created_at:daysAgo(4), is_voided:false },
+  { id:8,  invoice_number:"VL-2026-008", customer_name:"Walk-in",                  worker_name:"Eric Ndayisabye",       items_count:1, payment_method:"cash",     total_amount:35000,  created_at:daysAgo(5), is_voided:true },
 ];
 
 let FASHION_CUSTOMERS = [
-  { id:1, name:"Celestine Nyirahabimana", phone:"0788123456", location:"Nyamirambo", type:"retailer", segment:"vip", total_orders:12, total_spent:450000, last_purchase:daysAgo(2) },
+  { id:1, name:"Celestine Nyirahabimana", phone:"0788123456", location:"Nyamirambo", type:"wholesaler", segment:"vip",     total_orders:48, total_spent:12400000, last_purchase:"2026-05-30" },
+  { id:2, name:"Olivier Hakizimana",      phone:"0722334455", location:"Remera",     type:"retailer",   segment:"vip",     total_orders:31, total_spent:5800000,  last_purchase:"2026-05-28" },
+  { id:3, name:"Sandrine Uwera",          phone:"0733556677", location:"Kacyiru",    type:"retailer",   segment:"regular", total_orders:12, total_spent:1900000,  last_purchase:"2026-05-20" },
 ];
 
 // ─── KNOTTY INDUSTRY DATA (Manufacturing) ────────────────────────────────────
@@ -74,18 +89,18 @@ let ESTATE_MAINTENANCE = [
 
 let ESTATE_SALES = [
   { id:1, invoice_number:"REC-5501", customer_name:"Iradukunda Eric", worker_name:"Admin", items_count:1, payment_method:"bank", total_amount:450000, created_at:daysAgo(1), is_voided:false },
-  { id:2, invoice_number:"REC-5502", customer_name:"Gasana Jean", worker_name:"Admin", items_count:1, payment_method:"momo", total_amount:1200000, created_at:daysAgo(5), is_voided:false },
+  { id:2, invoice_number:"REC-5502", customer_name:"Gasana Jean",     worker_name:"Admin", items_count:1, payment_method:"momo", total_amount:1200000, created_at:daysAgo(5), is_voided:false },
 ];
 
 // ─── SHARED DATA ─────────────────────────────────────────────────────────────
 
 let WORKERS = [
   { id:1, name:"Jean Pierre Habimana", email:"jp@valano.rw", role:"manager", is_active:true, monthly_sales:42, monthly_revenue:4820000 },
-  { id:2, name:"Marie Uwamahoro", email:"marie@valano.rw", role:"worker", is_active:true, monthly_sales:28, monthly_revenue:2310000 },
+  { id:2, name:"Marie Uwamahoro",      email:"marie@valano.rw", role:"worker",  is_active:true, monthly_sales:28, monthly_revenue:2310000 },
 ];
 
 let AUDIT = [
-  { id:1, user_name:"Rukundo joseph", action:"LOGIN", entity_type:"user", details:"Logged in", created_at:daysAgo(0) },
+  { id:1,  user_name:"Rukundo joseph", action:"LOGIN", entity_type:"user", details:"Logged in", created_at:daysAgo(0) },
 ];
 
 const enrichStock = (item) => ({
@@ -110,10 +125,10 @@ function handle(method, url, body) {
   let currentCustomers = FASHION_CUSTOMERS;
 
   if (businessType === "industry") {
-    currentStock = INDUSTRY_RAW; // StockList usually shows Raw Materials in Industry
+    currentStock = INDUSTRY_RAW; 
     currentSales = INDUSTRY_SALES;
   } else if (businessType === "real_estate") {
-    currentStock = []; // Stock not used here
+    currentStock = []; 
     currentSales = ESTATE_SALES;
     currentCustomers = ESTATE_TENANTS;
   }
@@ -164,7 +179,7 @@ function handle(method, url, body) {
   if (r0 === "tenants") return ESTATE_TENANTS;
   if (r0 === "maintenance") return ESTATE_MAINTENANCE;
 
-  // ── SALES / RENT PAYMENTS / WHOLESALE ORDERS ────────────────────────────
+  // ── SALES ───────────────────────────────────────────────────────────────
   if (r0 === "sales") {
     if (!r1 && method === "GET") return { data: currentSales, total: currentSales.length, stats: { count: currentSales.length, revenue: currentSales.reduce((s,x)=>s+x.total_amount,0) } };
     if (r1 && method === "GET") {
@@ -173,10 +188,13 @@ function handle(method, url, body) {
     }
   }
 
-  // ── MANAGEMENT ────────────────────────────────────────────────────────────
-  if (r0 === "workers") return WORKERS;
+  // ── CUSTOMERS / SUPPLIERS ────────────────────────────────────────────────
   if (r0 === "customers") return { data: currentCustomers, total: currentCustomers.length, summary: [] };
-  if (r0 === "suppliers") return businessType === 'industry' ? [ { id:1, name:"Textile Rwanda Ltd", country:"Rwanda" } ] : [];
+  if (r0 === "suppliers") return businessType === 'industry' ? [ { id:1, name:"Textile Rwanda Ltd", country:"Rwanda" } ] : [ { id:1, name:"Guangzhou Fashion", country:"China" } ];
+  
+  if (r0 === "procurement") return { data: [], total: 0 };
+  if (r0 === "invoices") return [ { id:1, invoice_number:"INV-001", customer_name:"Walk-in", issued_at:nowIso(), total_amount:70000, status:"paid" }];
+  if (r0 === "workers") return WORKERS;
   if (r0 === "expenses") return { data: [], total: 0, byCategory: [] };
   if (r0 === "finance" && r1 === "pnl") return { totals: { revenue: 5000000, cogs: 2000000, expenses: 1000000, grossProfit: 3000000, netProfit: 2000000 }, byMonth: [] };
   if (r0 === "settings") return { branches: [], business_name:"KNOTTY SYSTEM", currency:"RWF" };

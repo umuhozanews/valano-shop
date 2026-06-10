@@ -90,19 +90,34 @@ export const NAV_ITEMS = (activeBusiness) => {
     ],
     [BUSINESS_TYPES.SHOP]: [
       {
-        section: "SALES",
+        section: "MAIN MENU",
         items: [
-          { label: "Dashboard",   icon: "LayoutDashboard", path: "/app/dashboard" },
-          { label: "Stock",       icon: "Package",         path: "/app/stock" },
-          { label: "Retail Sales",icon: "ShoppingCart",    path: "/app/sales" },
-          { label: "Customers",   icon: "UserCheck",       path: "/app/customers" },
+          { label: "Dashboard",   icon: "LayoutDashboard", path: "/app/dashboard",     roles: ["admin","manager"] },
+          { label: "Stock",       icon: "Package",         path: "/app/stock",         roles: ["admin","manager"] },
+          { label: "Sales",       icon: "ShoppingCart",    path: "/app/sales",         roles: ["admin","manager","worker"] },
+          { label: "Procurement", icon: "Truck",           path: "/app/procurement",   roles: ["admin","manager"] },
+        ],
+      },
+      {
+        section: "CRM",
+        items: [
+          { label: "Customers", icon: "UserCheck", path: "/app/customers", roles: ["admin","manager"] },
+          { label: "Suppliers", icon: "Globe",     path: "/app/suppliers", roles: ["admin"] },
         ],
       },
       {
         section: "FINANCE",
         items: [
-          { label: "Invoices",     icon: "FileText",  path: "/app/invoices" },
+          { label: "Invoices",     icon: "FileText",  path: "/app/invoices",    roles: ["admin","manager"] },
           { label: "Profit & Loss",icon: "TrendingUp",path: "/app/finance/pnl", roles: ["admin"] },
+        ],
+      },
+      {
+        section: "REPORTS",
+        items: [
+          { label: "Sales Report",       icon: "BarChart2",    path: "/app/reports/sales",   roles: ["admin","manager"] },
+          { label: "Stock Report",       icon: "ClipboardList",path: "/app/reports/stock",   roles: ["admin","manager"] },
+          { label: "Worker Performance", icon: "Award",        path: "/app/reports/workers", roles: ["admin","manager"] },
         ],
       },
     ],
