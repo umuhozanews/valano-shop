@@ -10,7 +10,7 @@ const TRANSLATIONS = {
     finance: "Finance",
     reports: "Reports",
     others: "Others",
-    production: "Production",
+    production_nav: "Production",
     real_estate: "Real Estate",
 
     // Nav Items
@@ -36,9 +36,9 @@ const TRANSLATIONS = {
     rent_payments: "Rent Payments",
     
     // Businesses
-    industry: "Industry (Manufacturing)",
-    shop: "Clothing Shop",
-    real_estate_biz: "Real Estate",
+    industry: "KNOTTY INDUSTRY",
+    shop: "KNOTTY FASHION",
+    real_estate_biz: "KNOTTY ESTATES",
     switch_business: "Switch Business",
     
     // Auth
@@ -89,7 +89,7 @@ const TRANSLATIONS = {
     low_stock_alerts: "Low Stock Alerts",
     items_sold: "items sold",
 
-    // Stock
+    // Stock & Production
     add_item: "Add Item",
     item_name: "Item Name",
     barcode: "Barcode",
@@ -103,8 +103,12 @@ const TRANSLATIONS = {
     low_stock: "Low Stock",
     out_of_stock: "Out of Stock",
     transfer_stock: "Transfer Stock",
+    planned: "Planned",
+    in_progress: "In Progress",
+    completed: "Completed",
+    cancelled: "Cancelled",
 
-    // Sales
+    // Sales & Rent
     new_sale: "New Sale",
     invoice_no: "Invoice No",
     customer: "Customer",
@@ -118,6 +122,15 @@ const TRANSLATIONS = {
     momo: "Mobile Money",
     bank: "Bank Transfer",
 
+    // Real Estate
+    occupied: "Occupied",
+    vacant: "Vacant",
+    partial: "Partial",
+    address: "Address",
+    rent_status: "Rent Status",
+    paid: "Paid",
+    pending: "Pending",
+
     // Finance
     revenue: "Revenue",
     cogs: "COGS (Cost of Goods)",
@@ -129,7 +142,7 @@ const TRANSLATIONS = {
     // Settings
     business_info: "Business Information",
     shop_name: "Shop Name",
-    address: "Address",
+    address_label: "Address",
     city: "City",
     currency: "Currency",
     language: "Language",
@@ -137,13 +150,13 @@ const TRANSLATIONS = {
   },
   rw: {
     // Nav Sections
-    main_menu: "Ibize imbere",
+    main_menu: "Ibikoreshwa cyane",
     management: "Imicungire",
     finance: "Imari",
     reports: "Raporo",
     others: "Ibindi",
-    production: "Umusaruro",
-    real_estate: "Imitungo Itimukanwa",
+    production_nav: "Umusaruro",
+    real_estate: "Inyubako",
 
     // Nav Items
     dashboard: "Incamake",
@@ -154,31 +167,31 @@ const TRANSLATIONS = {
     customers: "Abaguzi",
     suppliers: "Abaranguza",
     invoices: "Inyemezabwishyu",
-    expenses: "Imikoreshereze",
+    expenses: "Ayakoreshejwe",
     profit_loss: "Inyungu n'Igihombo",
     sales_report: "Raporo y'Icuruzwa",
     stock_report: "Raporo y'Ububiko",
     worker_performance: "Imikorere y'Abakozi",
-    audit_log: "Ibyakozwe mu miterere",
+    audit_log: "Ibyabaye muri sisitemu",
     notifications: "Imenyesha",
     settings: "Igenamiterere",
     raw_materials: "Ibikoresho by'ibanze",
-    properties: "Amazu",
+    properties: "Inyubako",
     tenants: "Abapangayi",
     rent_payments: "Ubukode",
     
     // Businesses
-    industry: "Inganda (Gukora imyenda)",
-    shop: "Iduka ry'Imyenda",
-    real_estate_biz: "Imitungo Itimukanwa",
+    industry: "KNOTTY INDUSTRY",
+    shop: "KNOTTY FASHION",
+    real_estate_biz: "KNOTTY ESTATES",
     switch_business: "Hindura Ubucuruzi",
     
     // Auth
-    welcome_back: "Muraho, twongeye kuguha ikaze",
-    sign_in_account: "Injira muri konti yawe",
+    welcome_back: "Muraho, ikaze nanone",
+    sign_in_account: "Injira muri sisitemu",
     email: "Imeri yawe",
     password: "Ijambo ry'ibanga",
-    remember_me: "Njyara mu banyibutsa",
+    remember_me: "Nyibuka",
     sign_in: "Injira",
     signing_in: "Turacyinjira...",
     login_failed: "Kwinjira ntibyakunze. Reba imeri cyangwa ijambo ry'ibanga.",
@@ -221,7 +234,7 @@ const TRANSLATIONS = {
     low_stock_alerts: "Ibirimo gushira mu bubiko",
     items_sold: "byagurishijwe",
 
-    // Stock
+    // Stock & Production
     add_item: "Ongeraho igicuruzwa",
     item_name: "Izina ry'igicuruzwa",
     barcode: "Kodegihamya",
@@ -235,8 +248,12 @@ const TRANSLATIONS = {
     low_stock: "Birimo gushira",
     out_of_stock: "Byashize",
     transfer_stock: "Kwimura ibintu",
+    planned: "Byateganyijwe",
+    in_progress: "Biracyakorwa",
+    completed: "Byarangiye",
+    cancelled: "Byahagaritswe",
 
-    // Sales
+    // Sales & Rent
     new_sale: "Icuruzwa rishya",
     invoice_no: "Inyemezabwishyu No",
     customer: "Umuguzi",
@@ -250,10 +267,19 @@ const TRANSLATIONS = {
     momo: "Momo",
     bank: "Banki",
 
+    // Real Estate
+    occupied: "Irimo abantu",
+    vacant: "Itegereje abantu",
+    partial: "Irimo bamwe",
+    address: "Aho iherereye",
+    rent_status: "Imishyurire",
+    paid: "Yishyuwe",
+    pending: "Itegerejwe",
+
     // Finance
     revenue: "Amafaranga yinjiye",
     cogs: "Ayakoreshejwe mu kuranguza",
-    gross_profit: "Inyungu mbere y'imikoreshereze",
+    gross_profit: "Inyungu mbumbe",
     net_profit: "Inyungu nyayo",
     operating_expenses: "Imikoreshereze y'ubucuruzi",
     monthly_summary: "Incamake y'ukwezi",
@@ -261,7 +287,7 @@ const TRANSLATIONS = {
     // Settings
     business_info: "Ibisobanuro by'ubucuruzi",
     shop_name: "Izina ry'iduka",
-    address: "Aho riherereye",
+    address_label: "Aho riherereye",
     city: "Umujyi",
     currency: "Ifaranga rikoreshwa",
     language: "Ururimi",

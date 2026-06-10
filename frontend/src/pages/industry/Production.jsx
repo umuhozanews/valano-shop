@@ -24,13 +24,20 @@ export default function Production() {
   const [editItem, setEditItem] = useState(null);
   const [form, setForm] = useState({ name: "", item: "", quantity: "", status: "planned", progress: 0 });
 
+  const STATUS_LABELS = {
+    planned: t("planned"),
+    in_progress: t("in_progress"),
+    completed: t("completed"),
+    cancelled: t("cancelled")
+  };
+
   const filtered = production.filter(p => 
     p.name.toLowerCase().includes(search.toLowerCase()) || 
     p.item.toLowerCase().includes(search.toLowerCase())
   );
 
   function handleSave() {
-    if (!form.name || !form.item) return toast.error("Please fill required fields");
+    if (!form.name || !form.item) return toast.error(t("error"));
     
     if (editItem) {
       setProduction(prev => prev.map(p => p.id === editItem.id ? { ...form, id: p.id } : p));
@@ -57,7 +64,7 @@ export default function Production() {
   }
 
   const columns = [
-    { key: "name", label: t("production"), render: (v, r) => (
+    { key: "name", label: t("production_nav"), render: (v, r) => (
       <div>
         <p className="font-medium text-text-primary">{v}</p>
         <p className="text-[11px] text-text-secondary">{r.item}</p>
@@ -75,7 +82,7 @@ export default function Production() {
       </div>
     )},
     { key: "status", label: t("status"), render: v => (
-      <Badge status={v === 'completed' ? 'success' : v === 'in_progress' ? 'warning' : 'neutral'} label={v.replace('_',' ')} />
+      <Badge status={v === 'completed' ? 'success' : v === 'in_progress' ? 'warning' : 'neutral'} label={STATUS_LABELS[v] || v} />
     )},
     { key: "id", label: "", render: (v, r) => (
       <div className="flex gap-1">
@@ -86,8 +93,8 @@ export default function Production() {
   ];
 
   return (
-    <PageWrapper title={t("production")} subtitle="Track manufacturing and production lines"
-      breadcrumbs={[{ label: t("production"), path: "/app/production" }, { label: t("production"), path: "/app/production" }]}>
+    <PageWrapper title={t("production_nav")} subtitle={t("production_nav")}
+      breadcrumbs={[{ label: t("production_nav"), path: "/app/production" }]}>
       
       <div className="flex justify-between items-center mb-4">
         <div className="relative w-64">
@@ -117,10 +124,10 @@ export default function Production() {
           <div>
             <label className="block text-[13px] font-medium text-text-primary mb-1">{t("status")}</label>
             <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="w-full h-9 px-3 border border-border rounded-card text-[13px] bg-surface">
-              <option value="planned">Planned</option>
-              <option value="in_progress">In Progress</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
+              <option value="planned">{t("planned")}</option>
+              <option value="in_progress">{t("in_progress")}</option>
+              <option value="completed">{t("completed")}</option>
+              <option value="cancelled">{t("cancelled")}</option>
             </select>
           </div>
         </div>

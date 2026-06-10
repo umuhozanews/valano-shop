@@ -25,13 +25,19 @@ export default function Properties() {
   const [editItem, setEditItem] = useState(null);
   const [form, setForm] = useState({ name: "", address: "", units: "", type: "Apartment", status: "vacant" });
 
+  const STATUS_LABELS = {
+    occupied: t("occupied"),
+    vacant: t("vacant"),
+    partial: t("partial")
+  };
+
   const filtered = properties.filter(p => 
     p.name.toLowerCase().includes(search.toLowerCase()) || 
     p.address.toLowerCase().includes(search.toLowerCase())
   );
 
   function handleSave() {
-    if (!form.name || !form.address) return toast.error("Please fill required fields");
+    if (!form.name || !form.address) return toast.error(t("error"));
     
     if (editItem) {
       setProperties(prev => prev.map(p => p.id === editItem.id ? { ...form, id: p.id } : p));
@@ -69,7 +75,7 @@ export default function Properties() {
         </div>
       </div>
     )},
-    { key: "address", label: t("address"), render: v => (
+    { key: "address", label: t("address_label"), render: v => (
       <div className="flex items-center gap-1 text-text-secondary">
         <MapPin size={12} />
         <span className="text-[12px]">{v}</span>
@@ -77,7 +83,7 @@ export default function Properties() {
     )},
     { key: "units", label: "Units", render: v => <span className="font-medium">{v}</span> },
     { key: "status", label: t("status"), render: v => (
-      <Badge status={v === 'occupied' ? 'success' : v === 'vacant' ? 'danger' : 'warning'} label={v} />
+      <Badge status={v === 'occupied' ? 'success' : v === 'vacant' ? 'danger' : 'warning'} label={STATUS_LABELS[v] || v} />
     )},
     { key: "id", label: "", render: (v, r) => (
       <div className="flex gap-1">
@@ -111,7 +117,7 @@ export default function Properties() {
         footer={<><Button variant="secondary" onClick={() => setShowModal(false)}>{t("cancel")}</Button><Button onClick={handleSave}>{t("save")}</Button></>}>
         <div className="space-y-3">
           <Input label={t("name")} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
-          <Input label={t("address")} value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} required />
+          <Input label={t("address_label")} value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} required />
           <div className="grid grid-cols-2 gap-3">
             <Input label="Units" type="number" value={form.units} onChange={e => setForm({ ...form, units: e.target.value })} />
             <div>
@@ -127,9 +133,9 @@ export default function Properties() {
           <div>
             <label className="block text-[13px] font-medium text-text-primary mb-1">{t("status")}</label>
             <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="w-full h-9 px-3 border border-border rounded-card text-[13px] bg-surface">
-              <option value="occupied">Occupied</option>
-              <option value="partial">Partial</option>
-              <option value="vacant">Vacant</option>
+              <option value="occupied">{t("occupied")}</option>
+              <option value="partial">{t("partial")}</option>
+              <option value="vacant">{t("vacant")}</option>
             </select>
           </div>
         </div>

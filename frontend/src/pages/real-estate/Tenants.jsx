@@ -30,7 +30,7 @@ export default function Tenants() {
   );
 
   function handleSave() {
-    if (!form.name || !form.property) return toast.error("Please fill required fields");
+    if (!form.name || !form.property) return toast.error(t("error"));
     
     if (editItem) {
       setTenants(prev => prev.map(item => item.id === editItem.id ? { ...form, id: item.id } : item));
@@ -69,8 +69,8 @@ export default function Tenants() {
         <p className="text-[11px] text-text-secondary">{r.unit}</p>
       </div>
     )},
-    { key: "paid", label: "Rent Status", render: v => (
-      <Badge status={v ? 'success' : 'danger'} label={v ? 'Paid' : 'Pending'} />
+    { key: "paid", label: t("rent_status"), render: v => (
+      <Badge status={v ? 'success' : 'danger'} label={v ? t("paid") : t("pending")} />
     )},
     { key: "status", label: t("status"), render: v => <Badge status="neutral" label={v} /> },
     { key: "id", label: "", render: (v, r) => (
@@ -106,19 +106,19 @@ export default function Tenants() {
         <div className="space-y-3">
           <Input label={t("name")} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Phone" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+            <Input label={t("phone")} value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
             <Input label="Email" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Property" value={form.property} onChange={e => setForm({ ...form, property: e.target.value })} required />
+            <Input label={t("properties")} value={form.property} onChange={e => setForm({ ...form, property: e.target.value })} required />
             <Input label="Unit Number" value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[13px] font-medium text-text-primary mb-1">Rent Status</label>
+              <label className="block text-[13px] font-medium text-text-primary mb-1">{t("rent_status")}</label>
               <select value={form.paid} onChange={e => setForm({ ...form, paid: e.target.value === "true" })} className="w-full h-9 px-3 border border-border rounded-card text-[13px] bg-surface">
-                <option value="true">Paid</option>
-                <option value="false">Pending</option>
+                <option value="true">{t("paid")}</option>
+                <option value="false">{t("pending")}</option>
               </select>
             </div>
             <div>
