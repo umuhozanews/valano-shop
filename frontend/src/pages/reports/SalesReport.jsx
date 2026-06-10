@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Download, FileText, Search } from "lucide-react";
 import PageWrapper from "../../components/layout/PageWrapper";
 import Card from "../../components/ui/Card";
@@ -9,12 +9,17 @@ import api from "../../utils/api";
 import { formatRWF, formatDate } from "../../utils/formatters";
 import toast from "react-hot-toast";
 import { useLanguage } from "../../context/LanguageContext";
+import { useBusiness } from "../../context/BusinessContext";
 
 export default function SalesReport() {
   const { t } = useLanguage();
+  const { activeBusiness } = useBusiness();
   const [data, setData] = useState({ sales:[], totals:{} });
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({ start_date:"", end_date:"" });
+
+  const isRealEstate = activeBusiness.type === "real_estate";
+  const isIndustry = activeBusiness.type === "industry";
 
   useEffect(() => {
     setLoading(true);
@@ -25,16 +30,16 @@ export default function SalesReport() {
   }, [filters, t]);
 
   const columns = [
-    { key:"invoice_number", label: t("invoice_no") },
-    { key:"customer_name", label: t("customer"), render:v => v || "Walk-in" },
-    { key:"name", label: t("workers") },
+    { key:"invoice_number", label: isRealEstate ? "Receipt No" : isIndustry ? "Order No" : t("invoice_no") },
+    { key:"customer_name", label: isRealEstate ? t("tenants") : isIndustry ? "Client Company" : t("customer"), render:v => v || "Walk-in" },
+    { key:"worker_name", label: t("workers") },
     { key:"total_amount", label: t("total"), render:v => formatRWF(v) },
     { key:"payment_method", label: t("payment_method"), render:v => v?.toUpperCase() },
     { key:"created_at", label: t("date"), render:v => formatDate(v, "dd MMM yyyy") },
   ];
 
   return (
-    <PageWrapper title={t("sales_report")} subtitle={t("reports")}
+    <PageWrapper title={isRealEstate ? "Rent Report" : isIndustry ? "Order Report" : t("sales_report")} subtitle={t("reports")}
       breadcrumbs={[{label: t("reports"), path:"/app/reports/sales"}, {label: t("sales_report"), path:"/app/reports/sales"}]}>
 
       <div className="flex flex-wrap gap-3 mb-4">
@@ -43,11 +48,11 @@ export default function SalesReport() {
       </div>
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
-        <StatCard title={t("total_sales")} value={data.totals?.count||0} />
+        <StatCard title={isRealEstate ? "Rent Collected" : t("total_sales")} value={data.totals?.count||0} />
         <StatCard title={t("total_revenue")} value={formatRWF(data.totals?.revenue||0)} />
       </div>
 
-      <Card title={t("sales")}>
+      <Card title={isRealEstate ? "Rent History" : isIndustry ? "Orders" : t("sales")}>
         <Table columns={columns} data={data.sales} loading={loading} />
       </Card>
     </PageWrapper>
