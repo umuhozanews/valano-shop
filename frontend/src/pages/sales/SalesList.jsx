@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Search, Download } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import PageWrapper from "../../components/layout/PageWrapper";
 import Table from "../../components/ui/Table";
@@ -10,10 +10,10 @@ import StatCard from "../../components/ui/StatCard";
 import api from "../../utils/api";
 import { formatRWF, formatDate } from "../../utils/formatters";
 import toast from "react-hot-toast";
-
-const PAYMENT_LABELS = { cash:"Cash", mtn_momo:"MTN MoMo", airtel:"Airtel" };
+import { useLanguage } from "../../context/LanguageContext";
 
 export default function SalesList() {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [sales, setSales] = useState([]);
   const [total, setTotal] = useState(0);
@@ -22,44 +22,50 @@ export default function SalesList() {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({ search:"", start_date:"", end_date:"", payment_method:"" });
 
+  const PAYMENT_LABELS = { 
+    cash: t("cash"), 
+    mtn_momo: t("momo"), 
+    airtel: "Airtel",
+    bank_transfer: t("bank") 
+  };
+
   const fetchSales = useCallback(async () => {
     setLoading(true);
     try {
       const params = { page, limit:20, ...Object.fromEntries(Object.entries(filters).filter(([,v])=>v)) };
       const { data } = await api.get("/sales", { params });
       setSales(data.data); setTotal(data.total); setStats(data.stats || {});
-    } catch { toast.error("Failed to load sales"); }
+    } catch { toast.error(t("error")); }
     finally { setLoading(false); }
-  }, [page, filters]);
+  }, [page, filters, t]);
 
   useEffect(() => { fetchSales(); }, [fetchSales]);
 
   const columns = [
-    { key:"invoice_number", label:"Invoice", render:v => <span className="font-mono text-[12px] font-medium text-primary">{v||"—"}</span> },
-    { key:"customer_name", label:"Customer", render:v => v || "Walk-in" },
-    { key:"worker_name", label:"Worker / Branch", render:(v,r) => (
-      <div><p className="font-medium">{v}</p><p className="text-[11px] text-text-secondary">{r.branch_name}</p></div>
+    { key:"invoice_number", label: t("invoice_no"), render:v => <span className="font-mono text-[12px] font-medium text-primary">{v||"—"}</span> },
+    { key:"customer_name", label: t("customer"), render:v => v || "Walk-in" },
+    { key:"worker_name", label: t("workers"), render:(v) => (
+      <div><p className="font-medium">{v}</p></div>
     )},
-    { key:"items_count", label:"Items", render:v => <span className="font-medium">{v}</span> },
-    { key:"payment_method", label:"Payment", render:v => <Badge status="neutral" label={PAYMENT_LABELS[v]||v} /> },
-    { key:"total_amount", label:"Total", render:v => <span className="font-semibold text-primary">{formatRWF(v)}</span> },
-    { key:"created_at", label:"Date", render:v => formatDate(v, "dd MMM yy HH:mm") },
-    { key:"is_voided", label:"Status", render:v => <Badge status={v?"danger":"success"} label={v?"Voided":"Completed"} /> },
+    { key:"items_count", label: t("all"), render:v => <span className="font-medium">{v}</span> },
+    { key:"payment_method", label: t("payment_method"), render:v => <Badge status="neutral" label={PAYMENT_LABELS[v]||v} /> },
+    { key:"total_amount", label: t("total"), render:v => <span className="font-semibold text-primary">{formatRWF(v)}</span> },
+    { key:"created_at", label: t("date"), render:v => formatDate(v, "dd MMM yy HH:mm") },
+    { key:"is_voided", label: t("status"), render:v => <Badge status={v?"danger":"success"} label={v? t("delete") : t("success")} /> },
     { key:"id", label:"", render:v => (
-      <Button variant="ghost" size="sm" onClick={() => navigate(`/app/sales/${v}`)}>View</Button>
+      <Button variant="ghost" size="sm" onClick={() => navigate(`/app/sales/${v}`)}>{t("view")}</Button>
     )},
   ];
 
   return (
-    <PageWrapper title="Sales" subtitle="All recorded transactions"
-      breadcrumbs={[{label:"Sales",path:"/app/sales"}]}>
+    <PageWrapper title={t("sales")} subtitle={t("all")}
+      breadcrumbs={[{label: t("sales"), path: "/app/sales"}]}>
 
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
-        <StatCard title="Total Sales" value={parseInt(stats.count)||0} />
-        <StatCard title="Total Revenue" value={formatRWF(stats.revenue||0)} />
-        <StatCard title="Avg Sale Value" value={formatRWF(Math.round(stats.avg_sale||0))} />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+        <StatCard title={t("total_sales")} value={parseInt(stats.count)||0} />
+        <StatCard title={t("total_revenue")} value={formatRWF(stats.revenue||0)} />
         <Button variant="primary" size="lg" icon={Plus} onClick={() => navigate("/app/sales/new")} className="!h-auto flex-col gap-1 py-4">
-          <span className="text-[15px]">New Sale</span>
+          <span className="text-[15px]">{t("new_sale")}</span>
         </Button>
       </div>
 
@@ -67,7 +73,7 @@ export default function SalesList() {
         <div className="flex flex-wrap gap-3 mb-4">
           <div className="relative flex-1 min-w-[180px]">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
-            <input value={filters.search} onChange={e=>setFilters(f=>({...f,search:e.target.value}))} placeholder="Search invoice or customer…"
+            <input value={filters.search} onChange={e=>setFilters(f=>({...f,search:e.target.value}))} placeholder={`${t("search")}…`}
               className="w-full h-9 pl-9 pr-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary" />
           </div>
           <input type="date" value={filters.start_date} onChange={e=>setFilters(f=>({...f,start_date:e.target.value}))}
@@ -76,21 +82,21 @@ export default function SalesList() {
             className="h-9 px-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface" />
           <select value={filters.payment_method} onChange={e=>setFilters(f=>({...f,payment_method:e.target.value}))}
             className="h-9 px-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface">
-            <option value="">All Payments</option>
-            <option value="cash">Cash</option>
-            <option value="mtn_momo">MTN MoMo</option>
+            <option value="">{t("payment_method")} ({t("all")})</option>
+            <option value="cash">{t("cash")}</option>
+            <option value="mtn_momo">{t("momo")}</option>
             <option value="airtel">Airtel</option>
           </select>
         </div>
 
-        <Table columns={columns} data={sales} loading={loading} emptyMessage="No sales found" />
+        <Table columns={columns} data={sales} loading={loading} emptyMessage={t("loading")} />
 
         {total > 20 && (
           <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
-            <p className="text-[13px] text-text-secondary">Showing {(page-1)*20+1}–{Math.min(page*20,total)} of {total}</p>
+            <p className="text-[13px] text-text-secondary">{t("loading")} {(page-1)*20+1}–{Math.min(page*20,total)} of {total}</p>
             <div className="flex gap-2">
-              <Button variant="secondary" size="sm" disabled={page===1} onClick={() => setPage(p=>p-1)}>Previous</Button>
-              <Button variant="secondary" size="sm" disabled={page*20>=total} onClick={() => setPage(p=>p+1)}>Next</Button>
+              <Button variant="secondary" size="sm" disabled={page===1} onClick={() => setPage(p=>p-1)}>{t("all")}</Button>
+              <Button variant="secondary" size="sm" disabled={page*20>=total} onClick={() => setPage(p=>p+1)}>{t("all")}</Button>
             </div>
           </div>
         )}

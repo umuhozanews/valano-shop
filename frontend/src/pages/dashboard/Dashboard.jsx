@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { Package, ShoppingCart, TrendingUp, Users, AlertTriangle, Activity } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, Legend } from "recharts";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import PageWrapper from "../../components/layout/PageWrapper";
 import StatCard from "../../components/ui/StatCard";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import api from "../../utils/api";
 import { formatRWF, formatRelative } from "../../utils/formatters";
+import { useLanguage } from "../../context/LanguageContext";
 
 const ACTION_COLORS = { SALE_CREATED:"text-success", STOCK_CREATED:"text-primary", LOGIN:"text-neutral", SALE_VOIDED:"text-warning", WORKER_CREATED:"text-primary" };
 const PIE_COLORS = ["#10B981","#F59E0B","#EF4444"];
@@ -16,6 +17,7 @@ function SkeletonCard() {
 }
 
 export default function Dashboard() {
+  const { t } = useLanguage();
   const [stats, setStats] = useState(null);
   const [trend, setTrend] = useState([]);
   const [health, setHealth] = useState(null);
@@ -23,7 +25,6 @@ export default function Dashboard() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [lowStock, setLowStock] = useState([]);
   const [activity, setActivity] = useState([]);
-  const [branchComp, setBranchComp] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -35,52 +36,55 @@ export default function Dashboard() {
       api.get("/dashboard/worker-leaderboard"),
       api.get("/dashboard/low-stock-alerts"),
       api.get("/dashboard/activity-feed"),
-      api.get("/dashboard/branch-comparison"),
-    ]).then(([s, tr, h, ti, lb, ls, act, bc]) => {
+    ]).then(([s, tr, h, ti, lb, ls, act]) => {
       setStats(s.data); setTrend(tr.data); setHealth(h.data);
       setTopItems(ti.data); setLeaderboard(lb.data); setLowStock(ls.data);
-      setActivity(act.data); setBranchComp(bc.data);
+      setActivity(act.data);
     }).catch(console.error).finally(() => setLoading(false));
   }, []);
 
   const healthData = health ? [
-    { name: "In Stock", value: parseInt(health.in_stock) },
-    { name: "Low Stock", value: parseInt(health.low_stock) },
-    { name: "Out of Stock", value: parseInt(health.out_of_stock) },
+    { name: t("in_stock"), value: parseInt(health.in_stock) },
+    { name: t("low_stock"), value: parseInt(health.low_stock) },
+    { name: t("out_of_stock"), value: parseInt(health.out_of_stock) },
   ] : [];
 
   const rankBadge = (i) => ["🥇","🥈","🥉"][i] || i+1;
 
+  // Aggregate trend data for a single line since "branches" are removed
+  const aggregatedTrend = trend.map(d => ({
+    date: d.date,
+    revenue: (d.branch1 || 0) + (d.branch2 || 0)
+  }));
+
   return (
-    <PageWrapper title="Dashboard" subtitle="Real-time business overview"
-      breadcrumbs={[{ label: "Dashboard", path: "/app/dashboard" }]}>
+    <PageWrapper title={t("dashboard")} subtitle={t("welcome_back")}
+      breadcrumbs={[{ label: t("dashboard"), path: "/app/dashboard" }]}>
 
       {/* ROW 1 — Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
         {loading ? Array(4).fill(0).map((_,i) => <SkeletonCard key={i} />) : <>
-          <StatCard title="Total Stock Value" value={formatRWF(stats?.totalStockValue)} icon={Package} color="primary" />
-          <StatCard title="Today's Revenue" value={formatRWF(stats?.todayRevenue)} icon={ShoppingCart} color="success" />
-          <StatCard title="Monthly Profit" value={formatRWF(stats?.monthlyProfit)} icon={TrendingUp} color="primary-dark" />
-          <StatCard title="Active Workers" value={stats?.activeWorkers || 0} icon={Users} color="neutral" />
+          <StatCard title={t("stock_value")} value={formatRWF(stats?.totalStockValue)} icon={Package} color="primary" />
+          <StatCard title={t("total_revenue")} value={formatRWF(stats?.todayRevenue)} icon={ShoppingCart} color="success" />
+          <StatCard title={t("net_profit")} value={formatRWF(stats?.monthlyProfit)} icon={TrendingUp} color="primary-dark" />
+          <StatCard title={t("active_workers")} value={stats?.activeWorkers || 0} icon={Users} color="neutral" />
         </>}
       </div>
 
       {/* ROW 2 — Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6">
-        <Card title="30-Day Sales Trend" className="lg:col-span-3">
+        <Card title={t("sales_trend")} className="lg:col-span-3">
           <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={trend}>
+            <LineChart data={aggregatedTrend}>
               <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={v => v?.slice(5)} />
               <YAxis tick={{ fontSize: 11 }} tickFormatter={v => (v/1000).toFixed(0)+"k"} />
-              <Tooltip formatter={(v, n) => [formatRWF(v), n === "branch1" ? "Nyabugogo" : "Kimironko"]} />
-              <Legend />
-              <Line type="monotone" dataKey="branch1" stroke="#10B981" strokeWidth={2} dot={false} name="Nyabugogo" />
-              <Line type="monotone" dataKey="branch2" stroke="#3B82F6" strokeWidth={2} dot={false} name="Kimironko" />
+              <Tooltip formatter={(v) => [formatRWF(v), t("revenue")]} />
+              <Line type="monotone" dataKey="revenue" stroke="#10B981" strokeWidth={2} dot={false} name={t("revenue")} />
             </LineChart>
           </ResponsiveContainer>
         </Card>
 
-        <Card title="Stock Health" subtitle={`${parseInt(health?.in_stock||0)+parseInt(health?.low_stock||0)+parseInt(health?.out_of_stock||0)} total items`} className="lg:col-span-2">
+        <Card title={t("stock_health")} subtitle={`${parseInt(health?.in_stock||0)+parseInt(health?.low_stock||0)+parseInt(health?.out_of_stock||0)} ${t("all")}`} className="lg:col-span-2">
           <ResponsiveContainer width="100%" height={180}>
             <PieChart>
               <Pie data={healthData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} dataKey="value">
@@ -90,7 +94,7 @@ export default function Dashboard() {
             </PieChart>
           </ResponsiveContainer>
           <div className="flex justify-center gap-4 mt-2">
-            {["In Stock","Low Stock","Out of Stock"].map((label, i) => (
+            {[t("in_stock"), t("low_stock"), t("out_of_stock")].map((label, i) => (
               <div key={label} className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full" style={{ background: PIE_COLORS[i] }} />
                 <span className="text-[11px] text-text-secondary">{label}: {healthData[i]?.value || 0}</span>
@@ -100,27 +104,17 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* ROW 3 — More charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        <Card title="Revenue by Branch">
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={branchComp}>
-              <XAxis dataKey="branch" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} tickFormatter={v => (v/1000).toFixed(0)+"k"} />
-              <Tooltip formatter={v => formatRWF(v)} />
-              <Bar dataKey="revenue" fill="#10B981" radius={[4,4,0,0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-        <Card title="Top Items This Month">
-          <div className="space-y-2">
-            {topItems.slice(0,6).map((item, i) => (
+      {/* ROW 3 — Top Items */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+        <Card title={t("top_selling_items")} className="lg:col-span-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-8">
+            {topItems.slice(0,8).map((item, i) => (
               <div key={i} className="flex items-center justify-between">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-[11px] font-bold text-text-secondary w-4">{i+1}</span>
                   <div className="min-w-0">
                     <p className="text-[13px] font-medium text-text-primary truncate">{item.name}</p>
-                    <p className="text-[11px] text-text-secondary">{item.total_sold} sold</p>
+                    <p className="text-[11px] text-text-secondary">{item.total_sold} {t("items_sold")}</p>
                   </div>
                 </div>
                 <span className="text-[13px] font-semibold text-primary shrink-0">{formatRWF(item.revenue)}</span>
@@ -128,12 +122,31 @@ export default function Dashboard() {
             ))}
           </div>
         </Card>
+        
+        {/* Low Stock (Moved here to fill row) */}
+        <Card title={t("low_stock_alerts")} action={
+          <Badge status={lowStock.length ? "danger" : "success"} label={`${lowStock.length}`} />
+        }>
+          <div className="space-y-2">
+            {lowStock.map((item) => (
+              <div key={item.id} className="flex items-center justify-between">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-medium text-text-primary truncate">{item.name}</p>
+                </div>
+                <Badge status={item.quantity === 0 ? "danger" : "warning"} label={`${item.quantity}`} />
+              </div>
+            ))}
+            {!lowStock.length && (
+              <p className="text-[13px] text-success text-center py-4">✓ {t("success")}</p>
+            )}
+          </div>
+        </Card>
       </div>
 
-      {/* ROW 4 — 3 panels */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* ROW 4 — Leaderboard & Activity */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Leaderboard */}
-        <Card title="Worker Leaderboard" subtitle="This month's top performers">
+        <Card title={t("worker_performance")} subtitle={t("monthly_summary")}>
           <div className="space-y-3">
             {leaderboard.map((w, i) => (
               <div key={w.id} className="flex items-center gap-3">
@@ -143,7 +156,6 @@ export default function Dashboard() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-medium text-text-primary truncate">{w.name}</p>
-                  <p className="text-[11px] text-text-secondary">{w.branch}</p>
                   <div className="mt-1 w-full h-1 bg-border rounded-full overflow-hidden">
                     <div className="h-full bg-primary rounded-full transition-all"
                          style={{ width: `${w.monthly_target > 0 ? Math.min(100, Math.round(w.revenue / w.monthly_target * 100)) : 0}%` }} />
@@ -152,32 +164,12 @@ export default function Dashboard() {
                 <p className="text-[12px] font-semibold text-primary shrink-0">{formatRWF(w.revenue)}</p>
               </div>
             ))}
-            {!leaderboard.length && <p className="text-[13px] text-text-secondary text-center py-4">No data yet</p>}
-          </div>
-        </Card>
-
-        {/* Low Stock */}
-        <Card title="Low Stock Alerts" action={
-          <Badge status={lowStock.length ? "danger" : "success"} label={`${lowStock.length} items`} />
-        }>
-          <div className="space-y-2">
-            {lowStock.map((item) => (
-              <div key={item.id} className="flex items-center justify-between">
-                <div className="min-w-0">
-                  <p className="text-[13px] font-medium text-text-primary truncate">{item.name}</p>
-                  <p className="text-[11px] text-text-secondary">{item.branch_name}</p>
-                </div>
-                <Badge status={item.quantity === 0 ? "danger" : "warning"} label={`${item.quantity} left`} />
-              </div>
-            ))}
-            {!lowStock.length && (
-              <p className="text-[13px] text-success text-center py-4">✓ All items well stocked</p>
-            )}
+            {!leaderboard.length && <p className="text-[13px] text-text-secondary text-center py-4">...</p>}
           </div>
         </Card>
 
         {/* Activity Feed */}
-        <Card title="Live Activity">
+        <Card title={t("recent_activity")}>
           <div className="space-y-3">
             {activity.map((a) => (
               <div key={a.id} className="flex items-start gap-2.5">

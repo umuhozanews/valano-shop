@@ -1,96 +1,93 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Package } from "lucide-react";
+import { ArrowLeft, Clock, Tag, Box, TrendingUp } from "lucide-react";
 import PageWrapper from "../../components/layout/PageWrapper";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Table from "../../components/ui/Table";
 import api from "../../utils/api";
-import { formatRWF, formatDate, formatRelative } from "../../utils/formatters";
+import { formatRWF, formatDate } from "../../utils/formatters";
 import toast from "react-hot-toast";
-
-const STATUS_MAP = { in_stock:"success", low_stock:"warning", out_of_stock:"danger" };
+import { useLanguage } from "../../context/LanguageContext";
 
 export default function StockDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [item, setItem] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [barcodeUrl, setBarcodeUrl] = useState(null);
 
   useEffect(() => {
     Promise.all([
       api.get(`/stock/${id}`),
       api.get(`/stock/${id}/history`),
-    ]).then(([itemRes, histRes]) => {
-      setItem(itemRes.data);
-      setHistory(histRes.data);
-      setBarcodeUrl(`${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/stock/${id}/barcode`);
-    }).catch(() => toast.error("Failed to load item")).finally(() => setLoading(false));
-  }, [id]);
+    ]).then(([d, h]) => {
+      setItem(d.data); setHistory(h.data);
+    }).catch(() => toast.error(t("error")))
+      .finally(() => setLoading(false));
+  }, [id, t]);
 
-  if (loading) return <div className="flex h-screen items-center justify-center"><div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
-  if (!item) return null;
+  if (loading) return <PageWrapper title="..." subtitle="..." breadcrumbs={[]}><div className="animate-pulse h-64 bg-surface rounded-card" /></PageWrapper>;
+  if (!item) return <PageWrapper title="Not Found" subtitle="..." breadcrumbs={[]}><Card>Item not found</Card></PageWrapper>;
 
-  const histColumns = [
-    { key:"date", label:"Date", render:v => formatDate(v, "dd MMM yyyy HH:mm") },
-    { key:"type", label:"Type", render:v => <Badge status={v==="sale"?"success":v==="transfer"?"warning":"neutral"} label={v} /> },
-    { key:"quantity", label:"Qty Change" },
-    { key:"done_by", label:"Done By" },
-    { key:"from_branch", label:"From → To", render:(v,r) => r.from_branch ? `${v} → ${r.to_branch}` : "—" },
+  const historyColumns = [
+    { key:"action", label: t("actions"), render: v => <span className="capitalize">{v.replace("_"," ")}</span> },
+    { key:"quantity_change", label: t("quantity"), render: v => <span className={v > 0 ? "text-success font-medium" : "text-danger font-medium"}>{v > 0 ? `+${v}` : v}</span> },
+    { key:"user_name", label: t("workers") },
+    { key:"created_at", label: t("date"), render: v => formatDate(v, "dd MMM yyyy HH:mm") },
   ];
 
   return (
-    <PageWrapper title={item.name} subtitle={`${item.category} · ${item.size || ""} · ${item.color || ""}`}
-      breadcrumbs={[{label:"Stock",path:"/app/stock"},{label:item.name,path:`/app/stock/${id}`}]}>
-      <Button variant="ghost" size="sm" icon={ArrowLeft} onClick={() => navigate("/app/stock")} className="mb-4">Back to Stock</Button>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-        {/* Item info */}
-        <Card className="lg:col-span-2">
-          <div className="grid grid-cols-2 gap-x-8 gap-y-3">
-            {[
-              ["Item Name", item.name], ["Category", item.category], ["Size", item.size], ["Color", item.color],
-              ["Branch", item.branch_name], ["Barcode", item.barcode], ["Cost Price", formatRWF(item.cost_price_rwf)],
-              ["Sell Price", formatRWF(item.sell_price_rwf)],
-              ["Margin", item.cost_price_rwf > 0 ? `${(((item.sell_price_rwf - item.cost_price_rwf) / item.cost_price_rwf)*100).toFixed(1)}%` : "—"],
-              ["Low Stock Threshold", item.low_stock_threshold],
-              ["Added", formatDate(item.created_at)],
-            ].map(([label, val]) => (
-              <div key={label}>
-                <p className="text-[11px] text-text-secondary uppercase tracking-wide mb-0.5">{label}</p>
-                <p className="text-[14px] font-medium text-text-primary">{val || "—"}</p>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* Stock level + barcode */}
-        <div className="space-y-4">
-          <Card>
-            <div className="text-center">
-              <p className="text-[11px] text-text-secondary uppercase tracking-wide mb-2">Current Stock</p>
-              <p className={`text-[48px] font-bold ${item.status==="out_of_stock"?"text-danger":item.status==="low_stock"?"text-warning":"text-primary"}`}>
-                {item.quantity}
-              </p>
-              <p className="text-[13px] text-text-secondary mb-3">units remaining</p>
-              <Badge status={STATUS_MAP[item.status]||"neutral"} label={item.status?.replace("_"," ")||"—"} />
-            </div>
-          </Card>
-          {barcodeUrl && (
-            <Card title="Barcode">
-              <img src={barcodeUrl} alt="barcode" className="w-full" onError={() => setBarcodeUrl(null)} />
-              <p className="text-center text-[11px] font-mono text-text-secondary mt-1">{item.barcode}</p>
-            </Card>
-          )}
-        </div>
+    <PageWrapper title={item.name} subtitle={item.category}
+      breadcrumbs={[{label: t("stock"), path:"/app/stock"}, {label: item.name, path:`/app/stock/${id}`}]}>
+      
+      <div className="flex items-center gap-3 mb-6">
+        <Button variant="secondary" size="sm" icon={ArrowLeft} onClick={() => navigate("/app/stock")}>{t("all")}</Button>
+        <Badge status={item.quantity > item.low_stock_threshold ? "success" : "warning"} label={item.status.replace("_"," ")} />
       </div>
 
-      <Card title="Movement History">
-        <Table columns={histColumns} data={history} emptyMessage="No movement history yet" />
-      </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-1 space-y-6">
+          <Card title={t("item_name")}>
+            <div className="space-y-4">
+              {[
+                [t("barcode"), item.barcode],
+                [t("size"), item.size || "—"],
+                [t("color"), item.color || "—"],
+                [t("category"), item.category],
+              ].map(([l, v]) => (
+                <div key={l} className="flex justify-between border-b border-border pb-2 last:border-0">
+                  <span className="text-[13px] text-text-secondary">{l}</span>
+                  <span className="text-[13px] font-medium text-text-primary">{v}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card title={t("selling_price")}>
+            <div className="space-y-4">
+              {[
+                [t("cost_price"), formatRWF(item.cost_price_rwf)],
+                [t("selling_price"), formatRWF(item.sell_price_rwf)],
+                [t("quantity"), item.quantity],
+              ].map(([l, v]) => (
+                <div key={l} className="flex justify-between border-b border-border pb-2 last:border-0">
+                  <span className="text-[13px] text-text-secondary">{l}</span>
+                  <span className="text-[14px] font-bold text-primary">{v}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+
+        <div className="lg:col-span-2">
+          <Card title={t("recent_activity")}>
+            <Table columns={historyColumns} data={history} />
+          </Card>
+        </div>
+      </div>
     </PageWrapper>
   );
 }

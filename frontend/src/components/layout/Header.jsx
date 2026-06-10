@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react";
-import { Menu, Bell, ChevronRight, Home, LogOut, User, ChevronDown } from "lucide-react";
+import { Menu, Bell, ChevronRight, Home, LogOut, ChevronDown } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import Badge from "../ui/Badge";
 import { useAuth } from "../../context/AuthContext";
+import { useLanguage } from "../../context/LanguageContext";
 
 const ROLE_STATUS = {
   admin:   "success",
@@ -15,11 +16,12 @@ const ROLE_STATUS = {
 
 export default function Header({ onMenuClick, title, subtitle, breadcrumbs = [], notificationCount = 0 }) {
   const { user, logout } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const menuRef = useRef(null);
 
-  const crumbs = [{ label: "Home", path: "/app/dashboard" }, ...breadcrumbs];
+  const crumbs = [{ label: t("dashboard"), path: "/app/dashboard" }, ...breadcrumbs];
 
   useEffect(() => {
     function handler(e) {
@@ -118,7 +120,7 @@ export default function Header({ onMenuClick, title, subtitle, breadcrumbs = [],
                   className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-danger hover:bg-danger/5 transition-colors"
                 >
                   <LogOut size={14} />
-                  Sign Out
+                  {t("sign_in")} (Out)
                 </button>
               </div>
             )}
