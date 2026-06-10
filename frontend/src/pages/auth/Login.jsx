@@ -95,7 +95,8 @@ export default function Login() {
           </div>
 
           <h2 className="text-[24px] font-bold text-text-primary mb-1">{t("welcome_back")}</h2>
-          <p className="text-[14px] text-text-secondary mb-8">{t("sign_in_account")}</p>
+          <p className="text-[14px] text-text-secondary mb-2">{t("sign_in_account")}</p>
+          <p className="text-[10px] text-text-secondary/50 mb-8 italic">System active for: rukundojosephtuyishime@gmail.com</p>
 
           {error && (
             <div className="mb-4 px-3 py-2.5 bg-danger/10 border border-danger/20 rounded-card flex items-center gap-2">
