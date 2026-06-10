@@ -59,24 +59,11 @@ export const NAV_ITEMS = (activeBusiness) => {
   
   const common = [
     {
-      section: "FINANCE",
-      items: [
-        { label: "Expenses",     icon: "Receipt",   path: "/app/expenses",    roles: ["admin","manager"] },
-        { label: "Profit & Loss",icon: "TrendingUp",path: "/app/finance/pnl", roles: ["admin"] },
-      ],
-    },
-    {
       section: "MANAGEMENT",
       items: [
         { label: "Workers",   icon: "Users",     path: "/app/workers",   roles: ["admin","manager"] },
-        { label: "Audit Log", icon: "Shield",    path: "/app/reports/audit",   roles: ["admin"] },
-      ],
-    },
-    {
-      section: "OTHERS",
-      items: [
-        { label: "Notifications", icon: "Bell",     path: "/app/notifications", roles: ["admin","manager","worker"] },
-        { label: "Settings",      icon: "Settings", path: "/app/settings",      roles: ["admin"] },
+        { label: "Expenses",  icon: "Receipt",   path: "/app/expenses",    roles: ["admin","manager"] },
+        { label: "Settings",  icon: "Settings",  path: "/app/settings",      roles: ["admin"] },
       ],
     },
   ];
@@ -86,10 +73,18 @@ export const NAV_ITEMS = (activeBusiness) => {
       {
         section: "PRODUCTION",
         items: [
-          { label: "Dashboard",   icon: "LayoutDashboard", path: "/app/dashboard",     roles: ["admin","manager"] },
-          { label: "Production",  icon: "Factory",         path: "/app/production",    roles: ["admin","manager"] },
-          { label: "Raw Materials", icon: "Box",           path: "/app/stock",         roles: ["admin","manager"] },
-          { label: "Procurement", icon: "Truck",           path: "/app/procurement",   roles: ["admin","manager"] },
+          { label: "Dashboard",       icon: "LayoutDashboard", path: "/app/dashboard" },
+          { label: "Production Runs",  icon: "Factory",         path: "/app/production" },
+          { label: "Raw Materials",    icon: "Box",            path: "/app/stock" },
+          { label: "Finished Goods",   icon: "Package",         path: "/app/finished-goods" },
+        ],
+      },
+      {
+        section: "SUPPLY CHAIN",
+        items: [
+          { label: "Wholesale Orders", icon: "ShoppingCart",    path: "/app/sales" },
+          { label: "Suppliers",        icon: "Truck",           path: "/app/suppliers" },
+          { label: "Procurement",      icon: "ClipboardList",   path: "/app/procurement" },
         ],
       },
     ],
@@ -97,10 +92,17 @@ export const NAV_ITEMS = (activeBusiness) => {
       {
         section: "SALES",
         items: [
-          { label: "Dashboard",   icon: "LayoutDashboard", path: "/app/dashboard",     roles: ["admin","manager"] },
-          { label: "Stock",       icon: "Package",         path: "/app/stock",         roles: ["admin","manager"] },
-          { label: "Sales",       icon: "ShoppingCart",    path: "/app/sales",         roles: ["admin","manager","worker"] },
-          { label: "Customers",   icon: "UserCheck",       path: "/app/customers",     roles: ["admin","manager"] },
+          { label: "Dashboard",   icon: "LayoutDashboard", path: "/app/dashboard" },
+          { label: "Stock",       icon: "Package",         path: "/app/stock" },
+          { label: "Retail Sales",icon: "ShoppingCart",    path: "/app/sales" },
+          { label: "Customers",   icon: "UserCheck",       path: "/app/customers" },
+        ],
+      },
+      {
+        section: "FINANCE",
+        items: [
+          { label: "Invoices",     icon: "FileText",  path: "/app/invoices" },
+          { label: "Profit & Loss",icon: "TrendingUp",path: "/app/finance/pnl", roles: ["admin"] },
         ],
       },
     ],
@@ -108,10 +110,17 @@ export const NAV_ITEMS = (activeBusiness) => {
       {
         section: "REAL ESTATE",
         items: [
-          { label: "Dashboard",   icon: "LayoutDashboard", path: "/app/dashboard",     roles: ["admin","manager"] },
-          { label: "Properties",  icon: "Home",            path: "/app/properties",    roles: ["admin","manager"] },
-          { label: "Tenants",     icon: "Users",           path: "/app/tenants",       roles: ["admin","manager"] },
-          { label: "Rent Payments", icon: "Key",           path: "/app/sales",         roles: ["admin","manager"] },
+          { label: "Dashboard",   icon: "LayoutDashboard", path: "/app/dashboard" },
+          { label: "Properties",  icon: "Home",            path: "/app/properties" },
+          { label: "Tenants",     icon: "Users",           path: "/app/tenants" },
+          { label: "Rent Payments", icon: "Key",           path: "/app/sales" },
+        ],
+      },
+      {
+        section: "OPERATIONS",
+        items: [
+          { label: "Maintenance",  icon: "Wrench",          path: "/app/maintenance" },
+          { label: "Profit & Loss",icon: "TrendingUp",      path: "/app/finance/pnl", roles: ["admin"] },
         ],
       },
     ],

@@ -11,12 +11,17 @@ const TRANSLATIONS = {
     reports: "Reports",
     others: "Others",
     production_nav: "Production",
+    production: "Production",
     real_estate: "Real Estate",
+    supply_chain: "Supply Chain",
+    operations: "Operations",
 
     // Nav Items
     dashboard: "Dashboard",
     stock: "Stock",
     sales: "Sales",
+    retail_sales: "Retail Sales",
+    wholesale_orders: "Wholesale Orders",
     procurement: "Procurement",
     workers: "Workers",
     customers: "Customers",
@@ -31,9 +36,12 @@ const TRANSLATIONS = {
     notifications: "Notifications",
     settings: "Settings",
     raw_materials: "Raw Materials",
+    finished_goods: "Finished Goods",
+    production_runs: "Production Runs",
     properties: "Properties",
     tenants: "Tenants",
     rent_payments: "Rent Payments",
+    maintenance: "Maintenance",
     
     // Businesses
     industry: "KNOTTY INDUSTRY",
@@ -127,6 +135,7 @@ const TRANSLATIONS = {
     vacant: "Vacant",
     partial: "Partial",
     address: "Address",
+    address_label: "Address",
     rent_status: "Rent Status",
     paid: "Paid",
     pending: "Pending",
@@ -142,7 +151,6 @@ const TRANSLATIONS = {
     // Settings
     business_info: "Business Information",
     shop_name: "Shop Name",
-    address_label: "Address",
     city: "City",
     currency: "Currency",
     language: "Language",
@@ -156,12 +164,17 @@ const TRANSLATIONS = {
     reports: "Raporo",
     others: "Ibindi",
     production_nav: "Umusaruro",
+    production: "Umusaruro",
     real_estate: "Inyubako",
+    supply_chain: "Ihererekanywa",
+    operations: "Imikorere",
 
     // Nav Items
     dashboard: "Incamake",
     stock: "Ububiko",
     sales: "Icuruzwa",
+    retail_sales: "Icuruzwa rito",
+    wholesale_orders: "Ibyaranguwe",
     procurement: "Ibyaranguwe",
     workers: "Abakozi",
     customers: "Abaguzi",
@@ -176,9 +189,12 @@ const TRANSLATIONS = {
     notifications: "Imenyesha",
     settings: "Igenamiterere",
     raw_materials: "Ibikoresho by'ibanze",
+    finished_goods: "Ibyarangiye gukorwa",
+    production_runs: "Umusaruro uri gukorwa",
     properties: "Inyubako",
     tenants: "Abapangayi",
     rent_payments: "Ubukode",
+    maintenance: "Gukanika",
     
     // Businesses
     industry: "KNOTTY INDUSTRY",
@@ -272,6 +288,7 @@ const TRANSLATIONS = {
     vacant: "Itegereje abantu",
     partial: "Irimo bamwe",
     address: "Aho iherereye",
+    address_label: "Aho riherereye",
     rent_status: "Imishyurire",
     paid: "Yishyuwe",
     pending: "Itegerejwe",
@@ -287,7 +304,6 @@ const TRANSLATIONS = {
     // Settings
     business_info: "Ibisobanuro by'ubucuruzi",
     shop_name: "Izina ry'iduka",
-    address_label: "Aho riherereye",
     city: "Umujyi",
     currency: "Ifaranga rikoreshwa",
     language: "Ururimi",

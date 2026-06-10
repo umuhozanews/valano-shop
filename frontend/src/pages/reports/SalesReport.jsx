@@ -38,9 +38,11 @@ export default function SalesReport() {
     { key:"created_at", label: t("date"), render:v => formatDate(v, "dd MMM yyyy") },
   ];
 
+  const reportTitle = isRealEstate ? t("rent_payments") : isIndustry ? t("wholesale_orders") : t("retail_sales");
+
   return (
-    <PageWrapper title={isRealEstate ? "Rent Report" : isIndustry ? "Order Report" : t("sales_report")} subtitle={t("reports")}
-      breadcrumbs={[{label: t("reports"), path:"/app/reports/sales"}, {label: t("sales_report"), path:"/app/reports/sales"}]}>
+    <PageWrapper title={reportTitle} subtitle={t("reports")}
+      breadcrumbs={[{label: t("reports"), path:"/app/reports/sales"}, {label: reportTitle, path:"/app/reports/sales"}]}>
 
       <div className="flex flex-wrap gap-3 mb-4">
         <input type="date" value={filters.start_date} onChange={e=>setFilters(f=>({...f,start_date:e.target.value}))} className="h-9 px-3 border border-border rounded-card text-[13px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary" />

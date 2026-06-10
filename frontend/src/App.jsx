@@ -41,8 +41,10 @@ const SettingsPage = L(() => import("./pages/settings/SettingsPage"));
 
 // New Business Specific Pages
 const ProductionPage = L(() => import("./pages/industry/Production"));
+const FinishedGoodsPage = L(() => import("./pages/industry/FinishedGoods"));
 const PropertiesPage = L(() => import("./pages/real-estate/Properties"));
 const TenantsPage = L(() => import("./pages/real-estate/Tenants"));
+const MaintenancePage = L(() => import("./pages/real-estate/Maintenance"));
 
 const AM = ["admin","manager"];
 const AO = ["admin"];
@@ -67,10 +69,12 @@ export default function App() {
         
         {/* Industry Specific */}
         <Route path="/app/production" element={<P roles={AM}><ProductionPage /></P>} />
+        <Route path="/app/finished-goods" element={<P roles={AM}><FinishedGoodsPage /></P>} />
         
         {/* Real Estate Specific */}
         <Route path="/app/properties" element={<P roles={AM}><PropertiesPage /></P>} />
         <Route path="/app/tenants" element={<P roles={AM}><TenantsPage /></P>} />
+        <Route path="/app/maintenance" element={<P roles={AM}><MaintenancePage /></P>} />
 
         <Route path="/app/procurement" element={<P roles={AM}><ProcurementList /></P>} />
         <Route path="/app/procurement/:id" element={<P roles={AM}><ProcurementDetail /></P>} />
