@@ -39,6 +39,11 @@ const AuditLog = L(() => import("./pages/reports/AuditLog"));
 const NotificationsPage = L(() => import("./pages/notifications/NotificationsPage"));
 const SettingsPage = L(() => import("./pages/settings/SettingsPage"));
 
+// New Business Specific Pages
+const ProductionPage = L(() => import("./pages/industry/Production"));
+const PropertiesPage = L(() => import("./pages/real-estate/Properties"));
+const TenantsPage = L(() => import("./pages/real-estate/Tenants"));
+
 const AM = ["admin","manager"];
 const AO = ["admin"];
 const ALL = ["admin","manager","worker"];
@@ -59,6 +64,14 @@ export default function App() {
         <Route path="/app/sales" element={<P roles={ALL}><SalesList /></P>} />
         <Route path="/app/sales/new" element={<P roles={ALL}><NewSale /></P>} />
         <Route path="/app/sales/:id" element={<P roles={ALL}><SaleDetail /></P>} />
+        
+        {/* Industry Specific */}
+        <Route path="/app/production" element={<P roles={AM}><ProductionPage /></P>} />
+        
+        {/* Real Estate Specific */}
+        <Route path="/app/properties" element={<P roles={AM}><PropertiesPage /></P>} />
+        <Route path="/app/tenants" element={<P roles={AM}><TenantsPage /></P>} />
+
         <Route path="/app/procurement" element={<P roles={AM}><ProcurementList /></P>} />
         <Route path="/app/procurement/:id" element={<P roles={AM}><ProcurementDetail /></P>} />
         <Route path="/app/workers" element={<P roles={AM}><WorkersList /></P>} />

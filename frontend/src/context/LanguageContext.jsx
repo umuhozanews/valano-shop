@@ -10,6 +10,8 @@ const TRANSLATIONS = {
     finance: "Finance",
     reports: "Reports",
     others: "Others",
+    production: "Production",
+    real_estate: "Real Estate",
 
     // Nav Items
     dashboard: "Dashboard",
@@ -28,6 +30,16 @@ const TRANSLATIONS = {
     audit_log: "Audit Log",
     notifications: "Notifications",
     settings: "Settings",
+    raw_materials: "Raw Materials",
+    properties: "Properties",
+    tenants: "Tenants",
+    rent_payments: "Rent Payments",
+    
+    // Businesses
+    industry: "Industry (Manufacturing)",
+    shop: "Clothing Shop",
+    real_estate_biz: "Real Estate",
+    switch_business: "Switch Business",
     
     // Auth
     welcome_back: "Welcome back",
@@ -130,6 +142,8 @@ const TRANSLATIONS = {
     finance: "Imari",
     reports: "Raporo",
     others: "Ibindi",
+    production: "Umusaruro",
+    real_estate: "Imitungo Itimukanwa",
 
     // Nav Items
     dashboard: "Incamake",
@@ -148,6 +162,16 @@ const TRANSLATIONS = {
     audit_log: "Ibyakozwe mu miterere",
     notifications: "Imenyesha",
     settings: "Igenamiterere",
+    raw_materials: "Ibikoresho by'ibanze",
+    properties: "Amazu",
+    tenants: "Abapangayi",
+    rent_payments: "Ubukode",
+    
+    // Businesses
+    industry: "Inganda (Gukora imyenda)",
+    shop: "Iduka ry'Imyenda",
+    real_estate_biz: "Imitungo Itimukanwa",
+    switch_business: "Hindura Ubucuruzi",
     
     // Auth
     welcome_back: "Muraho, twongeye kuguha ikaze",

@@ -1,12 +1,19 @@
 import { NavLink } from "react-router-dom";
-import { Store, Search, X, Globe } from "lucide-react";
-import * as Icons from "lucide-react";
-import { NAV_ITEMS } from "../../utils/constants";
+import { Store, Search, X, Globe, ChevronDown, Factory, Home, Key, Box, Truck, Users, LayoutDashboard, Package, ShoppingCart, UserCheck, FileText, Receipt, TrendingUp, BarChart2, ClipboardList, Award, Shield, Bell, Settings } from "lucide-react";
+import { NAV_ITEMS, BUSINESSES } from "../../utils/constants";
 import { useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../context/LanguageContext";
+import { useBusiness } from "../../context/BusinessContext";
+import { useState } from "react";
+
+const ICONS = {
+  LayoutDashboard, Package, ShoppingCart, Truck, Users, UserCheck, Globe,
+  FileText, Receipt, TrendingUp, BarChart2, ClipboardList, Award, Shield,
+  Bell, Settings, Factory, Home, Key, Box
+};
 
 function NavItem({ item, onClick, t }) {
-  const Icon = Icons[item.icon] || Icons.Circle;
+  const Icon = ICONS[item.icon] || ICONS.Box;
   const translationKey = item.label.toLowerCase().replace(/ & /g, "_").replace(/ /g, "_");
   
   return (
@@ -35,6 +42,10 @@ function NavItem({ item, onClick, t }) {
 export default function Sidebar({ open, onClose }) {
   const { user } = useAuth();
   const { t, lang, switchLanguage } = useLanguage();
+  const { activeBusiness, switchBusiness } = useBusiness();
+  const [showBizSwitcher, setShowBizSwitcher] = useState(false);
+
+  const items = NAV_ITEMS(activeBusiness);
 
   return (
     <>
@@ -54,40 +65,45 @@ export default function Sidebar({ open, onClose }) {
           lg:translate-x-0 lg:static lg:z-auto
         `}
       >
-        {/* Logo */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-primary rounded-btn flex items-center justify-center shrink-0">
-              <Store size={16} className="text-white" />
-            </div>
-            <span className="text-[15px] font-bold text-text-primary tracking-tight">KNOTTY SYSTEM</span>
-          </div>
-          <button
-            onClick={onClose}
-            className="lg:hidden text-text-secondary hover:text-text-primary p-1"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Search */}
-        <div className="px-4 py-3 border-b border-border shrink-0">
+        {/* Business Switcher */}
+        <div className="p-4 border-b border-border">
           <div className="relative">
-            <Search
-              size={14}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary"
-            />
-            <input
-              type="text"
-              placeholder={`${t("search")}...  ⌘S`}
-              className="w-full h-8 bg-background border border-border rounded-btn pl-8 pr-3 text-[13px] text-text-secondary placeholder:text-text-secondary focus:outline-none focus:ring-1 focus:ring-primary"
-            />
+            <button 
+              onClick={() => setShowBizSwitcher(!showBizSwitcher)}
+              className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-primary/5 border border-primary/10 rounded-card hover:bg-primary/10 transition-colors"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-6 h-6 rounded flex items-center justify-center text-white shrink-0" style={{ backgroundColor: activeBusiness.color }}>
+                  {activeBusiness.type === "industry" ? <Factory size={14} /> : activeBusiness.type === "real_estate" ? <Home size={14} /> : <Store size={14} />}
+                </div>
+                <span className="text-[13px] font-bold text-text-primary truncate">{activeBusiness.name}</span>
+              </div>
+              <ChevronDown size={14} className={`text-text-secondary transition-transform ${showBizSwitcher ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showBizSwitcher && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-border rounded-card shadow-xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-1">
+                <p className="px-3 py-1.5 text-[10px] font-bold text-text-secondary uppercase tracking-wider">{t("switch_business")}</p>
+                {BUSINESSES.map(b => (
+                  <button
+                    key={b.id}
+                    onClick={() => { switchBusiness(b.id); setShowBizSwitcher(false); }}
+                    className={`w-full flex items-center gap-3 px-3 py-2 text-[13px] hover:bg-background transition-colors ${activeBusiness.id === b.id ? 'bg-primary/5 text-primary font-medium' : 'text-text-secondary'}`}
+                  >
+                    <div className="w-5 h-5 rounded flex items-center justify-center text-white shrink-0" style={{ backgroundColor: b.color }}>
+                      {b.type === "industry" ? <Factory size={11} /> : b.type === "real_estate" ? <Home size={11} /> : <Store size={11} />}
+                    </div>
+                    {b.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
-          {NAV_ITEMS.map((section) => {
+          {items.map((section) => {
             const visibleItems = section.items.filter(item =>
               !item.roles || !user || item.roles.includes(user.role)
             );
@@ -111,12 +127,12 @@ export default function Sidebar({ open, onClose }) {
         </nav>
 
         {/* Language Toggle at Bottom */}
-        <div className="p-4 border-t border-border">
+        <div className="p-4 border-t border-border flex gap-2">
           <button 
             onClick={() => switchLanguage(lang === "en" ? "rw" : "en")}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-background border border-border rounded-card text-[13px] font-medium text-text-primary hover:bg-surface transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-background border border-border rounded-card text-[12px] font-medium text-text-primary hover:bg-surface transition-colors"
           >
-            <Globe size={14} />
+            <Globe size={13} />
             {lang === "en" ? "Kinyarwanda" : "English"}
           </button>
         </div>

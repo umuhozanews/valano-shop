@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Package, ShoppingCart, TrendingUp, Users, AlertTriangle, Activity } from "lucide-react";
+import { Package, ShoppingCart, TrendingUp, Users, Activity, Factory, Home, Key, Box } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import PageWrapper from "../../components/layout/PageWrapper";
 import StatCard from "../../components/ui/StatCard";
@@ -8,6 +8,7 @@ import Badge from "../../components/ui/Badge";
 import api from "../../utils/api";
 import { formatRWF, formatRelative } from "../../utils/formatters";
 import { useLanguage } from "../../context/LanguageContext";
+import { useBusiness } from "../../context/BusinessContext";
 
 const ACTION_COLORS = { SALE_CREATED:"text-success", STOCK_CREATED:"text-primary", LOGIN:"text-neutral", SALE_VOIDED:"text-warning", WORKER_CREATED:"text-primary" };
 const PIE_COLORS = ["#10B981","#F59E0B","#EF4444"];
@@ -18,6 +19,7 @@ function SkeletonCard() {
 
 export default function Dashboard() {
   const { t } = useLanguage();
+  const { activeBusiness } = useBusiness();
   const [stats, setStats] = useState(null);
   const [trend, setTrend] = useState([]);
   const [health, setHealth] = useState(null);
@@ -51,21 +53,27 @@ export default function Dashboard() {
 
   const rankBadge = (i) => ["🥇","🥈","🥉"][i] || i+1;
 
-  // Aggregate trend data for a single line since "branches" are removed
   const aggregatedTrend = trend.map(d => ({
     date: d.date,
     revenue: (d.branch1 || 0) + (d.branch2 || 0)
   }));
 
+  // Dynamic titles/icons based on business type
+  const bizInfo = {
+    industry: { icon: Factory, label: t("production") },
+    shop: { icon: ShoppingCart, label: t("sales") },
+    real_estate: { icon: Home, label: t("rent_payments") },
+  }[activeBusiness.type] || { icon: ShoppingCart, label: t("sales") };
+
   return (
-    <PageWrapper title={t("dashboard")} subtitle={t("welcome_back")}
+    <PageWrapper title={activeBusiness.name} subtitle={t("welcome_back")}
       breadcrumbs={[{ label: t("dashboard"), path: "/app/dashboard" }]}>
 
       {/* ROW 1 — Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
         {loading ? Array(4).fill(0).map((_,i) => <SkeletonCard key={i} />) : <>
-          <StatCard title={t("stock_value")} value={formatRWF(stats?.totalStockValue)} icon={Package} color="primary" />
-          <StatCard title={t("total_revenue")} value={formatRWF(stats?.todayRevenue)} icon={ShoppingCart} color="success" />
+          <StatCard title={activeBusiness.type === 'real_estate' ? t("properties") : t("stock_value")} value={activeBusiness.type === 'real_estate' ? '12' : formatRWF(stats?.totalStockValue)} icon={activeBusiness.type === 'real_estate' ? Home : Box} color="primary" />
+          <StatCard title={activeBusiness.type === 'real_estate' ? t("rent_payments") : t("total_revenue")} value={formatRWF(stats?.todayRevenue)} icon={bizInfo.icon} color="success" />
           <StatCard title={t("net_profit")} value={formatRWF(stats?.monthlyProfit)} icon={TrendingUp} color="primary-dark" />
           <StatCard title={t("active_workers")} value={stats?.activeWorkers || 0} icon={Users} color="neutral" />
         </>}
@@ -73,30 +81,30 @@ export default function Dashboard() {
 
       {/* ROW 2 — Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6">
-        <Card title={t("sales_trend")} className="lg:col-span-3">
+        <Card title={`${activeBusiness.name} — ${t("sales_trend")}`} className="lg:col-span-3">
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={aggregatedTrend}>
               <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={v => v?.slice(5)} />
               <YAxis tick={{ fontSize: 11 }} tickFormatter={v => (v/1000).toFixed(0)+"k"} />
               <Tooltip formatter={(v) => [formatRWF(v), t("revenue")]} />
-              <Line type="monotone" dataKey="revenue" stroke="#10B981" strokeWidth={2} dot={false} name={t("revenue")} />
+              <Line type="monotone" dataKey="revenue" stroke={activeBusiness.color} strokeWidth={2} dot={false} name={t("revenue")} />
             </LineChart>
           </ResponsiveContainer>
         </Card>
 
-        <Card title={t("stock_health")} subtitle={`${parseInt(health?.in_stock||0)+parseInt(health?.low_stock||0)+parseInt(health?.out_of_stock||0)} ${t("all")}`} className="lg:col-span-2">
+        <Card title={activeBusiness.type === 'real_estate' ? "Occupancy Rate" : t("stock_health")} subtitle={activeBusiness.type === 'real_estate' ? "12 total units" : `${parseInt(health?.in_stock||0)+parseInt(health?.low_stock||0)+parseInt(health?.out_of_stock||0)} ${t("all")}`} className="lg:col-span-2">
           <ResponsiveContainer width="100%" height={180}>
             <PieChart>
               <Pie data={healthData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} dataKey="value">
-                {healthData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i]} />)}
+                {healthData.map((_, i) => <Cell key={i} fill={i === 0 ? activeBusiness.color : PIE_COLORS[i]} />)}
               </Pie>
               <Tooltip />
             </PieChart>
           </ResponsiveContainer>
           <div className="flex justify-center gap-4 mt-2">
-            {[t("in_stock"), t("low_stock"), t("out_of_stock")].map((label, i) => (
+            {[activeBusiness.type === 'real_estate' ? "Occupied" : t("in_stock"), activeBusiness.type === 'real_estate' ? "Vacant" : t("low_stock"), t("out_of_stock")].map((label, i) => (
               <div key={label} className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full" style={{ background: PIE_COLORS[i] }} />
+                <span className="w-2 h-2 rounded-full" style={{ background: i === 0 ? activeBusiness.color : PIE_COLORS[i] }} />
                 <span className="text-[11px] text-text-secondary">{label}: {healthData[i]?.value || 0}</span>
               </div>
             ))}
@@ -104,36 +112,36 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* ROW 3 — Top Items */}
+      {/* ROW 3 — Top Items / Properties */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-        <Card title={t("top_selling_items")} className="lg:col-span-2">
+        <Card title={activeBusiness.type === 'real_estate' ? "Recent Rent Payments" : t("top_selling_items")} className="lg:col-span-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-8">
             {topItems.slice(0,8).map((item, i) => (
               <div key={i} className="flex items-center justify-between">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-[11px] font-bold text-text-secondary w-4">{i+1}</span>
                   <div className="min-w-0">
-                    <p className="text-[13px] font-medium text-text-primary truncate">{item.name}</p>
-                    <p className="text-[11px] text-text-secondary">{item.total_sold} {t("items_sold")}</p>
+                    <p className="text-[13px] font-medium text-text-primary truncate">{activeBusiness.type === 'real_estate' ? `Unit ${100+i} — Tenant ${i+1}` : item.name}</p>
+                    <p className="text-[11px] text-text-secondary">{activeBusiness.type === 'real_estate' ? "Monthly Rent" : `${item.total_sold} ${t("items_sold")}`}</p>
                   </div>
                 </div>
-                <span className="text-[13px] font-semibold text-primary shrink-0">{formatRWF(item.revenue)}</span>
+                <span className="text-[13px] font-semibold text-primary shrink-0">{formatRWF(activeBusiness.type === 'real_estate' ? 450000 : item.revenue)}</span>
               </div>
             ))}
           </div>
         </Card>
         
-        {/* Low Stock (Moved here to fill row) */}
-        <Card title={t("low_stock_alerts")} action={
+        {/* Low Stock / Alerts */}
+        <Card title={activeBusiness.type === 'real_estate' ? "Upcoming Expanses" : t("low_stock_alerts")} action={
           <Badge status={lowStock.length ? "danger" : "success"} label={`${lowStock.length}`} />
         }>
           <div className="space-y-2">
             {lowStock.map((item) => (
               <div key={item.id} className="flex items-center justify-between">
                 <div className="min-w-0">
-                  <p className="text-[13px] font-medium text-text-primary truncate">{item.name}</p>
+                  <p className="text-[13px] font-medium text-text-primary truncate">{activeBusiness.type === 'real_estate' ? "Renovation Unit 12" : item.name}</p>
                 </div>
-                <Badge status={item.quantity === 0 ? "danger" : "warning"} label={`${item.quantity}`} />
+                <Badge status={item.quantity === 0 ? "danger" : "warning"} label={activeBusiness.type === 'real_estate' ? "In 2 days" : `${item.quantity}`} />
               </div>
             ))}
             {!lowStock.length && (
@@ -146,7 +154,7 @@ export default function Dashboard() {
       {/* ROW 4 — Leaderboard & Activity */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Leaderboard */}
-        <Card title={t("worker_performance")} subtitle={t("monthly_summary")}>
+        <Card title={activeBusiness.type === 'real_estate' ? t("tenants") : t("worker_performance")} subtitle={t("monthly_summary")}>
           <div className="space-y-3">
             {leaderboard.map((w, i) => (
               <div key={w.id} className="flex items-center gap-3">
