@@ -92,6 +92,14 @@ let ESTATE_SALES = [
   { id:2, invoice_number:"REC-5502", customer_name:"Gasana Jean",     worker_name:"Admin", items_count:1, payment_method:"momo", total_amount:1200000, created_at:daysAgo(5), is_voided:false },
 ];
 
+let DEBTS = [
+  { id:1, person_name:"Eric Ndayisabye", amount:45000, type:"receivable", due_date:daysAgo(-5), status:"pending", business_id:"b2" },
+  { id:2, person_name:"Alliance Fashion", amount:280000, type:"receivable", due_date:daysAgo(-10), status:"pending", business_id:"b1" },
+  { id:3, person_name:"Mutesi Solange", amount:450000, type:"receivable", due_date:daysAgo(2), status:"pending", business_id:"b3" },
+  { id:4, person_name:"Textile Rwanda Ltd", amount:1200000, type:"payable", due_date:daysAgo(-15), status:"pending", business_id:"b1" },
+  { id:5, person_name:"Kigali City Council", amount:85000, type:"payable", due_date:daysAgo(-2), status:"pending", business_id:"b2" },
+];
+
 // ─── SHARED DATA ─────────────────────────────────────────────────────────────
 
 let WORKERS = [
@@ -185,6 +193,22 @@ function handle(method, url, body) {
     if (r1 && method === "GET") {
       const s = currentSales.find(x=>x.id===parseInt(r1)) || currentSales[0];
       return { ...s, items: [{ item_name: s.invoice_number, quantity: 1, unit_price: s.total_amount }] };
+    }
+  }
+
+  // ── DEBTS ────────────────────────────────────────────────────────────────
+  if (r0 === "debts") {
+    const bizDebts = DEBTS.filter(d => d.business_id === businessId);
+    if (!r1 && method === "GET") return bizDebts;
+    if (r2 === "pay" && method === "PUT") {
+      const idx = DEBTS.findIndex(d => d.id === parseInt(r1));
+      if (idx !== -1) DEBTS[idx].status = "paid";
+      return { ok: true };
+    }
+    if (method === "POST") {
+      const debt = { id: nextId(DEBTS), ...body, business_id: businessId, status: "pending" };
+      DEBTS.unshift(debt);
+      return debt;
     }
   }
 

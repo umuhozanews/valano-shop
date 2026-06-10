@@ -42,6 +42,16 @@ const TRANSLATIONS = {
     tenants: "Tenants",
     rent_payments: "Rent Payments",
     maintenance: "Maintenance",
+    debt_management: "Debt Management",
+    receivables: "Owed to Us",
+    payables: "We Owe Others",
+    due_date: "Due Date",
+    debtor: "Debtor",
+    creditor: "Creditor",
+    pay_debt: "Record Payment",
+    add_debt: "Add Debt",
+    total_debt: "Total Debt",
+    overdue: "Overdue",
     
     // Businesses
     industry: "KNOTTY INDUSTRY",
@@ -195,6 +205,16 @@ const TRANSLATIONS = {
     tenants: "Abapangayi",
     rent_payments: "Ubukode",
     maintenance: "Gukanika",
+    debt_management: "Icungamwenda",
+    receivables: "Amadeni tuberewemo",
+    payables: "Amadeni dufitiye abandi",
+    due_date: "Itariki yo kwishyura",
+    debtor: "Uwugufitiye",
+    creditor: "Uwo uwiherereye",
+    pay_debt: "Rishya umwenda",
+    add_debt: "Ongeraho umwenda",
+    total_debt: "Iteranyirizo ry'imyenda",
+    overdue: "Arengeje igihe",
     
     // Businesses
     industry: "KNOTTY INDUSTRY",

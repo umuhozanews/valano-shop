@@ -63,6 +63,7 @@ export const NAV_ITEMS = (activeBusiness) => {
       items: [
         { label: "Workers",   icon: "Users",     path: "/app/workers",   roles: ["admin","manager"] },
         { label: "Expenses",  icon: "Receipt",   path: "/app/expenses",    roles: ["admin","manager"] },
+        { label: "Debt Management", icon: "Scale", path: "/app/debts", roles: ["admin","manager"] },
         { label: "Settings",  icon: "Settings",  path: "/app/settings",      roles: ["admin"] },
       ],
     },

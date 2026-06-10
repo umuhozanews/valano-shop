@@ -30,6 +30,7 @@ const SuppliersList = L(() => import("./pages/suppliers/SuppliersList"));
 const InvoicesList = L(() => import("./pages/finance/InvoicesList"));
 const ExpensesList = L(() => import("./pages/finance/ExpensesList"));
 const ProfitLoss = L(() => import("./pages/finance/ProfitLoss"));
+const DebtManagement = L(() => import("./pages/finance/DebtManagement"));
 const SalesReport = L(() => import("./pages/reports/SalesReport"));
 const StockReport = L(() => import("./pages/reports/StockReport"));
 const WorkerPerformance = L(() => import("./pages/reports/WorkerPerformance"));
@@ -85,6 +86,7 @@ export default function App() {
         <Route path="/app/suppliers" element={<P roles={AO}><SuppliersList /></P>} />
         <Route path="/app/invoices" element={<P roles={AM}><InvoicesList /></P>} />
         <Route path="/app/expenses" element={<P roles={AM}><ExpensesList /></P>} />
+        <Route path="/app/debts" element={<P roles={AM}><DebtManagement /></P>} />
         <Route path="/app/finance/pnl" element={<P roles={AO}><ProfitLoss /></P>} />
         <Route path="/app/reports/sales" element={<P roles={AM}><SalesReport /></P>} />
         <Route path="/app/reports/stock" element={<P roles={AM}><StockReport /></P>} />
