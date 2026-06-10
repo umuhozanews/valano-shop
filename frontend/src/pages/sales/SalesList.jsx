@@ -11,9 +11,11 @@ import api from "../../utils/api";
 import { formatRWF, formatDate } from "../../utils/formatters";
 import toast from "react-hot-toast";
 import { useLanguage } from "../../context/LanguageContext";
+import { useBusiness } from "../../context/BusinessContext";
 
 export default function SalesList() {
   const { t } = useLanguage();
+  const { activeBusiness } = useBusiness();
   const navigate = useNavigate();
   const [sales, setSales] = useState([]);
   const [total, setTotal] = useState(0);
@@ -21,6 +23,8 @@ export default function SalesList() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({ search:"", start_date:"", end_date:"", payment_method:"" });
+
+  const isRealEstate = activeBusiness.type === "real_estate";
 
   const PAYMENT_LABELS = { 
     cash: t("cash"), 
@@ -42,12 +46,11 @@ export default function SalesList() {
   useEffect(() => { fetchSales(); }, [fetchSales]);
 
   const columns = [
-    { key:"invoice_number", label: t("invoice_no"), render:v => <span className="font-mono text-[12px] font-medium text-primary">{v||"—"}</span> },
-    { key:"customer_name", label: t("customer"), render:v => v || "Walk-in" },
+    { key:"invoice_number", label: isRealEstate ? "Receipt No" : t("invoice_no"), render:v => <span className="font-mono text-[12px] font-medium text-primary">{v||"—"}</span> },
+    { key:"customer_name", label: isRealEstate ? t("tenants") : t("customer"), render:v => v || (isRealEstate ? "Unnamed Tenant" : "Walk-in") },
     { key:"worker_name", label: t("workers"), render:(v) => (
       <div><p className="font-medium">{v}</p></div>
     )},
-    { key:"items_count", label: t("all"), render:v => <span className="font-medium">{v}</span> },
     { key:"payment_method", label: t("payment_method"), render:v => <Badge status="neutral" label={PAYMENT_LABELS[v]||v} /> },
     { key:"total_amount", label: t("total"), render:v => <span className="font-semibold text-primary">{formatRWF(v)}</span> },
     { key:"created_at", label: t("date"), render:v => formatDate(v, "dd MMM yy HH:mm") },
@@ -58,14 +61,14 @@ export default function SalesList() {
   ];
 
   return (
-    <PageWrapper title={t("sales")} subtitle={t("all")}
-      breadcrumbs={[{label: t("sales"), path: "/app/sales"}]}>
+    <PageWrapper title={isRealEstate ? t("rent_payments") : t("sales")} subtitle={t("all")}
+      breadcrumbs={[{label: isRealEstate ? t("rent_payments") : t("sales"), path: "/app/sales"}]}>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-        <StatCard title={t("total_sales")} value={parseInt(stats.count)||0} />
-        <StatCard title={t("total_revenue")} value={formatRWF(stats.revenue||0)} />
+        <StatCard title={isRealEstate ? "Total Collected" : t("total_sales")} value={isRealEstate ? formatRWF(stats.revenue||0) : parseInt(stats.count)||0} />
+        <StatCard title={isRealEstate ? "Pending Payments" : t("total_revenue")} value={isRealEstate ? "2,450,000 RWF" : formatRWF(stats.revenue||0)} />
         <Button variant="primary" size="lg" icon={Plus} onClick={() => navigate("/app/sales/new")} className="!h-auto flex-col gap-1 py-4">
-          <span className="text-[15px]">{t("new_sale")}</span>
+          <span className="text-[15px]">{isRealEstate ? "Record Payment" : t("new_sale")}</span>
         </Button>
       </div>
 
@@ -80,13 +83,6 @@ export default function SalesList() {
             className="h-9 px-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface" />
           <input type="date" value={filters.end_date} onChange={e=>setFilters(f=>({...f,end_date:e.target.value}))}
             className="h-9 px-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface" />
-          <select value={filters.payment_method} onChange={e=>setFilters(f=>({...f,payment_method:e.target.value}))}
-            className="h-9 px-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface">
-            <option value="">{t("payment_method")} ({t("all")})</option>
-            <option value="cash">{t("cash")}</option>
-            <option value="mtn_momo">{t("momo")}</option>
-            <option value="airtel">Airtel</option>
-          </select>
         </div>
 
         <Table columns={columns} data={sales} loading={loading} emptyMessage={t("loading")} />

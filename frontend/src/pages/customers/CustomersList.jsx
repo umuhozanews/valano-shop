@@ -12,10 +12,12 @@ import StatCard from "../../components/ui/StatCard";
 import api from "../../utils/api";
 import { formatRWF, formatDate } from "../../utils/formatters";
 import toast from "react-hot-toast";
+import { useLanguage } from "../../context/LanguageContext";
 
 const SEG_MAP = { vip:"success", regular:"warning", new:"neutral" };
 
 export default function CustomersList() {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [customers, setCustomers] = useState([]);
   const [total, setTotal] = useState(0);
@@ -42,15 +44,15 @@ export default function CustomersList() {
     setSaving(true);
     try {
       await api.post("/customers", form);
-      toast.success("Customer added"); setShowModal(false); fetchData();
-    } catch(e){ toast.error(e.response?.data?.error||"Failed"); }
+      toast.success(t("success")); setShowModal(false); fetchData();
+    } catch(e){ toast.error(e.response?.data?.error|| t("error")); }
     finally { setSaving(false); }
   }
 
   const getSegCount = (s) => parseInt(summary.find(x=>x.segment===s)?.cnt||0);
 
   const columns = [
-    { key:"name", label:"Customer", render:(v,r) => (
+    { key:"name", label: t("customer"), render:(v,r) => (
       <div className="flex items-center gap-2">
         <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
           <span className="text-[12px] font-bold text-primary">{v?.charAt(0)}</span>
@@ -65,9 +67,9 @@ export default function CustomersList() {
     { key:"last_purchase", label:"Last Purchase", render:v => v ? formatDate(v) : "—" },
     { key:"id", label:"", render:(v,r) => (
       <div className="flex gap-1">
-        <Button variant="ghost" size="sm" onClick={() => navigate(`/app/customers/${v}`)}>View</Button>
+        <Button variant="ghost" size="sm" onClick={() => navigate(`/app/customers/${v}`)}>{t("view")}</Button>
         {r.phone && (
-          <button onClick={() => window.open(`https://wa.me/${r.phone.replace(/\D/g,"")}?text=Hello+${encodeURIComponent(r.name)},+from+VALANO+SHOP`,"_blank")}
+          <button onClick={() => window.open(`https://wa.me/${r.phone.replace(/\D/g,"")}?text=Hello+${encodeURIComponent(r.name)},+from+KNOTTY+SYSTEM`,"_blank")}
             className="p-1 text-[#25D366] hover:opacity-80" title="WhatsApp">
             <MessageCircle size={14} />
           </button>
@@ -77,47 +79,43 @@ export default function CustomersList() {
   ];
 
   return (
-    <PageWrapper title="Customers" subtitle="CRM & purchase history" breadcrumbs={[{label:"Customers",path:"/app/customers"}]}>
+    <PageWrapper title={t("customers")} subtitle={t("management")} breadcrumbs={[{label: t("customers"), path:"/app/customers"}]}>
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
-        <StatCard title="Total Customers" value={total} />
+        <StatCard title={t("total")} value={total} />
         <StatCard title="VIP" value={getSegCount("vip")} />
         <StatCard title="Regular" value={getSegCount("regular")} />
         <StatCard title="New" value={getSegCount("new")} />
       </div>
 
-      <Card action={<Button icon={Plus} size="sm" onClick={() => setShowModal(true)}>Add Customer</Button>}>
+      <Card action={<Button icon={Plus} size="sm" onClick={() => setShowModal(true)}>{t("add")}</Button>}>
         <div className="flex flex-wrap gap-3 mb-4">
           <div className="relative flex-1 min-w-[180px]">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
-            <input value={filters.search} onChange={e=>setFilters(f=>({...f,search:e.target.value}))} placeholder="Search by name or phone…"
-              className="w-full h-9 pl-8 pr-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary" />
+            <input value={filters.search} onChange={e=>setFilters(f=>({...f,search:e.target.value}))} placeholder={`${t("search")}…`}
+              className="w-full h-9 pl-9 pr-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary" />
           </div>
           <select value={filters.type} onChange={e=>setFilters(f=>({...f,type:e.target.value}))}
             className="h-9 px-3 border border-border rounded-card text-[13px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary">
             <option value="">All Types</option><option value="retailer">Retailer</option><option value="wholesaler">Wholesaler</option>
           </select>
-          <select value={filters.segment} onChange={e=>setFilters(f=>({...f,segment:e.target.value}))}
-            className="h-9 px-3 border border-border rounded-card text-[13px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary">
-            <option value="">All Segments</option><option value="vip">VIP</option><option value="regular">Regular</option><option value="new">New</option>
-          </select>
         </div>
-        <Table columns={columns} data={customers} loading={loading} emptyMessage="No customers found" />
+        <Table columns={columns} data={customers} loading={loading} emptyMessage={t("loading")} />
         {total > 20 && (
           <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
-            <p className="text-[13px] text-text-secondary">{(page-1)*20+1}–{Math.min(page*20,total)} of {total}</p>
+            <p className="text-[13px] text-text-secondary">{t("loading")} {(page-1)*20+1}–{Math.min(page*20,total)} of {total}</p>
             <div className="flex gap-2">
-              <Button variant="secondary" size="sm" disabled={page===1} onClick={() => setPage(p=>p-1)}>Previous</Button>
-              <Button variant="secondary" size="sm" disabled={page*20>=total} onClick={() => setPage(p=>p+1)}>Next</Button>
+              <Button variant="secondary" size="sm" disabled={page===1} onClick={() => setPage(p=>p-1)}>{t("all")}</Button>
+              <Button variant="secondary" size="sm" disabled={page*20>=total} onClick={() => setPage(p=>p+1)}>{t("all")}</Button>
             </div>
           </div>
         )}
       </Card>
 
-      <Modal open={showModal} onClose={() => setShowModal(false)} title="Add Customer"
-        footer={<><Button variant="secondary" onClick={() => setShowModal(false)}>Cancel</Button><Button loading={saving} onClick={handleAdd}>Save</Button></>}>
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={t("add")}
+        footer={<><Button variant="secondary" onClick={() => setShowModal(false)}>{t("cancel")}</Button><Button loading={saving} onClick={handleAdd}>{t("save")}</Button></>}>
         <div className="space-y-3">
-          <Input label="Name" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} />
-          <Input label="Phone" value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} />
+          <Input label={t("name")} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} />
+          <Input label={t("phone")} value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} />
           <Input label="Location" value={form.location} onChange={e=>setForm(f=>({...f,location:e.target.value}))} />
           <div>
             <label className="block text-[13px] font-medium text-text-primary mb-1">Type</label>

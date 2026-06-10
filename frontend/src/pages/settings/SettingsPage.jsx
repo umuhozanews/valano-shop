@@ -1,20 +1,25 @@
 import { useState } from "react";
-import { Store, Bell, Shield, Palette, ChevronRight, Check } from "lucide-react";
+import { Store, Bell, Shield, Palette, ChevronRight, Check, Factory, Home } from "lucide-react";
 import PageWrapper from "../../components/layout/PageWrapper";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
 import toast from "react-hot-toast";
 import { useLanguage } from "../../context/LanguageContext";
+import { useBusiness } from "../../context/BusinessContext";
 
 export default function SettingsPage() {
   const { t } = useLanguage();
+  const { activeBusiness } = useBusiness();
   const [activeSection, setActiveSection] = useState("business");
-  const [business, setBusiness] = useState({ name:"KNOTTY SYSTEM", owner:"Rukundo joseph", phone:"0788000111", email:"info@valano.rw", city:"Kigali", currency:"RWF" });
+  const [business, setBusiness] = useState({ name: activeBusiness.name, owner:"Rukundo joseph", phone:"0788000111", email:"info@valano.rw", city:"Kigali", currency:"RWF" });
   const [saving, setSaving] = useState(false);
 
+  const isIndustry = activeBusiness.type === "industry";
+  const isRealEstate = activeBusiness.type === "real_estate";
+
   const SECTIONS = [
-    { key:"business",      label: t("business_info"),    icon:Store,   desc: t("description") },
+    { key:"business",      label: t("business_info"),    icon: isIndustry ? Factory : isRealEstate ? Home : Store,   desc: t("description") },
     { key:"roles",         label: t("roles_permissions"),icon:Shield,  desc: t("status") },
     { key:"notifications", label: t("notifications"),    icon:Bell,    desc: t("status") },
   ];
@@ -26,9 +31,8 @@ export default function SettingsPage() {
   ];
 
   const NOTIF_PREFS = [
-    { key:"low_stock",   label: t("low_stock_alerts"),        default:true },
-    { key:"large_sale",  label: "Large Sale Notifications", default:true },
-    { key:"daily_summary",label: t("monthly_summary"),   default:false },
+    { key:"low_stock",   label: isIndustry ? "Low Material Alerts" : isRealEstate ? "Rent Due Alerts" : t("low_stock_alerts"), default:true },
+    { key:"large_sale",  label: isRealEstate ? "Large Payment Received" : "Large Sale Notifications", default:true },
   ];
 
   const [notifPrefs, setNotifPrefs] = useState(Object.fromEntries(NOTIF_PREFS.map(n => [n.key, n.default])));
@@ -41,7 +45,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <PageWrapper title={t("settings")} subtitle={t("settings")}
+    <PageWrapper title={t("settings")} subtitle={activeBusiness.name}
       breadcrumbs={[{ label: t("settings"), path: "/app/settings" }]}>
 
       <div className="flex gap-4">

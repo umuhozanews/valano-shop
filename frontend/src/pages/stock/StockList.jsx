@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Tag, Search, Edit, Clock, Trash2 } from "lucide-react";
+import { Plus, Tag, Search, Edit, Clock, Trash2, Box } from "lucide-react";
 import PageWrapper from "../../components/layout/PageWrapper";
 import Table from "../../components/ui/Table";
 import Badge from "../../components/ui/Badge";
@@ -14,6 +14,7 @@ import { formatRWF } from "../../utils/formatters";
 import toast from "react-hot-toast";
 import { ITEM_CATEGORIES, SIZES } from "../../utils/constants";
 import { useLanguage } from "../../context/LanguageContext";
+import { useBusiness } from "../../context/BusinessContext";
 
 const STATUS_MAP = { in_stock: "success", low_stock: "warning", out_of_stock: "danger" };
 
@@ -21,7 +22,9 @@ const EMPTY_FORM = { name:"", category:"", size:"", color:"", quantity:0, cost_p
 
 export default function StockList() {
   const { t } = useLanguage();
+  const { activeBusiness } = useBusiness();
   const navigate = useNavigate();
+  
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [summary, setSummary] = useState({});
@@ -32,6 +35,8 @@ export default function StockList() {
   const [editItem, setEditItem] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+
+  const isIndustry = activeBusiness.type === "industry";
 
   const STATUS_LABEL = { 
     in_stock: t("in_stock"), 
@@ -86,24 +91,18 @@ export default function StockList() {
   }
 
   const columns = [
-    { key:"name", label: t("item_name"), render:(v,r) => (
+    { key:"name", label: isIndustry ? "Material Name" : t("item_name"), render:(v,r) => (
       <div>
         <p className="font-medium text-text-primary">{v}</p>
         <p className="text-[11px] text-text-secondary">{r.category}</p>
       </div>
     )},
     { key:"barcode", label: t("barcode"), render:v => <span className="font-mono text-[11px] text-text-secondary">{v}</span> },
-    { key:"size", label: `${t("size")} / ${t("color")}`, render:(v,r) => (
-      <div className="flex flex-wrap gap-1">
-        {v && <span className="px-1.5 py-0.5 bg-background border border-border rounded text-[11px]">{v}</span>}
-        {r.color && <span className="px-1.5 py-0.5 bg-background border border-border rounded text-[11px]">{r.color}</span>}
-      </div>
-    )},
     { key:"quantity", label: t("quantity"), render:(v,r) => (
       <span className={`font-semibold ${r.status==="out_of_stock"?"text-danger":r.status==="low_stock"?"text-warning":"text-text-primary"}`}>{v}</span>
     )},
     { key:"cost_price_rwf", label: t("cost_price"), render:v => formatRWF(v) },
-    { key:"sell_price_rwf", label: t("selling_price"), render:v => formatRWF(v) },
+    {!isIndustry && { key:"sell_price_rwf", label: t("selling_price"), render:v => formatRWF(v) }},
     { key:"status", label: t("status"), render:v => <Badge status={STATUS_MAP[v]||"neutral"} label={STATUS_LABEL[v]||v} /> },
     { key:"id", label:"", render:(v,r) => (
       <div className="flex gap-1">
@@ -112,11 +111,11 @@ export default function StockList() {
         <button onClick={() => handleDelete(v)} className="p-1 text-text-secondary hover:text-danger rounded" title={t("delete")}><Trash2 size={14}/></button>
       </div>
     )},
-  ];
+  ].filter(Boolean);
 
   return (
-    <PageWrapper title={t("stock")} subtitle={t("stock")}
-      breadcrumbs={[{label: t("stock"), path: "/app/stock"}]}>
+    <PageWrapper title={isIndustry ? t("raw_materials") : t("stock")} subtitle={isIndustry ? "Supplies for production" : t("stock")}
+      breadcrumbs={[{label: isIndustry ? t("raw_materials") : t("stock"), path: "/app/stock"}]}>
 
       {/* Summary */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
@@ -137,59 +136,32 @@ export default function StockList() {
           <select value={filters.category} onChange={e=>setFilters(f=>({...f,category:e.target.value}))}
             className="h-9 px-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface">
             <option value="">{t("category")} ({t("all")})</option>
-            {ITEM_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <select value={filters.status} onChange={e=>setFilters(f=>({...f,status:e.target.value}))}
-            className="h-9 px-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface">
-            <option value="">{t("status")} ({t("all")})</option>
-            <option value="in_stock">{t("in_stock")}</option>
-            <option value="low_stock">{t("low_stock")}</option>
-            <option value="out_of_stock">{t("out_of_stock")}</option>
+            {isIndustry ? ["Fabric","Buttons","Thread","Zippers","Labels","Packaging"].map(c => <option key={c} value={c}>{c}</option>) : ITEM_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
           <div className="ml-auto flex gap-2">
-            <Button variant="secondary" size="sm" icon={Tag} onClick={() => navigate("/app/stock/labels")}>{t("print")}</Button>
             <Button variant="primary" size="sm" icon={Plus} onClick={() => { setEditItem(null); setForm(EMPTY_FORM); setShowModal(true); }}>{t("add")}</Button>
           </div>
         </div>
 
         <Table columns={columns} data={items} loading={loading} emptyMessage={t("loading")} />
-
-        {/* Pagination */}
-        {total > 20 && (
-          <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
-            <p className="text-[13px] text-text-secondary">{t("loading")} {(page-1)*20+1}–{Math.min(page*20,total)} of {total}</p>
-            <div className="flex gap-2">
-              <Button variant="secondary" size="sm" disabled={page===1} onClick={() => setPage(p=>p-1)}>{t("all")}</Button>
-              <Button variant="secondary" size="sm" disabled={page*20>=total} onClick={() => setPage(p=>p+1)}>{t("all")}</Button>
-            </div>
-          </div>
-        )}
       </Card>
 
       {/* Add/Edit Modal */}
-      <Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? t("edit") : t("add_item")}
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? t("edit") : t("add")}
         footer={<><Button variant="secondary" onClick={() => setShowModal(false)}>{t("cancel")}</Button><Button loading={saving} onClick={handleSave}>{t("save")}</Button></>}>
         <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2"><Input label={t("item_name")} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} /></div>
+          <div className="col-span-2"><Input label={isIndustry ? "Material Name" : t("item_name")} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} /></div>
           <div>
             <label className="block text-[13px] font-medium text-text-primary mb-1">{t("category")}</label>
             <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} className="w-full h-9 px-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface">
               <option value="">{t("category")}…</option>
-              {ITEM_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              {isIndustry ? ["Fabric","Buttons","Thread","Zippers","Labels","Packaging"].map(c => <option key={c} value={c}>{c}</option>) : ITEM_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
-          <div>
-            <label className="block text-[13px] font-medium text-text-primary mb-1">{t("size")}</label>
-            <select value={form.size} onChange={e=>setForm(f=>({...f,size:e.target.value}))} className="w-full h-9 px-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface">
-              <option value="">{t("size")}…</option>
-              {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <Input label={t("color")} value={form.color} onChange={e=>setForm(f=>({...f,color:e.target.value}))} />
           <Input label={t("quantity")} type="number" value={form.quantity} onChange={e=>setForm(f=>({...f,quantity:e.target.value}))} />
           <Input label={t("min_stock")} type="number" value={form.low_stock_threshold} onChange={e=>setForm(f=>({...f,low_stock_threshold:e.target.value}))} />
           <Input label={t("cost_price")} type="number" value={form.cost_price_rwf} onChange={e=>setForm(f=>({...f,cost_price_rwf:e.target.value}))} />
-          <Input label={t("selling_price")} type="number" value={form.sell_price_rwf} onChange={e=>setForm(f=>({...f,sell_price_rwf:e.target.value}))} />
+          {!isIndustry && <Input label={t("selling_price")} type="number" value={form.sell_price_rwf} onChange={e=>setForm(f=>({...f,sell_price_rwf:e.target.value}))} />}
         </div>
       </Modal>
     </PageWrapper>
