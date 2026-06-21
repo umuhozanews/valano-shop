@@ -49,9 +49,7 @@ export const BUSINESS_TYPES = {
 };
 
 export const BUSINESSES = [
-  { id: "b1", type: BUSINESS_TYPES.INDUSTRY,    name: "KNOTTY INDUSTRY", color: "#006C49" },
   { id: "b2", type: BUSINESS_TYPES.SHOP,        name: "KNOTTY FASHION",   color: "#1e3a8a" },
-  { id: "b3", type: BUSINESS_TYPES.REAL_ESTATE, name: "KNOTTY ESTATES",   color: "#7c2d12" },
 ];
 
 export const NAV_ITEMS = (activeBusiness) => {

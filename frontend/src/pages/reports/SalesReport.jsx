@@ -29,6 +29,28 @@ export default function SalesReport() {
        .finally(() => setLoading(false));
   }, [filters, t]);
 
+  const handleExport = async (format) => {
+    try {
+      const response = await api.get("/reports/sales", {
+        params: { ...filters, export: format },
+        responseType: "blob",
+      });
+      const blob = new Blob([response.data], {
+        type: format === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `sales_report_${new Date().toISOString().slice(0, 10)}.${format === "pdf" ? "pdf" : "xlsx"}`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      toast.error(t("error"));
+    }
+  };
+
   const columns = [
     { key:"invoice_number", label: isRealEstate ? "Receipt No" : isIndustry ? "Order No" : t("invoice_no") },
     { key:"customer_name", label: isRealEstate ? t("tenants") : isIndustry ? "Client Company" : t("customer"), render:v => v || "Walk-in" },
@@ -44,9 +66,17 @@ export default function SalesReport() {
     <PageWrapper title={reportTitle} subtitle={t("reports")}
       breadcrumbs={[{label: t("reports"), path:"/app/reports/sales"}, {label: reportTitle, path:"/app/reports/sales"}]}>
 
-      <div className="flex flex-wrap gap-3 mb-4">
-        <input type="date" value={filters.start_date} onChange={e=>setFilters(f=>({...f,start_date:e.target.value}))} className="h-9 px-3 border border-border rounded-card text-[13px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary" />
-        <input type="date" value={filters.end_date} onChange={e=>setFilters(f=>({...f,end_date:e.target.value}))} className="h-9 px-3 border border-border rounded-card text-[13px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary" />
+      <div className="flex flex-wrap gap-3 mb-4 items-center">
+        <input type="date" value={filters.start_date} onChange={e=>setFilters(f=>({...f,start_date:e.target.value}))} className="h-9 px-3 border border-border rounded-card text-[13px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary font-medium" />
+        <input type="date" value={filters.end_date} onChange={e=>setFilters(f=>({...f,end_date:e.target.value}))} className="h-9 px-3 border border-border rounded-card text-[13px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary font-medium" />
+        <div className="flex gap-2 ml-auto">
+          {data.sales?.length > 0 && (
+            <>
+              <Button variant="secondary" size="sm" icon={FileText} onClick={() => handleExport("pdf")}>PDF</Button>
+              <Button variant="secondary" size="sm" icon={Download} onClick={() => handleExport("excel")}>Excel</Button>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-4">

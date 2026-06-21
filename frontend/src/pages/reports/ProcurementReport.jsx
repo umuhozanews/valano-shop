@@ -26,6 +26,27 @@ export default function ProcurementReport() {
     finally { setLoading(false); }
   }
 
+  const exportExcel = async () => {
+    try {
+      const activeFilters = Object.fromEntries(Object.entries(filters).filter(([,v])=>v));
+      const response = await api.get("/reports/procurement", {
+        params: { ...activeFilters, export: "excel" },
+        responseType: "blob",
+      });
+      const blob = new Blob([response.data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `procurement_report_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Failed to export Excel");
+    }
+  };
+
   const columns = [
     { key:"id", label:"Order #", render:v=>`#${v}` },
     { key:"supplier_name", label:"Supplier" },
@@ -48,7 +69,7 @@ export default function ProcurementReport() {
             className="h-9 px-3 border border-border rounded-card text-[13px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary" />
           <div className="flex gap-2 ml-auto">
             <Button loading={loading} onClick={generate}>Generate</Button>
-            {data.length > 0 && <Button variant="secondary" size="sm" icon={Download} onClick={()=>window.open(`${API}/reports/procurement?export=excel`,"_blank")}>Excel</Button>}
+            {data.length > 0 && <Button variant="secondary" size="sm" icon={Download} onClick={exportExcel}>Excel</Button>}
           </div>
         </div>
       </Card>

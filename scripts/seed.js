@@ -47,6 +47,7 @@ async function seed() {
       [7,"Mukamana Grace","worker4@valano.rw",passwords.worker,"worker",2,"+250780100007",1500000,3],
       [8,"Niyonzima Paul","worker5@valano.rw",passwords.worker,"worker",2,"+250780100008",1500000,3],
       [9,"Uwimana Sandra","worker6@valano.rw",passwords.worker,"worker",2,"+250780100009",1200000,3],
+      [10,"Rukundo joseph","rukundojosephtuyishime@gmail.com",await bcrypt.hash("rukundo2007", 10),"admin",1,"+250780000001",5000000,0],
     ];
 
     for (const [id,name,email,hash,role,branch,phone,target,comm] of users) {
@@ -54,7 +55,7 @@ async function seed() {
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (email) DO NOTHING`,
         [id,name,email,hash,role,branch,phone,target,comm]);
     }
-    await client.query("SELECT setval('users_id_seq', 9, true)");
+    await client.query("SELECT setval('users_id_seq', 10, true)");
     console.log("✓ Users seeded");
 
     // Exchange rates

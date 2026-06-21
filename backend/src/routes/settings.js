@@ -83,6 +83,29 @@ router.put("/branches/:id", requireRole("admin"), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.post("/branches/:id/clone-stock", requireRole("admin"), async (req, res, next) => {
+  try {
+    const toBranchId = req.params.id;
+    const { from_branch_id } = req.body;
+    if (!from_branch_id) return res.status(400).json({ error: "Source branch required" });
+
+    const { rows: sourceItems } = await pool.query(
+      "SELECT * FROM stock_items WHERE branch_id=$1 AND is_active=true", [from_branch_id]
+    );
+
+    for (const item of sourceItems) {
+      const newBarcode = `VLN${Date.now()}${Math.floor(Math.random() * 1000)}`;
+      await pool.query(
+        `INSERT INTO stock_items (name, category, size, color, barcode, branch_id, quantity, cost_price_rwf, sell_price_rwf, low_stock_threshold)
+         VALUES ($1,$2,$3,$4,$5,$6,0,$7,$8,$9)`,
+        [item.name, item.category, item.size, item.color, newBarcode, toBranchId, item.cost_price_rwf, item.sell_price_rwf, item.low_stock_threshold]
+      );
+    }
+
+    res.json({ message: `Cloned ${sourceItems.length} items to branch successfully.` });
+  } catch (err) { next(err); }
+});
+
 router.get("/backup", requireRole("admin"), async (req, res, next) => {
   try {
     const tables = ["branches", "users", "suppliers", "stock_items", "customers", "sales", "expenses", "exchange_rates"];

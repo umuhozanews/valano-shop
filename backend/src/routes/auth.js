@@ -98,4 +98,22 @@ router.put("/me/password", verifyToken, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.put("/me/profile", verifyToken, async (req, res, next) => {
+  try {
+    const { name, email, phone } = req.body;
+    if (!name || !email) return res.status(400).json({ error: "Name and email required" });
+    
+    const { rows: existing } = await pool.query("SELECT * FROM users WHERE email=$1 AND id!=$2", [email.toLowerCase().trim(), req.user.id]);
+    if (existing.length) return res.status(400).json({ error: "Email is already in use" });
+
+    const { rows: [updated] } = await pool.query(
+      `UPDATE users SET name=$1, email=$2, phone=$3 WHERE id=$4 RETURNING *`,
+      [name, email.toLowerCase().trim(), phone || null, req.user.id]
+    );
+
+    const { password_hash, ...safe } = updated;
+    res.json(safe);
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

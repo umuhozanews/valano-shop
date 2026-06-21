@@ -29,7 +29,7 @@ router.get("/", requireRole("admin", "manager"), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get("/:id", requireRole("admin"), async (req, res, next) => {
+router.get("/:id", requireRole("admin", "manager"), async (req, res, next) => {
   try {
     const [sup, orders] = await Promise.all([
       pool.query("SELECT * FROM suppliers WHERE id=$1", [req.params.id]),
@@ -40,7 +40,7 @@ router.get("/:id", requireRole("admin"), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post("/", requireRole("admin"), async (req, res, next) => {
+router.post("/", requireRole("admin", "manager"), async (req, res, next) => {
   try {
     const { name, wechat, whatsapp, city, country, specialty, notes } = req.body;
     const { rows: [s] } = await pool.query(
@@ -53,7 +53,7 @@ router.post("/", requireRole("admin"), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put("/:id", requireRole("admin"), async (req, res, next) => {
+router.put("/:id", requireRole("admin", "manager"), async (req, res, next) => {
   try {
     const { name, wechat, whatsapp, city, country, specialty, notes } = req.body;
     const { rows: [s] } = await pool.query(
@@ -65,7 +65,7 @@ router.put("/:id", requireRole("admin"), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.delete("/:id", requireRole("admin"), async (req, res, next) => {
+router.delete("/:id", requireRole("admin", "manager"), async (req, res, next) => {
   try {
     await pool.query("DELETE FROM suppliers WHERE id=$1", [req.params.id]);
     res.json({ message: "Supplier deleted" });

@@ -24,22 +24,6 @@ export function AuthProvider({ children }) {
     }, 14 * 60 * 1000);
   }, []);
 
-  useEffect(() => {
-    const token = localStorage.getItem("valano_token");
-    const stored = localStorage.getItem("valano_user");
-    if (token && stored) {
-      try {
-        const u = JSON.parse(stored);
-        setUser(u);
-        scheduleRefresh(token);
-      } catch {
-        localStorage.clear();
-      }
-    }
-    setLoading(false);
-    return () => { if (refreshTimer.current) clearTimeout(refreshTimer.current); };
-  }, []);
-
   const login = useCallback(async (email, password) => {
     const { data } = await api.post("/auth/login", { email, password });
     localStorage.setItem("valano_token", data.accessToken);
@@ -57,6 +41,37 @@ export function AuthProvider({ children }) {
     setUser(null);
     if (refreshTimer.current) clearTimeout(refreshTimer.current);
   }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem("valano_token");
+    const stored = localStorage.getItem("valano_user");
+    if (token && stored) {
+      try {
+        const u = JSON.parse(stored);
+        setUser(u);
+        
+        const startupRefresh = async () => {
+          try {
+            const rt = localStorage.getItem("valano_refresh");
+            if (rt) {
+              const { data } = await api.post("/auth/refresh", { refreshToken: rt });
+              localStorage.setItem("valano_token", data.accessToken);
+              scheduleRefresh(data.accessToken);
+            } else {
+              logout();
+            }
+          } catch {
+            logout();
+          }
+        };
+        startupRefresh();
+      } catch {
+        localStorage.clear();
+      }
+    }
+    setLoading(false);
+    return () => { if (refreshTimer.current) clearTimeout(refreshTimer.current); };
+  }, [scheduleRefresh, logout]);
 
   const hasRole = useCallback((...roles) => user && roles.includes(user.role), [user]);
 

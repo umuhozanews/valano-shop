@@ -68,20 +68,29 @@ export default function Sidebar({ open, onClose }) {
         {/* Business Switcher */}
         <div className="p-4 border-b border-border">
           <div className="relative">
-            <button 
-              onClick={() => setShowBizSwitcher(!showBizSwitcher)}
-              className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-primary/5 border border-primary/10 rounded-card hover:bg-primary/10 transition-colors"
-            >
-              <div className="flex items-center gap-2 min-w-0">
+            {BUSINESSES.length > 1 ? (
+              <button 
+                onClick={() => setShowBizSwitcher(!showBizSwitcher)}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-primary/5 border border-primary/10 rounded-card hover:bg-primary/10 transition-colors"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-6 h-6 rounded flex items-center justify-center text-white shrink-0" style={{ backgroundColor: activeBusiness.color }}>
+                    {activeBusiness.type === "industry" ? <Factory size={14} /> : activeBusiness.type === "real_estate" ? <Home size={14} /> : <Store size={14} />}
+                  </div>
+                  <span className="text-[13px] font-bold text-text-primary truncate">{activeBusiness.name}</span>
+                </div>
+                <ChevronDown size={14} className={`text-text-secondary transition-transform ${showBizSwitcher ? 'rotate-180' : ''}`} />
+              </button>
+            ) : (
+              <div className="w-full flex items-center gap-2 px-3 py-2 bg-primary/5 border border-primary/10 rounded-card">
                 <div className="w-6 h-6 rounded flex items-center justify-center text-white shrink-0" style={{ backgroundColor: activeBusiness.color }}>
                   {activeBusiness.type === "industry" ? <Factory size={14} /> : activeBusiness.type === "real_estate" ? <Home size={14} /> : <Store size={14} />}
                 </div>
                 <span className="text-[13px] font-bold text-text-primary truncate">{activeBusiness.name}</span>
               </div>
-              <ChevronDown size={14} className={`text-text-secondary transition-transform ${showBizSwitcher ? 'rotate-180' : ''}`} />
-            </button>
+            )}
 
-            {showBizSwitcher && (
+            {showBizSwitcher && BUSINESSES.length > 1 && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-border rounded-card shadow-xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-1">
                 <p className="px-3 py-1.5 text-[10px] font-bold text-text-secondary uppercase tracking-wider">{t("switch_business")}</p>
                 {BUSINESSES.map(b => (

@@ -28,7 +28,9 @@ export default function AuditLog() {
   const [filterAction, setFilterAction] = useState("");
 
   useEffect(() => {
-    api.get("/reports/audit").then(d => setLogs(d.data)).finally(() => setLoading(false));
+    api.get("/audit", { params: { limit: 200 } })
+       .then(d => setLogs(d.data.data || []))
+       .finally(() => setLoading(false));
   }, []);
 
   const filtered = logs.filter(l => {

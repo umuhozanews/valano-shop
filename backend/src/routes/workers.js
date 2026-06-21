@@ -119,8 +119,15 @@ router.put("/:id", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put("/:id/deactivate", requireRole("admin"), async (req, res, next) => {
+router.put("/:id/deactivate", requireRole("admin", "manager"), async (req, res, next) => {
   try {
+    if (req.user.role === "manager") {
+      const { rows: [worker] } = await pool.query("SELECT * FROM users WHERE id=$1", [req.params.id]);
+      if (!worker) return res.status(404).json({ error: "Worker not found" });
+      if (worker.branch_id !== req.user.branch_id) {
+        return res.status(403).json({ error: "Unauthorized branch" });
+      }
+    }
     await pool.query("UPDATE users SET is_active=false WHERE id=$1", [req.params.id]);
     await logAudit(req.user.id, "WORKER_DEACTIVATED", "users", req.params.id, null, null, req.ip);
     res.json({ message: "Worker deactivated" });

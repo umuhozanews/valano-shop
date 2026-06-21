@@ -201,6 +201,19 @@ CREATE TABLE IF NOT EXISTS settings (
   invoice_footer_text         TEXT DEFAULT 'Thank you for your business!'
 );
 
+CREATE TABLE IF NOT EXISTS debts (
+  id           SERIAL PRIMARY KEY,
+  person_name  VARCHAR(100) NOT NULL,
+  amount       BIGINT NOT NULL,
+  type         VARCHAR(20) NOT NULL CHECK (type IN ('receivable','payable')),
+  due_date     DATE,
+  status       VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending','paid')),
+  notes        TEXT,
+  branch_id    INTEGER REFERENCES branches(id) ON DELETE SET NULL,
+  sale_id      INTEGER REFERENCES sales(id) ON DELETE SET NULL,
+  created_at   TIMESTAMP DEFAULT NOW()
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_sales_created   ON sales(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_sales_branch    ON sales(branch_id);

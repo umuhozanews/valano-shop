@@ -30,8 +30,45 @@ export default function StockReport() {
     finally { setLoading(false); }
   }
 
-  const exportExcel = () => window.open(`${API}/reports/stock?export=excel${branchId?`&branch_id=${branchId}`:""}`, "_blank");
-  const exportPDF = () => window.open(`${API}/reports/stock?export=pdf${branchId?`&branch_id=${branchId}`:""}`, "_blank");
+  const exportExcel = async () => {
+    try {
+      const response = await api.get("/reports/stock", {
+        params: { branch_id: branchId || undefined, export: "excel" },
+        responseType: "blob",
+      });
+      const blob = new Blob([response.data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `stock_report_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Failed to export Excel");
+    }
+  };
+
+  const exportPDF = async () => {
+    try {
+      const response = await api.get("/reports/stock", {
+        params: { branch_id: branchId || undefined, export: "pdf" },
+        responseType: "blob",
+      });
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `stock_report_${new Date().toISOString().slice(0, 10)}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Failed to export PDF");
+    }
+  };
 
   const columns = [
     { key:"name", label:"Item" }, { key:"category", label:"Category" }, { key:"size", label:"Size" },

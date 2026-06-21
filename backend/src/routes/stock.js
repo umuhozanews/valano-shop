@@ -111,7 +111,7 @@ router.get("/:id/history", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post("/", requireRole("admin", "manager"), async (req, res, next) => {
+router.post("/", requireRole("admin", "manager", "worker"), async (req, res, next) => {
   try {
     const { name, category, size, color, branch_id, quantity, cost_price_rwf,
             sell_price_rwf, low_stock_threshold, image_url } = req.body;
@@ -122,15 +122,26 @@ router.post("/", requireRole("admin", "manager"), async (req, res, next) => {
       `INSERT INTO stock_items (name, category, size, color, barcode, image_url,
         branch_id, quantity, cost_price_rwf, sell_price_rwf, low_stock_threshold)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-      [name, category, size, color, barcode, image_url, branch_id, quantity || 0,
-       cost_price_rwf, sell_price_rwf, low_stock_threshold || 5]
+      [
+        name,
+        category,
+        size || null,
+        color || null,
+        barcode,
+        image_url || null,
+        branch_id ? parseInt(branch_id) : null,
+        parseInt(quantity) || 0,
+        parseInt(cost_price_rwf) || 0,
+        parseInt(sell_price_rwf) || 0,
+        parseInt(low_stock_threshold) || 5
+      ]
     );
     await logAudit(req.user.id, "STOCK_CREATED", "stock_items", rows[0].id, null, rows[0], req.ip);
     res.status(201).json(rows[0]);
   } catch (err) { next(err); }
 });
 
-router.put("/:id", requireRole("admin", "manager"), async (req, res, next) => {
+router.put("/:id", requireRole("admin", "manager", "worker"), async (req, res, next) => {
   try {
     const { name, category, size, color, branch_id, quantity, cost_price_rwf,
             sell_price_rwf, low_stock_threshold, image_url } = req.body;
@@ -141,8 +152,19 @@ router.put("/:id", requireRole("admin", "manager"), async (req, res, next) => {
         quantity=$6, cost_price_rwf=$7, sell_price_rwf=$8, low_stock_threshold=$9,
         image_url=COALESCE($10, image_url)
        WHERE id = $11 RETURNING *`,
-      [name, category, size, color, branch_id, quantity, cost_price_rwf,
-       sell_price_rwf, low_stock_threshold, image_url, req.params.id]
+      [
+        name,
+        category,
+        size || null,
+        color || null,
+        branch_id ? parseInt(branch_id) : null,
+        parseInt(quantity) || 0,
+        parseInt(cost_price_rwf) || 0,
+        parseInt(sell_price_rwf) || 0,
+        parseInt(low_stock_threshold) || 5,
+        image_url || null,
+        req.params.id
+      ]
     );
     if (!rows[0]) return res.status(404).json({ error: "Item not found" });
     await logAudit(req.user.id, "STOCK_UPDATED", "stock_items", rows[0].id, old.rows[0], rows[0], req.ip);
@@ -150,15 +172,21 @@ router.put("/:id", requireRole("admin", "manager"), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.delete("/:id", requireRole("admin"), async (req, res, next) => {
+router.delete("/:id", requireRole("admin", "manager", "worker"), async (req, res, next) => {
   try {
-    await pool.query("UPDATE stock_items SET is_active=false WHERE id=$1", [req.params.id]);
+    await pool.query("BEGIN");
+    await pool.query("DELETE FROM stock_transfers WHERE item_id = $1", [req.params.id]);
+    await pool.query("DELETE FROM stock_items WHERE id = $1", [req.params.id]);
+    await pool.query("COMMIT");
     await logAudit(req.user.id, "STOCK_DELETED", "stock_items", req.params.id, null, null, req.ip);
     res.json({ message: "Item deleted" });
-  } catch (err) { next(err); }
+  } catch (err) {
+    await pool.query("ROLLBACK").catch(() => {});
+    next(err);
+  }
 });
 
-router.post("/transfer", requireRole("admin", "manager"), async (req, res, next) => {
+router.post("/transfer", requireRole("admin", "manager", "worker"), async (req, res, next) => {
   try {
     const { item_id, from_branch, to_branch, quantity, notes } = req.body;
     const { rows: [item] } = await pool.query("SELECT * FROM stock_items WHERE id=$1", [item_id]);

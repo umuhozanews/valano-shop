@@ -24,11 +24,16 @@ router.get("/", async (req, res, next) => {
          FROM expenses e LEFT JOIN branches b ON b.id=e.branch_id LEFT JOIN users u ON u.id=e.recorded_by
          WHERE ${where} ORDER BY e.expense_date DESC
          LIMIT $${params.length-1} OFFSET $${params.length}`, params),
-      pool.query(`SELECT COUNT(*) FROM expenses e WHERE ${where}`, params.slice(0,-2)),
+      pool.query(`SELECT COUNT(*) as count, COALESCE(SUM(amount),0) as total_sum FROM expenses e WHERE ${where}`, params.slice(0,-2)),
       pool.query(`SELECT category, COALESCE(SUM(amount),0) as total FROM expenses e
          WHERE ${where.replace(/LIMIT.*/, "")} GROUP BY category`, params.slice(0,-2)),
     ]);
-    res.json({ data: data.rows, total: parseInt(cnt.rows[0].count), byCategory: summary.rows });
+    res.json({
+      data: data.rows,
+      total: parseInt(cnt.rows[0].count),
+      total_sum: parseFloat(cnt.rows[0].total_sum),
+      byCategory: summary.rows
+    });
   } catch (err) { next(err); }
 });
 
@@ -67,7 +72,7 @@ router.put("/:id", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.delete("/:id", requireRole("admin"), async (req, res, next) => {
+router.delete("/:id", requireRole("admin", "manager"), async (req, res, next) => {
   try {
     await pool.query("DELETE FROM expenses WHERE id=$1", [req.params.id]);
     res.json({ message: "Expense deleted" });

@@ -10,8 +10,6 @@ const Loading = () => (
 
 const L = (imp) => lazy(imp);
 
-const Landing = L(() => import("./pages/Landing"));
-const ProductDetail = L(() => import("./pages/ProductDetail"));
 const Login = L(() => import("./pages/auth/Login"));
 const Dashboard = L(() => import("./pages/dashboard/Dashboard"));
 const StockList = L(() => import("./pages/stock/StockList"));
@@ -46,6 +44,9 @@ const FinishedGoodsPage = L(() => import("./pages/industry/FinishedGoods"));
 const PropertiesPage = L(() => import("./pages/real-estate/Properties"));
 const TenantsPage = L(() => import("./pages/real-estate/Tenants"));
 const MaintenancePage = L(() => import("./pages/real-estate/Maintenance"));
+
+const Landing = L(() => import("./pages/Landing"));
+const ProductDetail = L(() => import("./pages/ProductDetail"));
 
 const AM = ["admin","manager"];
 const AO = ["admin"];

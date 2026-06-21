@@ -15,6 +15,7 @@ import toast from "react-hot-toast";
 import { ITEM_CATEGORIES, SIZES } from "../../utils/constants";
 import { useLanguage } from "../../context/LanguageContext";
 import { useBusiness } from "../../context/BusinessContext";
+import { useAuth } from "../../context/AuthContext";
 
 const STATUS_MAP = { in_stock: "success", low_stock: "warning", out_of_stock: "danger" };
 
@@ -23,6 +24,7 @@ const EMPTY_FORM = { name:"", category:"", size:"", color:"", quantity:0, cost_p
 export default function StockList() {
   const { t } = useLanguage();
   const { activeBusiness } = useBusiness();
+  const { user } = useAuth();
   const navigate = useNavigate();
   
   const [items, setItems] = useState([]);
@@ -68,8 +70,9 @@ export default function StockList() {
   async function handleSave() {
     setSaving(true);
     try {
-      if (editItem) await api.put(`/stock/${editItem.id}`, form);
-      else await api.post("/stock", form);
+      const payload = { ...form, branch_id: form.branch_id || user?.branch_id || 1 };
+      if (editItem) await api.put(`/stock/${editItem.id}`, payload);
+      else await api.post("/stock", payload);
       toast.success(t("success"));
       setShowModal(false); fetchData();
     } catch(e){ toast.error(e.response?.data?.error || t("error")); }
@@ -84,9 +87,9 @@ export default function StockList() {
 
   function openEdit(item) {
     setEditItem(item);
-    setForm({ name:item.name, category:item.category, size:item.size, color:item.color,
+    setForm({ name:item.name, category:item.category, size:item.size || "", color:item.color || "",
               quantity:item.quantity, cost_price_rwf:item.cost_price_rwf, sell_price_rwf:item.sell_price_rwf,
-              low_stock_threshold:item.low_stock_threshold });
+              low_stock_threshold:item.low_stock_threshold, branch_id:item.branch_id });
     setShowModal(true);
   }
 
@@ -94,7 +97,9 @@ export default function StockList() {
     { key:"name", label: isIndustry ? "Material Name" : t("item_name"), render:(v,r) => (
       <div>
         <p className="font-medium text-text-primary">{v}</p>
-        <p className="text-[11px] text-text-secondary">{r.category}</p>
+        <p className="text-[11px] text-text-secondary">
+          {r.category}{r.size ? ` • ${r.size}` : ""}{r.color ? ` • ${r.color}` : ""}
+        </p>
       </div>
     )},
     { key:"barcode", label: t("barcode"), render:v => <span className="font-mono text-[11px] text-text-secondary">{v}</span> },
@@ -102,7 +107,7 @@ export default function StockList() {
       <span className={`font-semibold ${r.status==="out_of_stock"?"text-danger":r.status==="low_stock"?"text-warning":"text-text-primary"}`}>{v}</span>
     )},
     { key:"cost_price_rwf", label: t("cost_price"), render:v => formatRWF(v) },
-    {!isIndustry && { key:"sell_price_rwf", label: t("selling_price"), render:v => formatRWF(v) }},
+    !isIndustry ? { key:"sell_price_rwf", label: t("selling_price"), render:v => formatRWF(v) } : null,
     { key:"status", label: t("status"), render:v => <Badge status={STATUS_MAP[v]||"neutral"} label={STATUS_LABEL[v]||v} /> },
     { key:"id", label:"", render:(v,r) => (
       <div className="flex gap-1">
@@ -158,6 +163,14 @@ export default function StockList() {
               {isIndustry ? ["Fabric","Buttons","Thread","Zippers","Labels","Packaging"].map(c => <option key={c} value={c}>{c}</option>) : ITEM_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
+          <div>
+            <label className="block text-[13px] font-medium text-text-primary mb-1">{t("size") || "Size"}</label>
+            <select value={form.size} onChange={e=>setForm(f=>({...f,size:e.target.value}))} className="w-full h-9 px-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface">
+              <option value="">{t("size") || "Size"}…</option>
+              {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <Input label={t("color") || "Color"} value={form.color} onChange={e=>setForm(f=>({...f,color:e.target.value}))} />
           <Input label={t("quantity")} type="number" value={form.quantity} onChange={e=>setForm(f=>({...f,quantity:e.target.value}))} />
           <Input label={t("min_stock")} type="number" value={form.low_stock_threshold} onChange={e=>setForm(f=>({...f,low_stock_threshold:e.target.value}))} />
           <Input label={t("cost_price")} type="number" value={form.cost_price_rwf} onChange={e=>setForm(f=>({...f,cost_price_rwf:e.target.value}))} />

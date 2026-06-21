@@ -30,6 +30,10 @@ export default function NewSale() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [showCart, setShowCart] = useState(false);
   const [invoiceNum, setInvoiceNum] = useState(null);
+  const [newSaleId, setNewSaleId] = useState(null);
+  const [isPartial, setIsPartial] = useState(false);
+  const [amountPaid, setAmountPaid] = useState("");
+  const [dueDate, setDueDate] = useState("");
 
   const isRealEstate = activeBusiness.type === "real_estate";
 
@@ -38,6 +42,13 @@ export default function NewSale() {
     { key:"mtn_momo", label: t("momo") },
     { key:"airtel", label:"Airtel" },
   ];
+
+  const fetchStock = useCallback(() => {
+    setLoading(true);
+    api.get("/stock", { params: { limit: 200 } })
+       .then(d => setAllItems(d.data.data))
+       .finally(() => setLoading(false));
+  }, []);
 
   useEffect(() => {
     if (isRealEstate) {
@@ -49,11 +60,9 @@ export default function NewSale() {
       ]);
       setLoading(false);
     } else {
-      api.get("/stock", { params: { limit: 200 } })
-         .then(d => setAllItems(d.data.data))
-         .finally(() => setLoading(false));
+      fetchStock();
     }
-  }, [isRealEstate]);
+  }, [isRealEstate, fetchStock]);
 
   const filtered = allItems.filter(item => {
     const matchSearch = !search || item.name.toLowerCase().includes(search.toLowerCase()) || item.barcode?.includes(search);
@@ -85,19 +94,40 @@ export default function NewSale() {
 
   async function confirmSale() {
     if (!cart.length) return toast.error("Cart is empty");
+
+    if (isPartial) {
+      const paid = parseFloat(amountPaid);
+      if (isNaN(paid) || paid < 0) {
+        return toast.error("Please enter a valid amount paid");
+      }
+      if (paid >= total) {
+        return toast.error("Amount paid for a partial payment must be less than the total sale amount");
+      }
+      if (!dueDate) {
+        return toast.error("Please specify a due date for the remainder");
+      }
+    }
+
     setSaving(true);
     try {
       const { data } = await api.post("/sales", {
         customer_name: customerName || (isRealEstate ? "Unnamed Tenant" : "Walk-in"),
         payment_method: payment,
         items: cart.map(i => ({ stock_item_id: i.stock_item_id, quantity: i.quantity, unit_price: i.unit_price })),
+        amount_paid: isPartial ? parseFloat(amountPaid) : total,
+        due_date: isPartial ? dueDate : null,
       });
       setInvoiceNum(data.invoice_number);
+      setNewSaleId(data.id);
       setShowConfirm(false);
       toast.success(isRealEstate ? "Payment recorded!" : `Sale recorded! Invoice: ${data.invoice_number}`);
       setCart([]);
       setCustomerName("");
       setPayment("cash");
+      setIsPartial(false);
+      setAmountPaid("");
+      setDueDate("");
+      if (!isRealEstate) fetchStock();
     } catch(e){ toast.error(e.response?.data?.error || t("error")); }
     finally { setSaving(false); }
   }
@@ -237,10 +267,56 @@ export default function NewSale() {
 
       <Modal open={showConfirm} onClose={() => setShowConfirm(false)} title={isRealEstate ? "Confirm Payment" : "Confirm Sale"}
         footer={<><Button variant="secondary" onClick={() => setShowConfirm(false)}>{t("cancel")}</Button><Button loading={saving} onClick={confirmSale}>{t("save")}</Button></>}>
-        <div className="space-y-2">
+        <div className="space-y-4">
           <p className="text-[13px] text-text-secondary">{isRealEstate ? "Tenant" : "Customer"}: <strong className="text-text-primary">{customerName || (isRealEstate ? "Unnamed Tenant" : "Walk-in")}</strong></p>
           <p className="text-[13px] text-text-secondary">{t("payment_method")}: <strong className="text-text-primary">{PAYMENTS.find(p=>p.key===payment)?.label}</strong></p>
-          <div className="text-[20px] font-bold text-primary pt-2">{formatRWF(total)}</div>
+          
+          <div className="flex justify-between items-center py-2 border-t border-b border-border">
+            <span className="text-[13px] font-bold text-text-primary">Total Sale Amount:</span>
+            <span className="text-[16px] font-black text-primary">{formatRWF(total)}</span>
+          </div>
+
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-[13px] font-medium text-text-primary cursor-pointer select-none">
+              <input type="checkbox" checked={isPartial} onChange={e => {
+                setIsPartial(e.target.checked);
+                if (e.target.checked) {
+                  setAmountPaid(String(Math.round(total / 2)));
+                  const nextWeek = new Date();
+                  nextWeek.setDate(nextWeek.getDate() + 7);
+                  setDueDate(nextWeek.toISOString().slice(0, 10));
+                } else {
+                  setAmountPaid("");
+                  setDueDate("");
+                }
+              }} className="rounded border-border text-primary focus:ring-primary h-4 w-4" />
+              <span>Record as Partial Payment (Customer Debt)</span>
+            </label>
+          </div>
+
+          {isPartial && (
+            <div className="p-3 bg-background border border-border rounded-card space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-text-secondary uppercase mb-1">Amount Paid (RWF)</label>
+                  <input type="number" min="0" max={total - 1} value={amountPaid} onChange={e => setAmountPaid(e.target.value)}
+                    className="w-full h-9 px-2 border border-border rounded text-[13px] focus:outline-none focus:ring-1 focus:ring-primary bg-surface font-semibold" />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-text-secondary uppercase mb-1">Remaining Due</label>
+                  <div className="h-9 px-2 border border-border rounded text-[13px] flex items-center bg-surface/50 text-danger font-bold">
+                    {formatRWF(Math.max(0, total - (parseFloat(amountPaid) || 0)))}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-text-secondary uppercase mb-1">Expected Pay Date</label>
+                <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
+                  className="w-full h-9 px-2 border border-border rounded text-[13px] focus:outline-none focus:ring-1 focus:ring-primary bg-surface" />
+              </div>
+            </div>
+          )}
         </div>
       </Modal>
 
@@ -252,9 +328,10 @@ export default function NewSale() {
             </div>
             <h3 className="text-[18px] font-bold text-text-primary mb-1">{isRealEstate ? "Payment Recorded!" : "Sale Recorded!"}</h3>
             <p className="text-[13px] text-text-secondary mb-4">{isRealEstate ? "Rent collection successfully tracked." : `Invoice: ${invoiceNum}`}</p>
-            <div className="flex gap-3">
-              <Button variant="secondary" className="flex-1" onClick={() => setInvoiceNum(null)}>{t("add")}</Button>
-              <Button className="flex-1" onClick={() => navigate("/app/sales")}>{t("view")}</Button>
+            <div className="flex gap-2 mt-4">
+              <Button variant="secondary" className="flex-1 text-[12px]" onClick={() => { setInvoiceNum(null); setNewSaleId(null); }}>{t("add")}</Button>
+              <Button variant="primary" className="flex-1 text-[12px]" onClick={() => navigate(`/app/sales/${newSaleId}?print=true`)}>{t("print")}</Button>
+              <Button variant="secondary" className="flex-1 text-[12px]" onClick={() => navigate(`/app/sales/${newSaleId}`)}>{t("view")}</Button>
             </div>
           </div>
         </div>

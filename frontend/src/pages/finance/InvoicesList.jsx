@@ -8,10 +8,12 @@ import Button from "../../components/ui/Button";
 import api from "../../utils/api";
 import { formatRWF, formatDate } from "../../utils/formatters";
 import toast from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 import { useLanguage } from "../../context/LanguageContext";
 
 export default function InvoicesList() {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({ search:"", status:"" });
@@ -20,21 +22,37 @@ export default function InvoicesList() {
     setLoading(true);
     try {
       const { data } = await api.get("/invoices", { params: filters });
-      setInvoices(data);
+      const list = Array.isArray(data) ? data : (data.data || []);
+      setInvoices(list);
     } catch { toast.error(t("error")); }
     finally { setLoading(false); }
   }, [filters, t]);
 
   useEffect(() => { fetchInvoices(); }, [fetchInvoices]);
 
+  const downloadPDF = async (invoiceId, invoiceNumber) => {
+    try {
+      const response = await api.get(`/invoices/${invoiceId}/pdf`, { responseType: "blob" });
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const link = document.createElement("a");
+      link.href = window.URL.createObjectURL(blob);
+      link.download = `${invoiceNumber || 'invoice'}.pdf`;
+      link.click();
+      toast.success(t("success") || "Downloaded");
+    } catch {
+      toast.error(t("error") || "Download failed");
+    }
+  };
+
   const columns = [
     { key:"invoice_number", label: t("invoice_no"), render:v => <span className="font-mono text-[12px] font-medium text-primary">{v}</span> },
     { key:"customer_name", label: t("customer"), render:v => v || "Walk-in" },
     { key:"total_amount", label: t("total"), render:v => <span className="font-semibold">{formatRWF(v)}</span> },
-    { key:"created_at", label: t("date"), render:v => formatDate(v, "dd MMM yyyy") },
-    { key:"id", label:"", render:v => (
+    { key:"issued_at", label: t("date"), render:v => formatDate(v, "dd MMM yyyy") },
+    { key:"id", label:"", render:(v, r) => (
       <div className="flex gap-1">
-        <Button variant="ghost" size="sm" icon={ExternalLink}>{t("view")}</Button>
+        <Button variant="ghost" size="sm" icon={ExternalLink} onClick={() => navigate(`/app/sales/${r.sale_id}`)}>{t("view")}</Button>
+        <Button variant="ghost" size="sm" icon={Download} onClick={() => downloadPDF(r.id, r.invoice_number)}>PDF</Button>
       </div>
     )},
   ];

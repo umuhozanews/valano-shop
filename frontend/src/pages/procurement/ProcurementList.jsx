@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import PageWrapper from "../../components/layout/PageWrapper";
 import Table from "../../components/ui/Table";
@@ -62,6 +62,17 @@ export default function ProcurementList() {
     finally { setSaving(false); }
   }
 
+  async function handleDelete(id) {
+    if (!confirm("Delete this procurement order?")) return;
+    try {
+      await api.delete(`/procurement/${id}`);
+      toast.success("Order deleted");
+      fetchOrders();
+    } catch {
+      toast.error("Failed to delete order");
+    }
+  }
+
   const columns = [
     { key:"id", label:"Order #", render:v => <span className="font-mono font-medium text-primary">#{v}</span> },
     { key:"supplier_name", label:"Supplier" },
@@ -70,7 +81,14 @@ export default function ProcurementList() {
     { key:"items_count", label:"Items" },
     { key:"items_cost", label:"Total Cost", render:v => formatRWF(v) },
     { key:"status", label:"Status", render:v => <Badge status={STATUS_MAP[v]||"neutral"} label={v?.replace("_"," ")||"—"} /> },
-    { key:"id", label:"", render:v => <Button variant="ghost" size="sm" onClick={() => navigate(`/app/procurement/${v}`)}>View</Button> },
+    { key:"id", label:"", render:(v) => (
+      <div className="flex gap-2 items-center justify-end">
+        <Button variant="ghost" size="sm" onClick={() => navigate(`/app/procurement/${v}`)}>View</Button>
+        <button onClick={() => handleDelete(v)} className="p-1 text-text-secondary hover:text-danger rounded" title="Delete Order">
+          <Trash2 size={14} />
+        </button>
+      </div>
+    )},
   ];
 
   return (

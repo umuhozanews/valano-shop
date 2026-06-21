@@ -52,9 +52,18 @@ export default function DebtManagement() {
   }
 
   async function markPaid(id) {
-    if (!confirm(t("confirm_delete"))) return;
+    if (!confirm("Are you sure you want to mark this debt as paid?")) return;
     try {
       await api.put(`/debts/${id}/pay`);
+      toast.success(t("success"));
+      fetchData();
+    } catch { toast.error(t("error")); }
+  }
+
+  async function deleteDebt(id) {
+    if (!confirm(t("confirm_delete"))) return;
+    try {
+      await api.delete(`/debts/${id}`);
       toast.success(t("success"));
       fetchData();
     } catch { toast.error(t("error")); }
@@ -85,7 +94,7 @@ export default function DebtManagement() {
             <CheckCircle2 size={16} />
           </button>
         )}
-        <button className="p-1 text-text-secondary hover:text-danger"><Trash2 size={14} /></button>
+        <button onClick={() => deleteDebt(v)} className="p-1 text-text-secondary hover:text-danger" title={t("delete")}><Trash2 size={14} /></button>
       </div>
     )}
   ];

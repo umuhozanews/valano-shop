@@ -20,7 +20,15 @@ router.get("/sales", async (req, res, next) => {
     if (bf) { params.push(bf); conds.push(`s.branch_id=$${params.length}`); }
     dateFilter(params, conds, { start_date, end_date, dateCol: "s.created_at" });
 
-    const [daily, workers, totals] = await Promise.all([
+    const [sales, daily, workers, totals] = await Promise.all([
+      pool.query(`SELECT s.*, u.name as worker_name, b.name as branch_name,
+          c.name as customer_name, i.invoice_number
+         FROM sales s
+         LEFT JOIN users u ON u.id=s.worker_id
+         LEFT JOIN branches b ON b.id=s.branch_id
+         LEFT JOIN customers c ON c.id=s.customer_id
+         LEFT JOIN invoices i ON i.sale_id=s.id
+         WHERE ${conds.join(" AND ")} ORDER BY s.created_at DESC`, params),
       pool.query(`SELECT DATE(s.created_at) as date, COUNT(*) as count, SUM(s.total_amount) as revenue
         FROM sales s WHERE ${conds.join(" AND ")} GROUP BY DATE(s.created_at) ORDER BY date`, params),
       pool.query(`SELECT u.name, b.name as branch, COUNT(s.id) as sales, SUM(s.total_amount) as revenue,
@@ -51,7 +59,7 @@ router.get("/sales", async (req, res, next) => {
       ]);
     }
 
-    res.json({ daily: daily.rows, workers: workers.rows, totals: totals.rows[0] });
+    res.json({ sales: sales.rows, daily: daily.rows, workers: workers.rows, totals: totals.rows[0] });
   } catch (err) { next(err); }
 });
 

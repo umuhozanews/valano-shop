@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Search, MessageCircle } from "lucide-react";
+import { Plus, Search, MessageCircle, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import PageWrapper from "../../components/layout/PageWrapper";
 import Table from "../../components/ui/Table";
@@ -49,6 +49,17 @@ export default function CustomersList() {
     finally { setSaving(false); }
   }
 
+  async function handleDelete(id) {
+    if (!confirm(t("confirm_delete") || "Delete this customer?")) return;
+    try {
+      await api.delete(`/customers/${id}`);
+      toast.success(t("success"));
+      fetchData();
+    } catch (e) {
+      toast.error(e.response?.data?.error || t("error"));
+    }
+  }
+
   const getSegCount = (s) => parseInt(summary.find(x=>x.segment===s)?.cnt||0);
 
   const columns = [
@@ -66,7 +77,7 @@ export default function CustomersList() {
     { key:"total_spent", label:"Total Spent", render:v => <span className="font-medium text-primary">{formatRWF(v||0)}</span> },
     { key:"last_purchase", label:"Last Purchase", render:v => v ? formatDate(v) : "—" },
     { key:"id", label:"", render:(v,r) => (
-      <div className="flex gap-1">
+      <div className="flex gap-1 items-center">
         <Button variant="ghost" size="sm" onClick={() => navigate(`/app/customers/${v}`)}>{t("view")}</Button>
         {r.phone && (
           <button onClick={() => window.open(`https://wa.me/${r.phone.replace(/\D/g,"")}?text=Hello+${encodeURIComponent(r.name)},+from+KNOTTY+SYSTEM`,"_blank")}
@@ -74,6 +85,9 @@ export default function CustomersList() {
             <MessageCircle size={14} />
           </button>
         )}
+        <button onClick={() => handleDelete(v)} className="p-1 text-text-secondary hover:text-danger rounded" title={t("delete")}>
+          <Trash2 size={14} />
+        </button>
       </div>
     )},
   ];

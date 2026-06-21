@@ -26,7 +26,16 @@ export default function ExpensesList() {
     setLoading(true);
     try {
       const { data } = await api.get("/expenses", { params: filters });
-      setExpenses(data.data); setTotals(data.totals);
+      const list = data.data || data || [];
+      const totalCount = data.total !== undefined ? data.total : list.length;
+      let totalSum = 0;
+      if (data.total_sum !== undefined) {
+        totalSum = data.total_sum;
+      } else {
+        totalSum = list.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
+      }
+      setExpenses(list);
+      setTotals({ total: totalSum, count: totalCount });
     } catch { toast.error(t("error")); }
     finally { setLoading(false); }
   }, [filters, t]);
@@ -37,7 +46,10 @@ export default function ExpensesList() {
     setSaving(true);
     try {
       await api.post("/expenses", form);
-      toast.success(t("success")); setShowModal(false); fetchExpenses();
+      toast.success(t("success"));
+      setShowModal(false);
+      setForm({ category:"Rent", amount:"", description:"", expense_date:new Date().toISOString().slice(0,10) });
+      fetchExpenses();
     } catch { toast.error(t("error")); }
     finally { setSaving(false); }
   }

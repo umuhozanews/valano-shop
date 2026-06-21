@@ -50,12 +50,13 @@ router.get("/:id/pdf", async (req, res, next) => {
     );
     if (!invoice) return res.status(404).json({ error: "Invoice not found" });
 
-    const [items, branch, customer, settings] = await Promise.all([
+    const [items, branch, customer, settings, debtRes] = await Promise.all([
       pool.query(`SELECT si.*, stk.name as item_name FROM sale_items si
         JOIN stock_items stk ON stk.id=si.stock_item_id WHERE si.sale_id=$1`, [invoice.sale_id]),
       pool.query(`SELECT b.* FROM sales s JOIN branches b ON b.id=s.branch_id WHERE s.id=$1`, [invoice.sale_id]),
       pool.query(`SELECT c.* FROM sales s LEFT JOIN customers c ON c.id=s.customer_id WHERE s.id=$1`, [invoice.sale_id]),
       pool.query("SELECT * FROM settings LIMIT 1"),
+      pool.query("SELECT * FROM debts WHERE sale_id=$1", [invoice.sale_id]),
     ]);
 
     createInvoicePDF(res, {
@@ -65,6 +66,7 @@ router.get("/:id/pdf", async (req, res, next) => {
       branch: branch.rows[0],
       customer: customer.rows[0],
       settings: settings.rows[0],
+      debt: debtRes.rows[0] || null,
     });
   } catch (err) { next(err); }
 });
@@ -76,6 +78,15 @@ router.put("/:id/status", requireRole("admin", "manager"), async (req, res, next
       "UPDATE invoices SET status=$1, paid_at=CASE WHEN $1='paid' THEN NOW() ELSE paid_at END WHERE id=$2 RETURNING *",
       [status, req.params.id]
     );
+
+    // Sync: If the invoice is marked as 'paid', mark any corresponding debt as 'paid'
+    if (status === "paid" && inv) {
+      await pool.query(
+        "UPDATE debts SET status = 'paid' WHERE sale_id = $1",
+        [inv.sale_id]
+      );
+    }
+
     res.json(inv);
   } catch (err) { next(err); }
 });

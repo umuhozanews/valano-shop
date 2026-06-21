@@ -1,6 +1,6 @@
 const PDFDocument = require("pdfkit");
 
-function createInvoicePDF(res, { invoice, sale, items, settings, branch, customer }) {
+function createInvoicePDF(res, { invoice, sale, items, settings, branch, customer, debt }) {
   const doc = new PDFDocument({ margin: 50, size: "A4" });
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `attachment; filename="${invoice.invoice_number}.pdf"`);
@@ -62,10 +62,36 @@ function createInvoicePDF(res, { invoice, sale, items, settings, branch, custome
 
   // Total
   rowY += 8;
-  doc.rect(50, rowY, doc.page.width - 100, 28).fill(emerald);
-  doc.fillColor("white").font("Helvetica-Bold").fontSize(11)
-     .text("TOTAL", 55, rowY + 8)
-     .text(fmt(total), 460, rowY + 8);
+  const remainingAmount = debt && debt.status === 'pending' ? parseFloat(debt.amount) : 0;
+  const paidAmount = debt ? (debt.status === 'paid' ? total : total - remainingAmount) : total;
+
+  if (remainingAmount > 0) {
+    doc.rect(50, rowY, doc.page.width - 100, 72).fill("#F3F4F6");
+    doc.fillColor(dark).font("Helvetica-Bold").fontSize(10);
+    doc.text("TOTAL AMOUNT:", 55, rowY + 8);
+    doc.text(fmt(total), 460, rowY + 8);
+
+    doc.font("Helvetica").fontSize(10);
+    doc.text("AMOUNT PAID:", 55, rowY + 28);
+    doc.text(fmt(paidAmount), 460, rowY + 28);
+
+    doc.fillColor("#EF4444").font("Helvetica-Bold");
+    doc.text("BALANCE DUE:", 55, rowY + 48);
+    doc.text(fmt(remainingAmount), 460, rowY + 48);
+
+    if (debt.due_date) {
+      doc.fillColor(gray).font("Helvetica").fontSize(9);
+      doc.text(`Due Date: ${new Date(debt.due_date).toLocaleDateString("en-RW")}`, 55, rowY + 68);
+      rowY += 20;
+    }
+    rowY += 72;
+  } else {
+    doc.rect(50, rowY, doc.page.width - 100, 28).fill(emerald);
+    doc.fillColor("white").font("Helvetica-Bold").fontSize(11)
+       .text("TOTAL PAID", 55, rowY + 8)
+       .text(fmt(total), 460, rowY + 8);
+    rowY += 28;
+  }
 
   // Footer
   doc.fillColor(gray).font("Helvetica").fontSize(9)

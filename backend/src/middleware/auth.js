@@ -34,8 +34,8 @@ function requireRole(...roles) {
       return res.status(401).json({ error: "Unauthenticated", code: "UNAUTHORIZED" });
     }
     const userLevel = ROLE_HIERARCHY[req.user.role] || 0;
-    const requiredLevel = Math.max(...roles.map((r) => ROLE_HIERARCHY[r] || 0));
-    if (userLevel < requiredLevel) {
+    const isAllowed = roles.some(r => userLevel >= (ROLE_HIERARCHY[r] || 0));
+    if (!isAllowed) {
       return res.status(403).json({ error: "Insufficient permissions", code: "FORBIDDEN" });
     }
     next();

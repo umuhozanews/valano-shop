@@ -68,10 +68,10 @@ router.get("/", async (req, res, next) => {
 
 router.get("/:id", async (req, res, next) => {
   try {
-    const [sale, items] = await Promise.all([
+    const [saleRes, itemsRes, debtRes] = await Promise.all([
       pool.query(`SELECT s.*, u.name as worker_name, b.name as branch_name, b.location as branch_location,
           b.phone as branch_phone, c.name as customer_name, c.phone as customer_phone,
-          i.invoice_number, i.status as invoice_status
+          i.id as invoice_id, i.invoice_number, i.status as invoice_status
          FROM sales s
          LEFT JOIN users u ON u.id=s.worker_id LEFT JOIN branches b ON b.id=s.branch_id
          LEFT JOIN customers c ON c.id=s.customer_id LEFT JOIN invoices i ON i.sale_id=s.id
@@ -79,15 +79,39 @@ router.get("/:id", async (req, res, next) => {
       pool.query(`SELECT si.*, stk.name as item_name, stk.size, stk.color, stk.barcode
          FROM sale_items si JOIN stock_items stk ON stk.id=si.stock_item_id
          WHERE si.sale_id=$1`, [req.params.id]),
+      pool.query(`SELECT * FROM debts WHERE sale_id=$1`, [req.params.id])
     ]);
-    if (!sale.rows[0]) return res.status(404).json({ error: "Sale not found" });
-    res.json({ ...sale.rows[0], items: items.rows });
+    if (!saleRes.rows[0]) return res.status(404).json({ error: "Sale not found" });
+    
+    const sale = saleRes.rows[0];
+    const debt = debtRes.rows[0] || null;
+    
+    let amountPaid = sale.total_amount;
+    let balanceDue = 0;
+    let dueDate = null;
+    
+    if (debt) {
+      dueDate = debt.due_date;
+      if (debt.status === "pending") {
+        balanceDue = parseFloat(debt.amount);
+        amountPaid = sale.total_amount - balanceDue;
+      }
+    }
+
+    res.json({ 
+      ...sale, 
+      items: itemsRes.rows, 
+      debt,
+      amount_paid: amountPaid,
+      balance_due: balanceDue,
+      due_date: dueDate
+    });
   } catch (err) { next(err); }
 });
 
 router.post("/", async (req, res, next) => {
   try {
-    const { customer_id, customer_name, payment_method, items } = req.body;
+    const { customer_id, customer_name, payment_method, items, amount_paid, due_date } = req.body;
     if (!items?.length) return res.status(400).json({ error: "No items" });
     if (!payment_method) return res.status(400).json({ error: "Payment method required" });
 
@@ -142,10 +166,35 @@ router.post("/", async (req, res, next) => {
 
     // Create invoice
     const invNum = generateInvoiceNumber();
+    const paid = amount_paid !== undefined ? parseFloat(amount_paid) : total;
+    const remaining = total - paid;
+    const invStatus = remaining > 0 ? "pending" : "paid";
+
     const { rows: [invoice] } = await pool.query(
       `INSERT INTO invoices (sale_id, invoice_number, status, issued_at)
-       VALUES ($1,$2,'paid',NOW()) RETURNING *`, [sale.id, invNum]
+       VALUES ($1,$2,$3,NOW()) RETURNING *`, [sale.id, invNum, invStatus]
     );
+
+    // Create debt if there is remainder
+    if (remaining > 0) {
+      let cName = customer_name || "Walk-in Customer";
+      if (custId && !customer_name) {
+        const { rows: [c] } = await pool.query("SELECT name FROM customers WHERE id=$1", [custId]);
+        if (c) cName = c.name;
+      }
+      await pool.query(
+        `INSERT INTO debts (person_name, amount, type, due_date, status, notes, branch_id, sale_id)
+         VALUES ($1, $2, 'receivable', $3, 'pending', $4, $5, $6)`,
+        [
+          cName,
+          remaining,
+          due_date || null,
+          `Remainder for Invoice #${invNum}. Total: ${total} RWF, Paid: ${paid} RWF.`,
+          req.user.branch_id,
+          sale.id
+        ]
+      );
+    }
 
     // Update customer stats / segment
     if (custId) {
@@ -179,6 +228,7 @@ router.post("/:id/void", requireRole("admin", "manager"), async (req, res, next)
     await pool.query("UPDATE sales SET is_voided=true, void_reason=$1, voided_by=$2 WHERE id=$3",
       [void_reason, req.user.id, sale.id]);
     await pool.query("UPDATE invoices SET status='voided' WHERE sale_id=$1", [sale.id]);
+    await pool.query("DELETE FROM debts WHERE sale_id=$1", [sale.id]);
 
     // Restore stock
     const { rows: items } = await pool.query("SELECT * FROM sale_items WHERE sale_id=$1", [sale.id]);

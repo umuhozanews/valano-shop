@@ -81,4 +81,11 @@ router.put("/:id", requireRole("admin", "manager"), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.delete("/:id", requireRole("admin", "manager"), async (req, res, next) => {
+  try {
+    await pool.query("DELETE FROM customers WHERE id=$1", [req.params.id]);
+    res.json({ message: "Customer deleted successfully" });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

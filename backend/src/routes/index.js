@@ -11,6 +11,7 @@ router.use("/customers",     require("./customers"));
 router.use("/suppliers",     require("./suppliers"));
 router.use("/invoices",      require("./invoices"));
 router.use("/expenses",      require("./expenses"));
+router.use("/debts",         require("./debts"));
 router.use("/finance",       require("./finance"));
 router.use("/reports",       require("./reports"));
 router.use("/notifications", require("./notifications"));

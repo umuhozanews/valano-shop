@@ -57,14 +57,23 @@ router.post("/", async (req, res, next) => {
       `INSERT INTO procurement_orders (supplier_id, order_date, arrival_date, currency,
         exchange_rate, shipping_cost, customs_cost, notes, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [supplier_id, order_date, arrival_date, currency || "CNY",
-       exchange_rate, shipping_cost || 0, customs_cost || 0, notes, req.user.id]
+      [supplier_id || null, order_date || null, arrival_date || null, currency || "CNY",
+       exchange_rate || null, shipping_cost || 0, customs_cost || 0, notes || null, req.user.id]
     );
     for (const item of (items || [])) {
       await pool.query(
         `INSERT INTO procurement_items (order_id, item_name, category, size, color, quantity, unit_cost, currency)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [order.id, item.item_name, item.category, item.size, item.color, item.quantity, item.unit_cost, currency || "CNY"]
+        [
+          order.id,
+          item.item_name || "Unnamed Item",
+          item.category || null,
+          item.size || null,
+          item.color || null,
+          parseInt(item.quantity) || 0,
+          parseFloat(item.unit_cost) || 0,
+          currency || "CNY"
+        ]
       );
     }
     await pool.query("COMMIT");
@@ -84,7 +93,7 @@ router.put("/:id", async (req, res, next) => {
       `UPDATE procurement_orders SET supplier_id=$1, arrival_date=$2, currency=$3,
         exchange_rate=$4, shipping_cost=$5, customs_cost=$6, notes=$7
        WHERE id=$8 RETURNING *`,
-      [supplier_id, arrival_date, currency, exchange_rate, shipping_cost, customs_cost, notes, req.params.id]
+      [supplier_id || null, arrival_date || null, currency || "CNY", exchange_rate || null, shipping_cost || 0, customs_cost || 0, notes || null, req.params.id]
     );
     await logAudit(req.user.id, "PROCUREMENT_UPDATED", "procurement_orders", order.id, old, order, req.ip);
     res.json(order);
@@ -156,6 +165,15 @@ router.post("/:id/stock-in", async (req, res, next) => {
     await pool.query("ROLLBACK").catch(() => {});
     next(err);
   }
+});
+
+router.delete("/:id", requireRole("admin", "manager"), async (req, res, next) => {
+  try {
+    const { rows } = await pool.query("DELETE FROM procurement_orders WHERE id=$1 RETURNING *", [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: "Order not found" });
+    await logAudit(req.user.id, "PROCUREMENT_DELETED", "procurement_orders", req.params.id, null, null, req.ip);
+    res.json({ message: "Order deleted successfully" });
+  } catch (err) { next(err); }
 });
 
 module.exports = router;
