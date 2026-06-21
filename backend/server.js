@@ -7,6 +7,7 @@ const logger = require("./src/middleware/logger");
 const errorHandler = require("./src/middleware/errorHandler");
 const routes = require("./src/routes");
 const { startCronJobs } = require("./src/cron");
+const { runDatabaseBackup } = require("./src/utils/backup");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -30,6 +31,11 @@ app.use(errorHandler);
 app.listen(PORT, () => {
   console.log(`KNOTTY SYSTEM backend → http://localhost:${PORT} [${process.env.NODE_ENV || "development"}]`);
   startCronJobs();
+  
+  // Create a backup of the database on server startup
+  runDatabaseBackup().catch(e => {
+    console.error("[BACKUP ERROR] Startup database backup failed:", e.message);
+  });
 });
 
 module.exports = app;

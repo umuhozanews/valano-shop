@@ -1,5 +1,6 @@
 const pool = require("../config/db");
 const crypto = require("crypto");
+const { runDatabaseBackup } = require("./backup");
 
 function paginate(page = 1, limit = 20) {
   const p = Math.max(1, parseInt(page));
@@ -25,6 +26,11 @@ async function logAudit(userId, action, tableName, recordId, oldValue, newValue,
        newValue ? JSON.stringify(newValue) : null,
        ip || null]
     );
+    
+    // Automatically trigger database backup on audit logging (write operations)
+    runDatabaseBackup().catch(e => {
+      console.error("[BACKUP ERROR] Auto backup failed in logAudit:", e.message);
+    });
   } catch (e) {
     console.error("Audit log error:", e.message);
   }
