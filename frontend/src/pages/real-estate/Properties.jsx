@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Home, MapPin, Search, Edit, Trash2 } from "lucide-react";
+import { Plus, Home, MapPin, Search, Edit, Trash2, Info } from "lucide-react";
 import PageWrapper from "../../components/layout/PageWrapper";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
@@ -36,6 +36,7 @@ export default function Properties() {
     p.address.toLowerCase().includes(search.toLowerCase())
   );
 
+  "handleSave"
   function handleSave() {
     if (!form.name || !form.address) return toast.error(t("error"));
     
@@ -97,6 +98,13 @@ export default function Properties() {
     <PageWrapper title={t("properties")} subtitle="Manage your real estate portfolio"
       breadcrumbs={[{ label: t("real_estate"), path: "/app/properties" }, { label: t("properties"), path: "/app/properties" }]}>
       
+      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2.5 text-blue-800 text-[13px] shadow-sm">
+        <Info size={16} className="text-blue-600 shrink-0" />
+        <div>
+          <span className="font-semibold">Frontend Prototype:</span> This Properties management feature is a design preview. Changes are stored in-memory and will reset when you refresh or reopen the app.
+        </div>
+      </div>
+
       <div className="flex justify-between items-center mb-4">
         <div className="relative w-64">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />

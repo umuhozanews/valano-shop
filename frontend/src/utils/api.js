@@ -564,6 +564,7 @@ function handle(method, url, body) {
 // ─── API INTERFACE EXPORT ────────────────────────────────────────────────────
 
 const api = {
+  isMock: false,
   get: async (url, config) => {
     try {
       const res = await realApi.get(url, config);
@@ -574,6 +575,7 @@ const api = {
     } catch (err) {
       if (isNetworkError(err)) {
         await delay();
+        api.isMock = true;
         return { data: handle("GET", url, config?.params) };
       }
       throw err;
@@ -589,6 +591,7 @@ const api = {
     } catch (err) {
       if (isNetworkError(err)) {
         await delay();
+        api.isMock = true;
         return { data: handle("POST", url, body) };
       }
       throw err;
@@ -604,6 +607,7 @@ const api = {
     } catch (err) {
       if (isNetworkError(err)) {
         await delay();
+        api.isMock = true;
         return { data: handle("PUT", url, body) };
       }
       throw err;
@@ -619,6 +623,7 @@ const api = {
     } catch (err) {
       if (isNetworkError(err)) {
         await delay();
+        api.isMock = true;
         return { data: handle("DELETE", url, null) };
       }
       throw err;

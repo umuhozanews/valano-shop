@@ -4,6 +4,7 @@ const bcrypt = require("bcryptjs");
 const pool = require("../config/db");
 const { verifyToken, requireRole } = require("../middleware/auth");
 const { logAudit, createNotification, paginate } = require("../utils/helpers");
+const { isValidEmail, validatePasswordStrength } = require("../utils/validation");
 
 router.use(verifyToken, requireRole("admin", "manager"));
 
@@ -92,11 +93,22 @@ router.get("/:id/performance", async (req, res, next) => {
 router.post("/", async (req, res, next) => {
   try {
     const { name, email, phone, role, branch_id, monthly_target, commission_rate, password } = req.body;
-    const hash = await bcrypt.hash(password || "Worker@123", 10);
+
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ error: "Invalid email format" });
+    }
+
+    const passToValidate = password || "Worker@123";
+    const strength = validatePasswordStrength(passToValidate);
+    if (!strength.valid) {
+      return res.status(400).json({ error: strength.error });
+    }
+
+    const hash = await bcrypt.hash(passToValidate, 10);
     const { rows: [user] } = await pool.query(
       `INSERT INTO users (name, email, password_hash, role, branch_id, phone, monthly_target, commission_rate)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [name, email, hash, role || "worker", branch_id, phone, monthly_target || 0, commission_rate || 5]
+      [name, email.toLowerCase().trim(), hash, role || "worker", branch_id, phone, monthly_target || 0, commission_rate || 5]
     );
     await logAudit(req.user.id, "WORKER_CREATED", "users", user.id, null, { name, email, role }, req.ip);
     const { password_hash, ...safe } = user;

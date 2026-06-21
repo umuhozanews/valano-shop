@@ -6,12 +6,18 @@ const pool = require("../config/db");
 const { JWT_SECRET, JWT_REFRESH_SECRET } = require("../config/env");
 const { verifyToken } = require("../middleware/auth");
 const { logAudit } = require("../utils/helpers");
+const { isValidEmail, validatePasswordStrength } = require("../utils/validation");
+const { sendLoginAlert } = require("../utils/mailer");
 
 router.post("/login", async (req, res, next) => {
   try {
     const { email, password } = req.body;
     if (!email || !password)
       return res.status(400).json({ error: "Email and password required" });
+
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ error: "Invalid email format" });
+    }
 
     const { rows } = await pool.query(
       "SELECT * FROM users WHERE email = $1 AND is_active = true",
@@ -35,6 +41,11 @@ router.post("/login", async (req, res, next) => {
     const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, { expiresIn: "7d" });
 
     await logAudit(user.id, "LOGIN", "users", user.id, null, { email }, req.ip);
+
+    // Send security alert email asynchronously
+    sendLoginAlert(user.email, user.name, req.ip).catch(e => {
+      console.error("[MAIL ERROR] Background email dispatch failed:", e.message);
+    });
 
     const { password_hash, ...safeUser } = user;
     res.json({ accessToken, refreshToken, user: safeUser });
@@ -91,6 +102,11 @@ router.put("/me/password", verifyToken, async (req, res, next) => {
     const user = rows[0];
     if (!user || !(await bcrypt.compare(currentPassword, user.password_hash)))
       return res.status(400).json({ error: "Current password incorrect" });
+
+    const strength = validatePasswordStrength(newPassword);
+    if (!strength.valid) {
+      return res.status(400).json({ error: strength.error });
+    }
 
     const hash = await bcrypt.hash(newPassword, 10);
     await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [hash, req.user.id]);
