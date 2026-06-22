@@ -5,7 +5,7 @@ const compression = require("compression");
 const path = require("path");
 const logger = require("./src/middleware/logger");
 const errorHandler = require("./src/middleware/errorHandler");
-const routes = require("./src/routes");
+const routes = require("./src/routes/index.js");
 const { startCronJobs } = require("./src/cron");
 const { runDatabaseBackup } = require("./src/utils/backup");
 
