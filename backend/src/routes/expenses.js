@@ -4,7 +4,7 @@ const pool = require("../config/db");
 const { verifyToken, requireRole } = require("../middleware/auth");
 const { logAudit, paginate } = require("../utils/helpers");
 
-router.use(verifyToken, requireRole("admin", "manager"));
+router.use(verifyToken, requireRole("admin", "manager", "accountant"));
 
 router.get("/", async (req, res, next) => {
   try {
@@ -72,7 +72,7 @@ router.put("/:id", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.delete("/:id", requireRole("admin", "manager"), async (req, res, next) => {
+router.delete("/:id", requireRole("admin", "manager", "accountant"), async (req, res, next) => {
   try {
     await pool.query("DELETE FROM expenses WHERE id=$1", [req.params.id]);
     res.json({ message: "Expense deleted" });

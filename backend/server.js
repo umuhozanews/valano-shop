@@ -24,8 +24,12 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", time: new Date().toISOString(), version: "1.0.0" });
 });
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", time: new Date().toISOString(), version: "1.0.0" });
+});
 
 app.use("/api", routes);
+app.use("/", routes);
 app.use(errorHandler);
 
 app.listen(PORT, () => {

@@ -13,12 +13,13 @@ import { formatRWF } from "../../utils/formatters";
 import toast from "react-hot-toast";
 import { useLanguage } from "../../context/LanguageContext";
 
-const EMPTY = { name:"", email:"", phone:"", role:"worker", monthly_target:0, commission_rate:5, password:"" };
+const EMPTY = { name:"", email:"", phone:"", role:"worker", monthly_target:0, commission_rate:5, password:"", branch_id:"" };
 
 export default function WorkersList() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [workers, setWorkers] = useState([]);
+  const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editW, setEditW] = useState(null);
@@ -36,11 +37,21 @@ export default function WorkersList() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  useEffect(() => {
+    api.get("/settings").then(({ data }) => {
+      setBranches(data.branches || []);
+    }).catch(console.error);
+  }, []);
+
   async function handleSave() {
     setSaving(true);
     try {
-      if (editW) await api.put(`/workers/${editW.id}`, form);
-      else await api.post("/workers", form);
+      const payload = {
+        ...form,
+        branch_id: form.branch_id ? parseInt(form.branch_id) : null
+      };
+      if (editW) await api.put(`/workers/${editW.id}`, payload);
+      else await api.post("/workers", payload);
       toast.success(t("success"));
       setShowModal(false); fetchData();
     } catch(e){ toast.error(e.response?.data?.error|| t("error")); }
@@ -56,7 +67,7 @@ export default function WorkersList() {
   function openEdit(w) {
     setEditW(w);
     setForm({ name:w.name, email:w.email, phone:w.phone||"", role:w.role,
-              monthly_target:w.monthly_target, commission_rate:w.commission_rate, password:"" });
+              monthly_target:w.monthly_target, commission_rate:w.commission_rate, password:"", branch_id:w.branch_id||"" });
     setShowModal(true);
   }
 
@@ -70,6 +81,7 @@ export default function WorkersList() {
       </div>
     )},
     { key:"role", label: "Role", render:v => <Badge status={v==="manager"?"warning":"neutral"} label={v} /> },
+    { key:"branch_name", label: "Branch", render:v => <Badge status="neutral" label={v || "Global"} /> },
     { key:"monthly_sales", label: t("sales"), render:v => parseInt(v)||0 },
     { key:"monthly_revenue", label: t("revenue"), render:v => <span className="text-primary font-medium">{formatRWF(v||0)}</span> },
     { key:"monthly_target", label: "Target", render:v => formatRWF(v) },
@@ -104,6 +116,15 @@ export default function WorkersList() {
           <div className="col-span-2"><Input label={t("name")} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} /></div>
           <Input label="Email" type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} />
           <Input label={t("phone")} value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} />
+          <div>
+            <label className="block text-[13px] font-medium text-text-primary mb-1">Branch</label>
+            <select value={form.branch_id} onChange={e=>setForm(f=>({...f,branch_id:e.target.value}))} className="w-full h-9 px-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface">
+              <option value="">None (Global)</option>
+              {branches.map(b => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="block text-[13px] font-medium text-text-primary mb-1">Role</label>
             <select value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value}))} className="w-full h-9 px-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface">

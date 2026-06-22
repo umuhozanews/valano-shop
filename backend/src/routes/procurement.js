@@ -4,7 +4,7 @@ const pool = require("../config/db");
 const { verifyToken, requireRole } = require("../middleware/auth");
 const { logAudit, notifyAdminsAndManagers, paginate } = require("../utils/helpers");
 
-router.use(verifyToken, requireRole("admin", "manager"));
+router.use(verifyToken, requireRole("admin", "manager", "accountant"));
 
 const STATUS_FLOW = ["ordered", "in_transit", "at_customs", "arrived", "stocked"];
 
@@ -118,6 +118,12 @@ router.put("/:id/status", async (req, res, next) => {
 router.post("/:id/stock-in", async (req, res, next) => {
   try {
     const { branch_id, items } = req.body;
+    
+    const targetBranchId = req.user.role === "admin" ? branch_id : req.user.branch_id;
+    if (!targetBranchId) {
+      return res.status(400).json({ error: "Branch assignment is required." });
+    }
+
     const { rows: [order] } = await pool.query("SELECT * FROM procurement_orders WHERE id=$1", [req.params.id]);
     if (!order) return res.status(404).json({ error: "Order not found" });
 
@@ -141,7 +147,7 @@ router.post("/:id/stock-in", async (req, res, next) => {
       // Upsert stock
       const { rows: existing } = await pool.query(
         `SELECT id FROM stock_items WHERE name=$1 AND size=$2 AND color=$3 AND branch_id=$4 AND is_active=true LIMIT 1`,
-        [pi.item_name, pi.size, pi.color, branch_id]
+        [pi.item_name, pi.size, pi.color, targetBranchId]
       );
       if (existing[0]) {
         await pool.query(
@@ -153,13 +159,13 @@ router.post("/:id/stock-in", async (req, res, next) => {
         await pool.query(
           `INSERT INTO stock_items (name,category,size,color,barcode,branch_id,quantity,cost_price_rwf,sell_price_rwf,low_stock_threshold)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,5)`,
-          [pi.item_name, pi.category, pi.size, pi.color, barcode, branch_id, item.actual_qty, unitCostRWF, Math.round(unitCostRWF * 1.5)]
+          [pi.item_name, pi.category, pi.size, pi.color, barcode, targetBranchId, item.actual_qty, unitCostRWF, Math.round(unitCostRWF * 1.5)]
         );
       }
     }
     await pool.query("UPDATE procurement_orders SET status='stocked' WHERE id=$1", [order.id]);
     await pool.query("COMMIT");
-    await logAudit(req.user.id, "STOCK_CREATED", "procurement_orders", order.id, null, { branch_id, items_count: items.length }, req.ip);
+    await logAudit(req.user.id, "STOCK_CREATED", "procurement_orders", order.id, null, { branch_id: targetBranchId, items_count: items.length }, req.ip);
     res.json({ message: "Stocked in successfully" });
   } catch (err) {
     await pool.query("ROLLBACK").catch(() => {});

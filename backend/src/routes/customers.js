@@ -6,7 +6,7 @@ const { paginate } = require("../utils/helpers");
 
 router.use(verifyToken);
 
-router.get("/", requireRole("admin", "manager"), async (req, res, next) => {
+router.get("/", requireRole("admin", "manager", "accountant"), async (req, res, next) => {
   try {
     const { search, type, segment, page, limit } = req.query;
     const { limit: lim, offset } = paginate(page, limit);
@@ -32,7 +32,7 @@ router.get("/", requireRole("admin", "manager"), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get("/top", requireRole("admin", "manager"), async (req, res, next) => {
+router.get("/top", requireRole("admin", "manager", "accountant"), async (req, res, next) => {
   try {
     const { rows } = await pool.query(`
       SELECT c.*, COUNT(s.id) as orders, COALESCE(SUM(s.total_amount),0) as spent
@@ -42,7 +42,7 @@ router.get("/top", requireRole("admin", "manager"), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get("/:id", requireRole("admin", "manager"), async (req, res, next) => {
+router.get("/:id", requireRole("admin", "manager", "accountant"), async (req, res, next) => {
   try {
     const [customer, sales] = await Promise.all([
       pool.query(`SELECT c.*, COUNT(s.id) as total_orders, COALESCE(SUM(s.total_amount),0) as total_spent,
@@ -70,7 +70,7 @@ router.post("/", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put("/:id", requireRole("admin", "manager"), async (req, res, next) => {
+router.put("/:id", requireRole("admin", "manager", "accountant"), async (req, res, next) => {
   try {
     const { name, phone, location, type, segment, notes } = req.body;
     const { rows: [c] } = await pool.query(
@@ -81,7 +81,7 @@ router.put("/:id", requireRole("admin", "manager"), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.delete("/:id", requireRole("admin", "manager"), async (req, res, next) => {
+router.delete("/:id", requireRole("admin", "manager", "accountant"), async (req, res, next) => {
   try {
     await pool.query("DELETE FROM customers WHERE id=$1", [req.params.id]);
     res.json({ message: "Customer deleted successfully" });

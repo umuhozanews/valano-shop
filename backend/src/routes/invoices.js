@@ -7,7 +7,7 @@ const { createInvoicePDF } = require("../utils/pdf");
 
 router.use(verifyToken);
 
-router.get("/", requireRole("admin", "manager"), async (req, res, next) => {
+router.get("/", requireRole("admin", "manager", "accountant"), async (req, res, next) => {
   try {
     const { status, start_date, end_date, page, limit } = req.query;
     const { limit: lim, offset } = paginate(page, limit);
@@ -32,7 +32,7 @@ router.get("/", requireRole("admin", "manager"), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get("/:id", requireRole("admin", "manager"), async (req, res, next) => {
+router.get("/:id", requireRole("admin", "manager", "accountant"), async (req, res, next) => {
   try {
     const { rows: [inv] } = await pool.query(
       `SELECT i.*, s.* FROM invoices i JOIN sales s ON s.id=i.sale_id WHERE i.id=$1`, [req.params.id]
@@ -71,7 +71,7 @@ router.get("/:id/pdf", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put("/:id/status", requireRole("admin", "manager"), async (req, res, next) => {
+router.put("/:id/status", requireRole("admin", "manager", "accountant"), async (req, res, next) => {
   try {
     const { status } = req.body;
     const { rows: [inv] } = await pool.query(

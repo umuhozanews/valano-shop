@@ -59,6 +59,7 @@ export default function SettingsPage() {
   const ROLES = [
     { role: "admin", label: "Admin (Owner)", desc: "Full access to all modules including P&L, settings, and all reports", color: "bg-danger/10 text-danger" },
     { role: "manager", label: "Manager", desc: "Sales, stock, workers, procurement, customers, invoices — all except settings and owner P&L", color: "bg-warning/10 text-warning" },
+    { role: "accountant", label: "Accountant", desc: "Full access to financial modules including expenses, debts, invoices, P&L, stock, and financial reports", color: "bg-primary/10 text-primary" },
     { role: "worker", label: "Worker", desc: "Record sales only — limited to POS screen and own sales history", color: "bg-neutral/10 text-text-secondary" },
   ];
 
@@ -549,7 +550,7 @@ export default function SettingsPage() {
                         <p className="text-[13px] text-text-secondary">{r.desc}</p>
                         <div className="mt-3 grid grid-cols-2 gap-2">
                           {["Dashboard", "Stock", "Sales", "Procurement", "Workers", "Customers", "Suppliers", "Invoices", "Expenses", "P&L", "Reports", "Settings"].map(mod => {
-                            const allowed = r.role === "admin" ? true : r.role === "manager" ? mod !== "Settings" && mod !== "P&L" : mod === "Sales";
+                            const allowed = r.role === "admin" ? true : r.role === "manager" ? (mod !== "Settings" && mod !== "P&L") : r.role === "accountant" ? (mod !== "Workers" && mod !== "Settings") : mod === "Sales";
                             return (
                               <div key={mod} className="flex items-center gap-2">
                                 <div className={`w-4 h-4 rounded-full flex items-center justify-center ${allowed ? "bg-success" : "bg-border"}`}>

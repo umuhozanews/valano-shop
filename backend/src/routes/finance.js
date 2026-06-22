@@ -8,15 +8,15 @@ const { exportToExcel } = require("../utils/excel");
 
 router.use(verifyToken);
 
-router.get("/pnl", requireRole("admin", "manager"), async (req, res, next) => {
+router.get("/pnl", requireRole("admin", "manager", "accountant"), async (req, res, next) => {
   try {
     const { year = new Date().getFullYear(), branch_id } = req.query;
     
-    const bfSales = req.user.role === "admin"
+    const bfSales = (req.user.role === "admin" || req.user.role === "accountant")
       ? (branch_id ? `AND s.branch_id=${parseInt(branch_id)}` : "")
       : `AND s.branch_id=${req.user.branch_id}`;
 
-    const bfExpenses = req.user.role === "admin"
+    const bfExpenses = (req.user.role === "admin" || req.user.role === "accountant")
       ? (branch_id ? `AND branch_id=${parseInt(branch_id)}` : "")
       : `AND branch_id=${req.user.branch_id}`;
 
@@ -108,7 +108,7 @@ router.get("/pnl", requireRole("admin", "manager"), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get("/pnl/daily", requireRole("admin", "manager"), async (req, res, next) => {
+router.get("/pnl/daily", requireRole("admin", "manager", "accountant"), async (req, res, next) => {
   try {
     const { year = new Date().getFullYear(), month = new Date().getMonth() + 1, branch_id } = req.query;
     
@@ -116,11 +116,11 @@ router.get("/pnl/daily", requireRole("admin", "manager"), async (req, res, next)
     const lastDay = new Date(year, month, 0).getDate();
     const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
-    const bfSales = req.user.role === "admin"
+    const bfSales = (req.user.role === "admin" || req.user.role === "accountant")
       ? (branch_id ? `AND s.branch_id=${parseInt(branch_id)}` : "")
       : `AND s.branch_id=${req.user.branch_id}`;
 
-    const bfExpenses = req.user.role === "admin"
+    const bfExpenses = (req.user.role === "admin" || req.user.role === "accountant")
       ? (branch_id ? `AND branch_id=${parseInt(branch_id)}` : "")
       : `AND branch_id=${req.user.branch_id}`;
 

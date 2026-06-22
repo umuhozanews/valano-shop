@@ -49,8 +49,11 @@ const Landing = L(() => import("./pages/Landing"));
 const ProductDetail = L(() => import("./pages/ProductDetail"));
 
 const AM = ["admin","manager"];
+const AMA = ["admin","manager","accountant"];
 const AO = ["admin"];
+const AA = ["admin","accountant"];
 const ALL = ["admin","manager","worker"];
+const ALLA = ["admin","manager","worker","accountant"];
 
 const P = ({ children, roles }) => <ProtectedRoute roles={roles}>{children}</ProtectedRoute>;
 
@@ -61,41 +64,41 @@ export default function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/product/:id" element={<ProductDetail />} />
         <Route path="/app/login" element={<Login />} />
-        <Route path="/app/dashboard" element={<P roles={AM}><Dashboard /></P>} />
-        <Route path="/app/stock" element={<P roles={AM}><StockList /></P>} />
-        <Route path="/app/stock/labels" element={<P roles={AM}><LabelPrint /></P>} />
-        <Route path="/app/stock/:id" element={<P roles={AM}><StockDetail /></P>} />
-        <Route path="/app/sales" element={<P roles={ALL}><SalesList /></P>} />
-        <Route path="/app/sales/new" element={<P roles={ALL}><NewSale /></P>} />
-        <Route path="/app/sales/:id" element={<P roles={ALL}><SaleDetail /></P>} />
+        <Route path="/app/dashboard" element={<P roles={AMA}><Dashboard /></P>} />
+        <Route path="/app/stock" element={<P roles={AMA}><StockList /></P>} />
+        <Route path="/app/stock/labels" element={<P roles={AMA}><LabelPrint /></P>} />
+        <Route path="/app/stock/:id" element={<P roles={AMA}><StockDetail /></P>} />
+        <Route path="/app/sales" element={<P roles={ALLA}><SalesList /></P>} />
+        <Route path="/app/sales/new" element={<P roles={ALLA}><NewSale /></P>} />
+        <Route path="/app/sales/:id" element={<P roles={ALLA}><SaleDetail /></P>} />
         
         {/* Industry Specific */}
-        <Route path="/app/production" element={<P roles={AM}><ProductionPage /></P>} />
-        <Route path="/app/finished-goods" element={<P roles={AM}><FinishedGoodsPage /></P>} />
+        <Route path="/app/production" element={<P roles={AMA}><ProductionPage /></P>} />
+        <Route path="/app/finished-goods" element={<P roles={AMA}><FinishedGoodsPage /></P>} />
         
         {/* Real Estate Specific */}
-        <Route path="/app/properties" element={<P roles={AM}><PropertiesPage /></P>} />
-        <Route path="/app/tenants" element={<P roles={AM}><TenantsPage /></P>} />
-        <Route path="/app/maintenance" element={<P roles={AM}><MaintenancePage /></P>} />
+        <Route path="/app/properties" element={<P roles={AMA}><PropertiesPage /></P>} />
+        <Route path="/app/tenants" element={<P roles={AMA}><TenantsPage /></P>} />
+        <Route path="/app/maintenance" element={<P roles={AMA}><MaintenancePage /></P>} />
 
-        <Route path="/app/procurement" element={<P roles={AM}><ProcurementList /></P>} />
-        <Route path="/app/procurement/:id" element={<P roles={AM}><ProcurementDetail /></P>} />
+        <Route path="/app/procurement" element={<P roles={AMA}><ProcurementList /></P>} />
+        <Route path="/app/procurement/:id" element={<P roles={AMA}><ProcurementDetail /></P>} />
         <Route path="/app/workers" element={<P roles={AM}><WorkersList /></P>} />
         <Route path="/app/workers/:id" element={<P roles={AM}><WorkerProfile /></P>} />
-        <Route path="/app/customers" element={<P roles={AM}><CustomersList /></P>} />
-        <Route path="/app/customers/:id" element={<P roles={AM}><CustomerProfile /></P>} />
-        <Route path="/app/suppliers" element={<P roles={AO}><SuppliersList /></P>} />
-        <Route path="/app/invoices" element={<P roles={AM}><InvoicesList /></P>} />
-        <Route path="/app/expenses" element={<P roles={AM}><ExpensesList /></P>} />
-        <Route path="/app/debts" element={<P roles={AM}><DebtManagement /></P>} />
-        <Route path="/app/finance/pnl" element={<P roles={AO}><ProfitLoss /></P>} />
-        <Route path="/app/reports/sales" element={<P roles={AM}><SalesReport /></P>} />
-        <Route path="/app/reports/stock" element={<P roles={AM}><StockReport /></P>} />
-        <Route path="/app/reports/workers" element={<P roles={AM}><WorkerPerformance /></P>} />
-        <Route path="/app/reports/financial" element={<P roles={AO}><FinancialReport /></P>} />
-        <Route path="/app/reports/procurement" element={<P roles={AO}><ProcurementReport /></P>} />
+        <Route path="/app/customers" element={<P roles={AMA}><CustomersList /></P>} />
+        <Route path="/app/customers/:id" element={<P roles={AMA}><CustomerProfile /></P>} />
+        <Route path="/app/suppliers" element={<P roles={AA}><SuppliersList /></P>} />
+        <Route path="/app/invoices" element={<P roles={AMA}><InvoicesList /></P>} />
+        <Route path="/app/expenses" element={<P roles={AMA}><ExpensesList /></P>} />
+        <Route path="/app/debts" element={<P roles={AMA}><DebtManagement /></P>} />
+        <Route path="/app/finance/pnl" element={<P roles={AA}><ProfitLoss /></P>} />
+        <Route path="/app/reports/sales" element={<P roles={AMA}><SalesReport /></P>} />
+        <Route path="/app/reports/stock" element={<P roles={AMA}><StockReport /></P>} />
+        <Route path="/app/reports/workers" element={<P roles={AMA}><WorkerPerformance /></P>} />
+        <Route path="/app/reports/financial" element={<P roles={AA}><FinancialReport /></P>} />
+        <Route path="/app/reports/procurement" element={<P roles={AA}><ProcurementReport /></P>} />
         <Route path="/app/reports/audit" element={<P roles={AO}><AuditLog /></P>} />
-        <Route path="/app/notifications" element={<P roles={ALL}><NotificationsPage /></P>} />
+        <Route path="/app/notifications" element={<P roles={ALLA}><NotificationsPage /></P>} />
         <Route path="/app/settings" element={<P roles={AO}><SettingsPage /></P>} />
         <Route path="/app" element={<Navigate to="/app/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />

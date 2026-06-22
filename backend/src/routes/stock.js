@@ -28,7 +28,7 @@ router.get("/", async (req, res, next) => {
     const conditions = ["si.is_active = true"];
     const params = [];
 
-    if (req.user.role !== "admin" && req.user.branch_id) {
+    if (req.user.role !== "admin" && req.user.role !== "accountant" && req.user.branch_id) {
       params.push(req.user.branch_id);
       conditions.push(`si.branch_id = $${params.length}`);
     } else if (branch_id) {
@@ -75,14 +75,24 @@ router.get("/:id", async (req, res, next) => {
         WHERE si.id = $1`, [req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: "Item not found" });
+    
+    if (req.user.role !== "admin" && req.user.role !== "accountant" && req.user.branch_id && rows[0].branch_id !== req.user.branch_id) {
+      return res.status(403).json({ error: "Access denied: this stock item belongs to another branch." });
+    }
+
     res.json(rows[0]);
   } catch (err) { next(err); }
 });
 
 router.get("/:id/barcode", async (req, res, next) => {
   try {
-    const { rows } = await pool.query("SELECT barcode FROM stock_items WHERE id = $1", [req.params.id]);
+    const { rows } = await pool.query("SELECT barcode, branch_id FROM stock_items WHERE id = $1", [req.params.id]);
     if (!rows[0]?.barcode) return res.status(404).json({ error: "No barcode" });
+
+    if (req.user.role !== "admin" && req.user.role !== "accountant" && req.user.branch_id && rows[0].branch_id !== req.user.branch_id) {
+      return res.status(403).json({ error: "Access denied: this stock item belongs to another branch." });
+    }
+
     const buf = await generateBarcodeBuffer(rows[0].barcode);
     res.setHeader("Content-Type", "image/png");
     res.send(buf);
@@ -91,6 +101,13 @@ router.get("/:id/barcode", async (req, res, next) => {
 
 router.get("/:id/history", async (req, res, next) => {
   try {
+    const { rows: itemRows } = await pool.query("SELECT branch_id FROM stock_items WHERE id = $1", [req.params.id]);
+    if (!itemRows[0]) return res.status(404).json({ error: "Item not found" });
+
+    if (req.user.role !== "admin" && req.user.role !== "accountant" && req.user.branch_id && itemRows[0].branch_id !== req.user.branch_id) {
+      return res.status(403).json({ error: "Access denied: this stock item belongs to another branch." });
+    }
+
     const { rows } = await pool.query(`
       SELECT 'transfer' as type, st.transferred_at as date,
         st.quantity, u.name as done_by,
@@ -116,6 +133,11 @@ router.post("/", requireRole("admin", "manager", "worker"), async (req, res, nex
     const { name, category, size, color, branch_id, quantity, cost_price_rwf,
             sell_price_rwf, low_stock_threshold, image_url } = req.body;
 
+    const targetBranchId = (req.user.role === "admin" || req.user.role === "accountant") ? branch_id : req.user.branch_id;
+    if (!targetBranchId) {
+      return res.status(400).json({ error: "Branch assignment is required." });
+    }
+
     const barcode = `VLN${Date.now()}${Math.floor(Math.random() * 1000)}`;
 
     const { rows } = await pool.query(
@@ -129,7 +151,7 @@ router.post("/", requireRole("admin", "manager", "worker"), async (req, res, nex
         color || null,
         barcode,
         image_url || null,
-        branch_id ? parseInt(branch_id) : null,
+        parseInt(targetBranchId),
         parseInt(quantity) || 0,
         parseInt(cost_price_rwf) || 0,
         parseInt(sell_price_rwf) || 0,
@@ -147,6 +169,17 @@ router.put("/:id", requireRole("admin", "manager", "worker"), async (req, res, n
             sell_price_rwf, low_stock_threshold, image_url } = req.body;
 
     const old = await pool.query("SELECT * FROM stock_items WHERE id = $1", [req.params.id]);
+    if (!old.rows[0]) return res.status(404).json({ error: "Item not found" });
+
+    if (req.user.role !== "admin" && req.user.role !== "accountant" && req.user.branch_id && old.rows[0].branch_id !== req.user.branch_id) {
+      return res.status(403).json({ error: "You do not have permission to modify stock from another branch." });
+    }
+
+    const targetBranchId = (req.user.role === "admin" || req.user.role === "accountant") ? branch_id : req.user.branch_id;
+    if (!targetBranchId) {
+      return res.status(400).json({ error: "Branch assignment is required." });
+    }
+
     const { rows } = await pool.query(
       `UPDATE stock_items SET name=$1, category=$2, size=$3, color=$4, branch_id=$5,
         quantity=$6, cost_price_rwf=$7, sell_price_rwf=$8, low_stock_threshold=$9,
@@ -157,7 +190,7 @@ router.put("/:id", requireRole("admin", "manager", "worker"), async (req, res, n
         category,
         size || null,
         color || null,
-        branch_id ? parseInt(branch_id) : null,
+        parseInt(targetBranchId),
         parseInt(quantity) || 0,
         parseInt(cost_price_rwf) || 0,
         parseInt(sell_price_rwf) || 0,
@@ -166,7 +199,6 @@ router.put("/:id", requireRole("admin", "manager", "worker"), async (req, res, n
         req.params.id
       ]
     );
-    if (!rows[0]) return res.status(404).json({ error: "Item not found" });
     await logAudit(req.user.id, "STOCK_UPDATED", "stock_items", rows[0].id, old.rows[0], rows[0], req.ip);
     res.json(rows[0]);
   } catch (err) { next(err); }
@@ -174,6 +206,13 @@ router.put("/:id", requireRole("admin", "manager", "worker"), async (req, res, n
 
 router.delete("/:id", requireRole("admin", "manager", "worker"), async (req, res, next) => {
   try {
+    const { rows } = await pool.query("SELECT * FROM stock_items WHERE id = $1", [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: "Item not found" });
+
+    if (req.user.role !== "admin" && req.user.role !== "accountant" && req.user.branch_id && rows[0].branch_id !== req.user.branch_id) {
+      return res.status(403).json({ error: "You do not have permission to delete stock from another branch." });
+    }
+
     await pool.query("BEGIN");
     await pool.query("DELETE FROM stock_transfers WHERE item_id = $1", [req.params.id]);
     await pool.query("DELETE FROM stock_items WHERE id = $1", [req.params.id]);
@@ -191,6 +230,13 @@ router.post("/transfer", requireRole("admin", "manager", "worker"), async (req, 
     const { item_id, from_branch, to_branch, quantity, notes } = req.body;
     const { rows: [item] } = await pool.query("SELECT * FROM stock_items WHERE id=$1", [item_id]);
     if (!item) return res.status(404).json({ error: "Item not found" });
+
+    if (req.user.role !== "admin" && req.user.role !== "accountant" && req.user.branch_id && item.branch_id !== req.user.branch_id) {
+      return res.status(403).json({ error: "You can only transfer stock from your own branch." });
+    }
+    if (item.branch_id !== parseInt(from_branch)) {
+      return res.status(400).json({ error: "Source branch mismatch." });
+    }
     if (item.quantity < quantity) return res.status(400).json({ error: "Insufficient stock" });
 
     await pool.query("BEGIN");

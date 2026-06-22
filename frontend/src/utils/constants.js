@@ -60,8 +60,8 @@ export const NAV_ITEMS = (activeBusiness) => {
       section: "MANAGEMENT",
       items: [
         { label: "Workers",   icon: "Users",     path: "/app/workers",   roles: ["admin","manager"] },
-        { label: "Expenses",  icon: "Receipt",   path: "/app/expenses",    roles: ["admin","manager"] },
-        { label: "Debt Management", icon: "Scale", path: "/app/debts", roles: ["admin","manager"] },
+        { label: "Expenses",  icon: "Receipt",   path: "/app/expenses",    roles: ["admin","manager","accountant"] },
+        { label: "Debt Management", icon: "Scale", path: "/app/debts", roles: ["admin","manager","accountant"] },
         { label: "Settings",  icon: "Settings",  path: "/app/settings",      roles: ["admin"] },
       ],
     },
@@ -91,32 +91,32 @@ export const NAV_ITEMS = (activeBusiness) => {
       {
         section: "MAIN MENU",
         items: [
-          { label: "Dashboard",   icon: "LayoutDashboard", path: "/app/dashboard",     roles: ["admin","manager"] },
-          { label: "Stock",       icon: "Package",         path: "/app/stock",         roles: ["admin","manager"] },
-          { label: "Sales",       icon: "ShoppingCart",    path: "/app/sales",         roles: ["admin","manager","worker"] },
-          { label: "Procurement", icon: "Truck",           path: "/app/procurement",   roles: ["admin","manager"] },
+          { label: "Dashboard",   icon: "LayoutDashboard", path: "/app/dashboard",     roles: ["admin","manager","accountant"] },
+          { label: "Stock",       icon: "Package",         path: "/app/stock",         roles: ["admin","manager","accountant"] },
+          { label: "Sales",       icon: "ShoppingCart",    path: "/app/sales",         roles: ["admin","manager","worker","accountant"] },
+          { label: "Procurement", icon: "Truck",           path: "/app/procurement",   roles: ["admin","manager","accountant"] },
         ],
       },
       {
         section: "CRM",
         items: [
-          { label: "Customers", icon: "UserCheck", path: "/app/customers", roles: ["admin","manager"] },
-          { label: "Suppliers", icon: "Globe",     path: "/app/suppliers", roles: ["admin"] },
+          { label: "Customers", icon: "UserCheck", path: "/app/customers", roles: ["admin","manager","accountant"] },
+          { label: "Suppliers", icon: "Globe",     path: "/app/suppliers", roles: ["admin","accountant"] },
         ],
       },
       {
         section: "FINANCE",
         items: [
-          { label: "Invoices",     icon: "FileText",  path: "/app/invoices",    roles: ["admin","manager"] },
-          { label: "Profit & Loss",icon: "TrendingUp",path: "/app/finance/pnl", roles: ["admin"] },
+          { label: "Invoices",     icon: "FileText",  path: "/app/invoices",    roles: ["admin","manager","accountant"] },
+          { label: "Profit & Loss",icon: "TrendingUp",path: "/app/finance/pnl", roles: ["admin","accountant"] },
         ],
       },
       {
         section: "REPORTS",
         items: [
-          { label: "Sales Report",       icon: "BarChart2",    path: "/app/reports/sales",   roles: ["admin","manager"] },
-          { label: "Stock Report",       icon: "ClipboardList",path: "/app/reports/stock",   roles: ["admin","manager"] },
-          { label: "Worker Performance", icon: "Award",        path: "/app/reports/workers", roles: ["admin","manager"] },
+          { label: "Sales Report",       icon: "BarChart2",    path: "/app/reports/sales",   roles: ["admin","manager","accountant"] },
+          { label: "Stock Report",       icon: "ClipboardList",path: "/app/reports/stock",   roles: ["admin","manager","accountant"] },
+          { label: "Worker Performance", icon: "Award",        path: "/app/reports/workers", roles: ["admin","manager","accountant"] },
         ],
       },
     ],

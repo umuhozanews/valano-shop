@@ -19,7 +19,7 @@ import { useAuth } from "../../context/AuthContext";
 
 const STATUS_MAP = { in_stock: "success", low_stock: "warning", out_of_stock: "danger" };
 
-const EMPTY_FORM = { name:"", category:"", size:"", color:"", quantity:0, cost_price_rwf:"", sell_price_rwf:"", low_stock_threshold:5 };
+const EMPTY_FORM = { name:"", category:"", size:"", color:"", quantity:0, cost_price_rwf:"", sell_price_rwf:"", low_stock_threshold:5, branch_id:"" };
 
 export default function StockList() {
   const { t } = useLanguage();
@@ -37,6 +37,13 @@ export default function StockList() {
   const [editItem, setEditItem] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [branches, setBranches] = useState([]);
+
+  useEffect(() => {
+    api.get("/settings").then(({ data }) => {
+      setBranches(data.branches || []);
+    }).catch(() => {});
+  }, []);
 
   const isIndustry = activeBusiness.type === "industry";
 
@@ -70,7 +77,15 @@ export default function StockList() {
   async function handleSave() {
     setSaving(true);
     try {
-      const payload = { ...form, branch_id: form.branch_id || user?.branch_id || 1 };
+      const payload = { ...form };
+      if (user?.role !== "admin") {
+        payload.branch_id = user?.branch_id;
+      }
+      if (!payload.branch_id) {
+        toast.error("Branch assignment is required.");
+        setSaving(false);
+        return;
+      }
       if (editItem) await api.put(`/stock/${editItem.id}`, payload);
       else await api.post("/stock", payload);
       toast.success(t("success"));
@@ -156,6 +171,17 @@ export default function StockList() {
         footer={<><Button variant="secondary" onClick={() => setShowModal(false)}>{t("cancel")}</Button><Button loading={saving} onClick={handleSave}>{t("save")}</Button></>}>
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2"><Input label={isIndustry ? "Material Name" : t("item_name")} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} /></div>
+          
+          {user?.role === "admin" && (
+            <div className="col-span-2">
+              <label className="block text-[13px] font-medium text-text-primary mb-1">Assign to Branch</label>
+              <select value={form.branch_id || ""} onChange={e=>setForm(f=>({...f,branch_id:e.target.value}))} className="w-full h-9 px-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface">
+                <option value="">Select Branch…</option>
+                {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </div>
+          )}
+
           <div>
             <label className="block text-[13px] font-medium text-text-primary mb-1">{t("category")}</label>
             <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} className="w-full h-9 px-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface">

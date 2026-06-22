@@ -9,6 +9,7 @@ import api from "../../utils/api";
 import { formatRWF, formatRelative } from "../../utils/formatters";
 import { useLanguage } from "../../context/LanguageContext";
 import { useBusiness } from "../../context/BusinessContext";
+import { useAuth } from "../../context/AuthContext";
 
 const ACTION_COLORS = { SALE_CREATED:"text-success", STOCK_CREATED:"text-primary", LOGIN:"text-neutral", SALE_VOIDED:"text-warning", WORKER_CREATED:"text-primary" };
 const PIE_COLORS = ["#10B981","#F59E0B","#EF4444"];
@@ -20,6 +21,7 @@ function SkeletonCard() {
 export default function Dashboard() {
   const { t } = useLanguage();
   const { activeBusiness } = useBusiness();
+  const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [trend, setTrend] = useState([]);
   const [health, setHealth] = useState(null);
@@ -55,7 +57,7 @@ export default function Dashboard() {
 
   const aggregatedTrend = trend.map(d => ({
     date: d.date,
-    revenue: (d.branch1 || 0) + (d.branch2 || 0)
+    revenue: parseFloat(d.revenue) || 0
   }));
 
   // Dynamic titles/icons based on business type
@@ -66,7 +68,7 @@ export default function Dashboard() {
   }[activeBusiness.type] || { icon: ShoppingCart, label: t("sales") };
 
   return (
-    <PageWrapper title={activeBusiness.name} subtitle={t("welcome_back")}
+    <PageWrapper title={activeBusiness.name} subtitle={`${t("welcome_back")}${user?.name ? `, ${user.name}` : ''}${user?.branch_name ? ` (${user.branch_name})` : ''}`}
       breadcrumbs={[{ label: t("dashboard"), path: "/app/dashboard" }]}>
 
       {/* ROW 1 — Stat Cards */}

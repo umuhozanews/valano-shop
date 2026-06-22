@@ -19,7 +19,7 @@ router.get("/", async (req, res, next) => {
     } else if (req.user.role === "manager") {
       params.push(req.user.branch_id); conds.push(`s.branch_id=$${params.length}`);
     }
-    if (branch_id && req.user.role === "admin") { params.push(branch_id); conds.push(`s.branch_id=$${params.length}`); }
+    if (branch_id && (req.user.role === "admin" || req.user.role === "accountant")) { params.push(branch_id); conds.push(`s.branch_id=$${params.length}`); }
     if (worker_id) { params.push(worker_id); conds.push(`s.worker_id=$${params.length}`); }
     if (payment_method) { params.push(payment_method); conds.push(`s.payment_method=$${params.length}`); }
     if (start_date) { params.push(start_date); conds.push(`DATE(s.created_at)>=$${params.length}`); }
@@ -215,7 +215,7 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-router.post("/:id/void", requireRole("admin", "manager"), async (req, res, next) => {
+router.post("/:id/void", requireRole("admin", "manager", "accountant"), async (req, res, next) => {
   try {
     const { void_reason } = req.body;
     if (!void_reason) return res.status(400).json({ error: "Void reason required" });

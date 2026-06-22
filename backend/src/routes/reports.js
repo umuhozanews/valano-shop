@@ -5,7 +5,7 @@ const { verifyToken, requireRole } = require("../middleware/auth");
 const { createReportPDF } = require("../utils/pdf");
 const { exportToExcel } = require("../utils/excel");
 
-router.use(verifyToken, requireRole("admin", "manager"));
+router.use(verifyToken, requireRole("admin", "manager", "accountant"));
 
 function dateFilter(params, conds, { start_date, end_date, dateCol = "created_at" }) {
   if (start_date) { params.push(start_date); conds.push(`DATE(${dateCol})>=$${params.length}`); }
@@ -106,7 +106,7 @@ router.get("/stock", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get("/worker-performance", requireRole("admin", "manager"), async (req, res, next) => {
+router.get("/worker-performance", requireRole("admin", "manager", "accountant"), async (req, res, next) => {
   try {
     const { start_date, end_date, export: exp } = req.query;
     const conds = ["s.is_voided=false"]; const params = [];
@@ -140,7 +140,7 @@ router.get("/worker-performance", requireRole("admin", "manager"), async (req, r
   } catch (err) { next(err); }
 });
 
-router.get("/procurement", requireRole("admin"), async (req, res, next) => {
+router.get("/procurement", requireRole("admin", "accountant"), async (req, res, next) => {
   try {
     const { start_date, end_date, export: exp } = req.query;
     const conds = ["1=1"]; const params = [];

@@ -20,7 +20,9 @@ router.post("/login", async (req, res, next) => {
     }
 
     const { rows } = await pool.query(
-      "SELECT * FROM users WHERE email = $1 AND is_active = true",
+      `SELECT u.*, b.name as branch_name FROM users u
+       LEFT JOIN branches b ON b.id = u.branch_id
+       WHERE u.email = $1 AND u.is_active = true`,
       [email.toLowerCase().trim()]
     );
     const user = rows[0];

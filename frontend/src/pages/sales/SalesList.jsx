@@ -51,6 +51,7 @@ export default function SalesList() {
     { key:"worker_name", label: t("workers"), render:(v) => (
       <div><p className="font-medium">{v}</p></div>
     )},
+    { key:"branch_name", label: "Branch", render:v => <Badge status="neutral" label={v || "Global"} /> },
     { key:"payment_method", label: t("payment_method"), render:v => <Badge status="neutral" label={PAYMENT_LABELS[v]||v} /> },
     { key:"total_amount", label: t("total"), render:v => <span className="font-semibold text-primary">{formatRWF(v)}</span> },
     { key:"created_at", label: t("date"), render:v => formatDate(v, "dd MMM yy HH:mm") },

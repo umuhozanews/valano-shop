@@ -46,6 +46,9 @@ router.get("/stats", async (req, res, next) => {
 
 router.get("/sales-trend", async (req, res, next) => {
   try {
+    const u = req.user;
+    const bf = u.role === "admin" ? "1=1" : "s.branch_id = $2";
+    const bp = u.role === "admin" ? [] : [u.branch_id];
     const days = parseInt(req.query.days) || 30;
     const { rows } = await pool.query(`
       SELECT DATE(s.created_at) as date,
@@ -54,9 +57,9 @@ router.get("/sales-trend", async (req, res, next) => {
              SUM(CASE WHEN s.branch_id=2 THEN s.total_amount ELSE 0 END) as branch2
       FROM sales s
       WHERE s.created_at >= NOW() - ($1 || ' days')::INTERVAL
-        AND s.is_voided = false
+        AND s.is_voided = false AND ${bf}
       GROUP BY DATE(s.created_at)
-      ORDER BY date`, [days]);
+      ORDER BY date`, [days, ...bp]);
     res.json(rows);
   } catch (err) { next(err); }
 });
@@ -76,6 +79,9 @@ router.get("/branch-comparison", async (req, res, next) => {
 
 router.get("/top-items", async (req, res, next) => {
   try {
+    const u = req.user;
+    const bf = u.role === "admin" ? "1=1" : "s.branch_id = $2";
+    const bp = u.role === "admin" ? [] : [u.branch_id];
     const limit = parseInt(req.query.limit) || 10;
     const { rows } = await pool.query(`
       SELECT stk.name, stk.category,
@@ -86,8 +92,9 @@ router.get("/top-items", async (req, res, next) => {
       JOIN sales s ON s.id = si.sale_id
       WHERE s.is_voided=false
         AND DATE_TRUNC('month',s.created_at)=DATE_TRUNC('month',NOW())
+        AND ${bf}
       GROUP BY stk.id, stk.name, stk.category
-      ORDER BY revenue DESC LIMIT $1`, [limit]);
+      ORDER BY revenue DESC LIMIT $1`, [limit, ...bp]);
     res.json(rows);
   } catch (err) { next(err); }
 });
@@ -109,16 +116,23 @@ router.get("/stock-health", async (req, res, next) => {
 
 router.get("/activity-feed", async (req, res, next) => {
   try {
+    const u = req.user;
+    const bf = u.role === "admin" ? "1=1" : "u.branch_id = $1";
+    const bp = u.role === "admin" ? [] : [u.branch_id];
     const { rows } = await pool.query(`
       SELECT al.*, u.name as user_name, u.role as user_role
       FROM audit_log al LEFT JOIN users u ON u.id = al.user_id
-      ORDER BY al.created_at DESC LIMIT 10`);
+      WHERE ${bf}
+      ORDER BY al.created_at DESC LIMIT 10`, bp);
     res.json(rows);
   } catch (err) { next(err); }
 });
 
 router.get("/worker-leaderboard", async (req, res, next) => {
   try {
+    const u = req.user;
+    const bf = u.role === "admin" ? "1=1" : "u.branch_id = $1";
+    const bp = u.role === "admin" ? [] : [u.branch_id];
     const { rows } = await pool.query(`
       SELECT u.id, u.name, u.avatar_url, b.name as branch,
              COUNT(s.id) as sales_count,
@@ -129,9 +143,9 @@ router.get("/worker-leaderboard", async (req, res, next) => {
       LEFT JOIN sales s ON s.worker_id = u.id
         AND DATE_TRUNC('month',s.created_at)=DATE_TRUNC('month',NOW())
         AND s.is_voided=false
-      WHERE u.role='worker' AND u.is_active=true
+      WHERE u.role='worker' AND u.is_active=true AND ${bf}
       GROUP BY u.id, u.name, u.avatar_url, b.name, u.monthly_target
-      ORDER BY revenue DESC LIMIT 3`);
+      ORDER BY revenue DESC LIMIT 3`, bp);
     res.json(rows);
   } catch (err) { next(err); }
 });
