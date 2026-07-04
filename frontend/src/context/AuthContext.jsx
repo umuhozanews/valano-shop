@@ -27,11 +27,12 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (email, password) => {
     const { data } = await api.post("/auth/login", { email, password });
     localStorage.setItem("valano_token", data.accessToken);
-    localStorage.setItem("valano_refresh", data.refreshToken);
+    if (data.refreshToken) localStorage.setItem("valano_refresh", data.refreshToken);
     localStorage.setItem("valano_user", JSON.stringify(data.user));
     setUser(data.user);
+    scheduleRefresh(data.accessToken);
     return data.user;
-  }, []);
+  }, [scheduleRefresh]);
 
   const logout = useCallback(() => {
     api.post("/auth/logout").catch(() => {});
@@ -53,15 +54,15 @@ export function AuthProvider({ children }) {
         const startupRefresh = async () => {
           try {
             const rt = localStorage.getItem("valano_refresh");
-            if (rt) {
+            if (rt && rt !== "undefined" && rt !== "null") {
               const { data } = await api.post("/auth/refresh", { refreshToken: rt });
-              localStorage.setItem("valano_token", data.accessToken);
-              scheduleRefresh(data.accessToken);
-            } else {
-              logout();
+              if (data.accessToken) {
+                localStorage.setItem("valano_token", data.accessToken);
+                scheduleRefresh(data.accessToken);
+              }
             }
           } catch {
-            logout();
+            // Refresh failed — keep the existing token and let the interceptor handle expiry
           }
         };
         startupRefresh();

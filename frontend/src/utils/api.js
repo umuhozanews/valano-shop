@@ -210,15 +210,28 @@ function handle(method, url, body) {
     currentCustomers = ESTATE_TENANTS;
   }
 
-  // Auth Login
+  // Auth
+  if (path === "/auth/refresh") {
+    return { accessToken: "mock-access-token" };
+  }
+
   if (path === "/auth/login") {
     const USERS = {
-      "rukundojosephtuyishime@gmail.com": { id:1, name:"Rukundo joseph", email:"rukundojosephtuyishime@gmail.com", role:"admin" },
+      "rukundojosephtuyishime@gmail.com": { id:1, name:"Rukundo joseph", email:"rukundojosephtuyishime@gmail.com", role:"admin", branch_id:1 },
+      "manager@valano.rw":   { id:2, name:"Habimana Jean Pierre", email:"manager@valano.rw",   role:"manager",    branch_id:1 },
+      "accounts@valano.rw":  { id:3, name:"Uwimana Angélique",    email:"accounts@valano.rw",  role:"accountant", branch_id:1 },
+      "worker1@valano.rw":   { id:4, name:"Uwamahoro Marie",       email:"worker1@valano.rw",   role:"worker",     branch_id:1 },
+    };
+    const PASSWORDS = {
+      "rukundojosephtuyishime@gmail.com": "rukundo2007",
+      "manager@valano.rw":  "valano123",
+      "accounts@valano.rw": "valano123",
+      "worker1@valano.rw":  "valano123",
     };
     const email = body?.email?.trim().toLowerCase();
     const u = USERS[email];
-    if (!u || body?.password !== "rukundo2007") throw { response:{ status:401, data:{ error:"Invalid credentials" } } };
-    return { user:u, accessToken:"demo-token" };
+    if (!u || body?.password !== PASSWORDS[email]) throw { response:{ status:401, data:{ error:"Invalid credentials" } } };
+    return { user:u, accessToken:"mock-access-token", refreshToken:"mock-refresh-token" };
   }
 
   // Dashboard Stats
