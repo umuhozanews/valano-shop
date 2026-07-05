@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, Component } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/layout/ProtectedRoute";
 
@@ -7,6 +7,27 @@ const Loading = () => (
     <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
   </div>
 );
+
+class ErrorBoundary extends Component {
+  state = { error: null };
+  static getDerivedStateFromError(error) { return { error }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="flex h-screen items-center justify-center bg-background flex-col gap-4 p-8 text-center">
+          <div className="text-4xl">⚠️</div>
+          <h1 className="text-headline font-semibold text-text-primary">Something went wrong</h1>
+          <p className="text-text-secondary text-[13px] max-w-sm">{this.state.error?.message || "Unexpected error"}</p>
+          <button onClick={() => window.location.href = "/app/login"}
+            className="mt-2 px-4 py-2 bg-primary text-white rounded-btn text-[13px] font-medium">
+            Go to Login
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const L = (imp) => lazy(imp);
 
@@ -59,6 +80,7 @@ const P = ({ children, roles }) => <ProtectedRoute roles={roles}>{children}</Pro
 
 export default function App() {
   return (
+    <ErrorBoundary>
     <Suspense fallback={<Loading />}>
       <Routes>
         <Route path="/" element={<Landing />} />
@@ -104,5 +126,6 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>
+    </ErrorBoundary>
   );
 }
