@@ -21,14 +21,16 @@ export default function NotificationsPage() {
   const [filter, setFilter] = useState("all");
 
   useEffect(() => {
-    api.get("/notifications").then(d => setItems(d.data)).finally(() => setLoading(false));
+    api.get("/notifications").then(d => setItems(d.data?.data || [])).finally(() => setLoading(false));
   }, []);
 
   function markRead(id) {
+    api.put(`/notifications/${id}/read`).catch(() => {});
     setItems(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
   }
 
   function markAllRead() {
+    api.put("/notifications/read-all").catch(() => {});
     setItems(prev => prev.map(n => ({ ...n, is_read: true })));
     toast.success("All notifications marked as read");
   }

@@ -116,10 +116,10 @@ export default function CustomersList() {
         <Table columns={columns} data={customers} loading={loading} emptyMessage={t("loading")} />
         {total > 20 && (
           <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
-            <p className="text-[13px] text-text-secondary">{t("loading")} {(page-1)*20+1}–{Math.min(page*20,total)} of {total}</p>
+            <p className="text-[13px] text-text-secondary">Showing {(page-1)*20+1}–{Math.min(page*20,total)} of {total}</p>
             <div className="flex gap-2">
-              <Button variant="secondary" size="sm" disabled={page===1} onClick={() => setPage(p=>p-1)}>{t("all")}</Button>
-              <Button variant="secondary" size="sm" disabled={page*20>=total} onClick={() => setPage(p=>p+1)}>{t("all")}</Button>
+              <Button variant="secondary" size="sm" disabled={page===1} onClick={() => setPage(p=>p-1)}>Previous</Button>
+              <Button variant="secondary" size="sm" disabled={page*20>=total} onClick={() => setPage(p=>p+1)}>Next</Button>
             </div>
           </div>
         )}

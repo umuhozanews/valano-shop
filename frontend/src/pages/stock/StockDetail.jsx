@@ -33,10 +33,10 @@ export default function StockDetail() {
   if (!item) return <PageWrapper title="Not Found" subtitle="..." breadcrumbs={[]}><Card>Item not found</Card></PageWrapper>;
 
   const historyColumns = [
-    { key:"action", label: t("actions"), render: v => <span className="capitalize">{v.replace("_"," ")}</span> },
-    { key:"quantity_change", label: t("quantity"), render: v => <span className={v > 0 ? "text-success font-medium" : "text-danger font-medium"}>{v > 0 ? `+${v}` : v}</span> },
-    { key:"user_name", label: t("workers") },
-    { key:"created_at", label: t("date"), render: v => formatDate(v, "dd MMM yyyy HH:mm") },
+    { key:"type", label: t("actions"), render: v => <span className="capitalize">{v?.replace("_"," ")}</span> },
+    { key:"quantity", label: t("quantity"), render: v => <span className={v > 0 ? "text-success font-medium" : "text-danger font-medium"}>{v > 0 ? `+${v}` : v}</span> },
+    { key:"done_by", label: t("workers") },
+    { key:"date", label: t("date"), render: v => formatDate(v, "dd MMM yyyy HH:mm") },
   ];
 
   return (

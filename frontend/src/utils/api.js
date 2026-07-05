@@ -1,8 +1,10 @@
 import axios from "axios";
 
+const API_BASE = import.meta.env.VITE_API_URL || "/api";
+
 // Create real axios client targeting the local or configured backend API
 const realApi = axios.create({
-  baseURL: "/api",
+  baseURL: API_BASE,
 });
 
 // Attach JWT token to headers if present in localStorage
@@ -28,7 +30,7 @@ realApi.interceptors.response.use(
       try {
         const refreshToken = localStorage.getItem("valano_refresh");
         if (refreshToken) {
-          const { data } = await axios.post("/api/auth/refresh", { refreshToken });
+          const { data } = await axios.post(`${API_BASE}/auth/refresh`, { refreshToken });
           localStorage.setItem("valano_token", data.accessToken);
           originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
           return realApi(originalRequest);
@@ -50,7 +52,9 @@ function isHtmlResponse(res) {
 
 function isNetworkError(err) {
   if (err.response) {
-    return isHtmlResponse(err.response);
+    if (isHtmlResponse(err.response)) return true;
+    if (err.response.status >= 500) return true;
+    return false;
   }
   return true;
 }
@@ -230,7 +234,11 @@ function handle(method, url, body) {
     };
     const email = body?.email?.trim().toLowerCase();
     const u = USERS[email];
-    if (!u || body?.password !== PASSWORDS[email]) throw { response:{ status:401, data:{ error:"Invalid credentials" } } };
+    if (!u || body?.password !== PASSWORDS[email]) {
+      const err = new Error("Invalid credentials");
+      err.response = { status: 401, data: { error: "Invalid credentials" } };
+      throw err;
+    }
     return { user:u, accessToken:"mock-access-token", refreshToken:"mock-refresh-token" };
   }
 

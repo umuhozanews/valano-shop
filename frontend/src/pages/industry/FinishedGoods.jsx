@@ -28,7 +28,7 @@ export default function FinishedGoods() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get("/stock/all/finished");
+      const { data } = await api.get("/stock");
       setItems(data.data);
     } catch { toast.error(t("error")); }
     finally { setLoading(false); }

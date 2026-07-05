@@ -16,20 +16,22 @@ export default function SaleDetail() {
   const [searchParams] = useSearchParams();
   const { t } = useLanguage();
   const [sale, setSale] = useState(null);
+  const [shopSettings, setShopSettings] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get(`/sales/${id}`)
-       .then(d => {
-         setSale(d.data);
-         if (searchParams.get("print") === "true") {
-           setTimeout(() => {
-             window.print();
-           }, 500);
-         }
-       })
-       .catch(() => toast.error(t("error")))
-       .finally(() => setLoading(false));
+    Promise.all([
+      api.get(`/sales/${id}`),
+      api.get("/settings").catch(() => ({ data: {} })),
+    ]).then(([d, s]) => {
+      setSale(d.data);
+      setShopSettings(s.data?.settings || null);
+      if (searchParams.get("print") === "true") {
+        setTimeout(() => window.print(), 500);
+      }
+    })
+    .catch(() => toast.error(t("error")))
+    .finally(() => setLoading(false));
   }, [id, t, searchParams]);
 
   useEffect(() => {
@@ -105,8 +107,10 @@ export default function SaleDetail() {
 
   async function handleVoid() {
     if (!confirm(t("confirm_delete"))) return;
+    const reason = window.prompt("Enter void reason (required):", "");
+    if (!reason?.trim()) return toast.error("Void reason is required");
     try {
-      await api.post(`/sales/${id}/void`);
+      await api.post(`/sales/${id}/void`, { void_reason: reason.trim() });
       toast.success(t("success"));
       navigate("/app/sales");
     } catch { toast.error(t("error")); }
@@ -188,7 +192,7 @@ export default function SaleDetail() {
               <div className="absolute left-4 w-8 top-8 flex flex-col items-center select-none z-10">
                 <div className="writing-vertical text-[#7C3AED] font-black text-[14px] tracking-[0.25em] uppercase"
                      style={{ transform: "rotate(180deg)", writingMode: "vertical-rl" }}>
-                  Adam Kozel
+                  {shopSettings?.shop_name || sale.branch_name || "KNOTTY"}
                 </div>
                 <div className="w-1.5 h-1.5 rounded-full bg-[#7C3AED] mt-2" />
               </div>
@@ -196,14 +200,11 @@ export default function SaleDetail() {
               {/* Top Row: Sender Info & Invoice Title */}
               <div className="flex justify-between items-start mb-6">
                 <div className="text-[11px] text-text-secondary leading-relaxed font-sans">
-                  <p className="font-bold text-text-primary text-[12px] mb-0.5">Adam Kozel</p>
-                  <p>New street 000/40 735 41, Prague</p>
-                  <p>Tel: +420730644231</p>
-                  <p>E-mail: adamkozel.des@gmail.com</p>
-                  <div className="mt-2 font-mono text-[10px] text-text-primary leading-tight">
-                    <p>ID: 05860351</p>
-                    <p>VAT-ID: Not payer of DPH</p>
-                  </div>
+                  <p className="font-bold text-text-primary text-[12px] mb-0.5">{shopSettings?.shop_name || sale.branch_name || "KNOTTY FASHION"}</p>
+                  <p>{shopSettings?.shop_address || sale.branch_location || "Kigali, Rwanda"}</p>
+                  {(shopSettings?.shop_phone || sale.branch_phone) && (
+                    <p>Tel: {shopSettings?.shop_phone || sale.branch_phone}</p>
+                  )}
                 </div>
                 <div className="text-right">
                   <h1 className="text-[32px] font-extrabold tracking-tight text-[#7C3AED] leading-none mb-1 font-sans">
@@ -241,7 +242,7 @@ export default function SaleDetail() {
                     #{sale.invoice_number}
                   </p>
                   <p className="text-[11px] text-text-secondary text-right">
-                    Prague, {formatDate(sale.created_at, "d. MM. yyyy")}
+                    Kigali, {formatDate(sale.created_at, "d. MM. yyyy")}
                   </p>
                 </div>
               </div>
@@ -334,17 +335,18 @@ export default function SaleDetail() {
                 {/* Bank Info & Signature Line */}
                 <div className="grid grid-cols-2 gap-4 mt-8 pt-4 border-t border-border">
                   <div>
-                    <p className="text-[10px] font-bold text-text-primary uppercase tracking-wider mb-2">Bank information:</p>
+                    <p className="text-[10px] font-bold text-text-primary uppercase tracking-wider mb-2">Contact Information:</p>
                     <div className="space-y-1 text-[10px] font-mono text-[#7C3AED] font-semibold leading-none">
-                      <p>IBAN: CZ0001000001075133850223</p>
-                      <p>SWIFT: COMVCZPPXXX</p>
-                      <p>Bank account number: 234-5133850247/023</p>
+                      {(shopSettings?.shop_phone || sale.branch_phone) && (
+                        <p>Tel: {shopSettings?.shop_phone || sale.branch_phone}</p>
+                      )}
+                      <p>{shopSettings?.shop_address || sale.branch_location || "Kigali, Rwanda"}</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex flex-col justify-between items-end">
                     <div className="text-right">
-                      <p className="text-[10px] font-bold text-text-primary uppercase tracking-wider">Invoiced by Adam Kozel</p>
+                      <p className="text-[10px] font-bold text-text-primary uppercase tracking-wider">Invoiced by {shopSettings?.shop_name || sale.branch_name || "KNOTTY FASHION"}</p>
                     </div>
                     <div className="w-full max-w-[120px] border-b border-border mt-6" />
                   </div>
@@ -355,7 +357,7 @@ export default function SaleDetail() {
                   <p className="font-medium">
                     This is a computer-generated document. Technical data is verified automatically.
                   </p>
-                  <p className="mt-0.5">© 2026 Adam Kozel. All rights reserved.</p>
+                  <p className="mt-0.5">{shopSettings?.invoice_footer_text || `© 2026 ${shopSettings?.shop_name || "KNOTTY FASHION"}. All rights reserved.`}</p>
                 </div>
               </div>
             </div>
