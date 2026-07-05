@@ -1,10 +1,18 @@
 import axios from "axios";
 
-const API_BASE = import.meta.env.VITE_API_URL || "/api";
+// If VITE_API_URL is explicitly configured we treat that as a real backend and
+// talk to it over HTTP. When it is NOT configured (the default for the static
+// Vercel deployment) there is no backend to reach, so we run entirely against a
+// persistent in-browser data engine. This makes production deterministic — no
+// doomed network requests, no white screens, and data that survives reloads.
+const CONFIGURED_API = (import.meta.env.VITE_API_URL || "").trim();
+const HAS_BACKEND = CONFIGURED_API.length > 0;
+const API_BASE = HAS_BACKEND ? CONFIGURED_API : "/api";
 
-// Create real axios client targeting the local or configured backend API
+// Create real axios client targeting the configured backend API
 const realApi = axios.create({
   baseURL: API_BASE,
+  timeout: 12000,
 });
 
 // Attach JWT token to headers if present in localStorage
@@ -59,8 +67,7 @@ function isNetworkError(err) {
   return true;
 }
 
-// In-memory stateful mock API — all mutations persist for the session
-const delay = (ms = 70) => new Promise(r => setTimeout(r, ms));
+const delay = (ms = 40) => new Promise(r => setTimeout(r, ms));
 
 const nextId = (arr) => Math.max(0, ...arr.map(x => x.id)) + 1;
 const nowIso = () => new Date().toISOString();
@@ -72,119 +79,147 @@ function computeStatus(quantity, threshold) {
   return "in_stock";
 }
 
-// ─── STATEFUL DATASETS ──────────────────────────────────────────────────────
+// ─── DEFAULT SEED DATA ───────────────────────────────────────────────────────
+// These are the initial values used the first time the app runs on a device.
+// After that, the live state is loaded from (and saved back to) localStorage so
+// every change the user makes is durable across logins and reloads.
 
-let FASHION_STOCK = [
-  { id:1,  name:"Winter Puffer Jacket", category:"Jackets",     size:"M",        color:"Black",    quantity:24, cost_price_rwf:18000, sell_price_rwf:35000, low_stock_threshold:5,  barcode:"VL-00001", created_at:daysAgo(30) },
-  { id:2,  name:"Slim Fit Chinos",      category:"Trousers",    size:"32",       color:"Khaki",    quantity:3,  cost_price_rwf:9500,  sell_price_rwf:18000, low_stock_threshold:5,  barcode:"VL-00002", created_at:daysAgo(28) },
-  { id:3,  name:"Floral Summer Dress",  category:"Dresses",     size:"S",        color:"Red",      quantity:18, cost_price_rwf:12000, sell_price_rwf:25000, low_stock_threshold:5,  barcode:"VL-00003", created_at:daysAgo(25) },
-  { id:4,  name:"Classic White Shirt",  category:"Shirts",      size:"L",        color:"White",    quantity:0,  cost_price_rwf:7000,  sell_price_rwf:14000, low_stock_threshold:5,  barcode:"VL-00004", created_at:daysAgo(22) },
-  { id:5,  name:"Hoodie Fleece",        category:"Hoodies",     size:"XL",       color:"Navy",     quantity:11, cost_price_rwf:14000, sell_price_rwf:28000, low_stock_threshold:5,  barcode:"VL-00005", created_at:daysAgo(20) },
-  { id:6,  name:"Leather Ankle Boots",  category:"Shoes",       size:"40",       color:"Brown",    quantity:8,  cost_price_rwf:22000, sell_price_rwf:45000, low_stock_threshold:3,  barcode:"VL-00006", created_at:daysAgo(18) },
-  { id:7,  name:"Cargo Trousers",       category:"Trousers",    size:"34",       color:"Olive",    quantity:15, cost_price_rwf:11000, sell_price_rwf:22000, low_stock_threshold:5,  barcode:"VL-00007", created_at:daysAgo(16) },
-  { id:8,  name:"Polo T-Shirt",         category:"Shirts",      size:"M",        color:"Sky Blue", quantity:4,  cost_price_rwf:6000,  sell_price_rwf:12000, low_stock_threshold:5,  barcode:"VL-00008", created_at:daysAgo(14) },
-  { id:9,  name:"Wrap Midi Dress",      category:"Dresses",     size:"M",        color:"Purple",   quantity:9,  cost_price_rwf:13000, sell_price_rwf:27000, low_stock_threshold:3,  barcode:"VL-00009", created_at:daysAgo(12) },
-  { id:10, name:"Denim Jacket",         category:"Jackets",     size:"L",        color:"Blue",     quantity:6,  cost_price_rwf:20000, sell_price_rwf:40000, low_stock_threshold:3,  barcode:"VL-00010", created_at:daysAgo(10) },
-];
+function buildDefaults() {
+  return {
+    FASHION_STOCK: [
+      { id:1,  name:"Winter Puffer Jacket", category:"Jackets",     size:"M",        color:"Black",    quantity:24, cost_price_rwf:18000, sell_price_rwf:35000, low_stock_threshold:5,  barcode:"VL-00001", created_at:daysAgo(30) },
+      { id:2,  name:"Slim Fit Chinos",      category:"Trousers",    size:"32",       color:"Khaki",    quantity:3,  cost_price_rwf:9500,  sell_price_rwf:18000, low_stock_threshold:5,  barcode:"VL-00002", created_at:daysAgo(28) },
+      { id:3,  name:"Floral Summer Dress",  category:"Dresses",     size:"S",        color:"Red",      quantity:18, cost_price_rwf:12000, sell_price_rwf:25000, low_stock_threshold:5,  barcode:"VL-00003", created_at:daysAgo(25) },
+      { id:4,  name:"Classic White Shirt",  category:"Shirts",      size:"L",        color:"White",    quantity:0,  cost_price_rwf:7000,  sell_price_rwf:14000, low_stock_threshold:5,  barcode:"VL-00004", created_at:daysAgo(22) },
+      { id:5,  name:"Hoodie Fleece",        category:"Hoodies",     size:"XL",       color:"Navy",     quantity:11, cost_price_rwf:14000, sell_price_rwf:28000, low_stock_threshold:5,  barcode:"VL-00005", created_at:daysAgo(20) },
+      { id:6,  name:"Leather Ankle Boots",  category:"Shoes",       size:"40",       color:"Brown",    quantity:8,  cost_price_rwf:22000, sell_price_rwf:45000, low_stock_threshold:3,  barcode:"VL-00006", created_at:daysAgo(18) },
+      { id:7,  name:"Cargo Trousers",       category:"Trousers",    size:"34",       color:"Olive",    quantity:15, cost_price_rwf:11000, sell_price_rwf:22000, low_stock_threshold:5,  barcode:"VL-00007", created_at:daysAgo(16) },
+      { id:8,  name:"Polo T-Shirt",         category:"Shirts",      size:"M",        color:"Sky Blue", quantity:4,  cost_price_rwf:6000,  sell_price_rwf:12000, low_stock_threshold:5,  barcode:"VL-00008", created_at:daysAgo(14) },
+      { id:9,  name:"Wrap Midi Dress",      category:"Dresses",     size:"M",        color:"Purple",   quantity:9,  cost_price_rwf:13000, sell_price_rwf:27000, low_stock_threshold:3,  barcode:"VL-00009", created_at:daysAgo(12) },
+      { id:10, name:"Denim Jacket",         category:"Jackets",     size:"L",        color:"Blue",     quantity:6,  cost_price_rwf:20000, sell_price_rwf:40000, low_stock_threshold:3,  barcode:"VL-00010", created_at:daysAgo(10) },
+    ],
+    FASHION_SALES: [
+      { id:1,  invoice_number:"VL-2026-001", customer_name:"Celestine Nyirahabimana", worker_name:"Jean Pierre Habimana", items_count:5, payment_method:"mtn_momo", total_amount:145000, created_at:daysAgo(1), is_voided:false },
+      { id:2,  invoice_number:"VL-2026-002", customer_name:"Walk-in",                  worker_name:"Marie Uwamahoro",       items_count:2, payment_method:"cash",     total_amount:52000,  created_at:daysAgo(1), is_voided:false },
+      { id:3,  invoice_number:"VL-2026-003", customer_name:"Alliance Fashion Shop",    worker_name:"Alice Mukamana",        items_count:8, payment_method:"mtn_momo", total_amount:280000, created_at:daysAgo(2), is_voided:false },
+      { id:4,  invoice_number:"VL-2026-004", customer_name:"Olivier Hakizimana",       worker_name:"Eric Ndayisabye",       items_count:3, payment_method:"cash",     total_amount:78000,  created_at:daysAgo(2), is_voided:false },
+      { id:5,  invoice_number:"VL-2026-005", customer_name:"Walk-in",                  worker_name:"Alice Mukamana",        items_count:1, payment_method:"airtel",   total_amount:25000,  created_at:daysAgo(3), is_voided:false },
+      { id:6,  invoice_number:"VL-2026-006", customer_name:"Style Hub Boutique",       worker_name:"Jean Pierre Habimana",  items_count:10,payment_method:"mtn_momo", total_amount:420000, created_at:daysAgo(3), is_voided:false },
+      { id:7,  invoice_number:"VL-2026-007", customer_name:"Sandrine Uwera",           worker_name:"Marie Uwamahoro",       items_count:2, payment_method:"cash",     total_amount:46000,  created_at:daysAgo(4), is_voided:false },
+      { id:8,  invoice_number:"VL-2026-008", customer_name:"Walk-in",                  worker_name:"Eric Ndayisabye",       items_count:1, payment_method:"cash",     total_amount:35000,  created_at:daysAgo(5), is_voided:true },
+    ],
+    FASHION_CUSTOMERS: [
+      { id:1, name:"Celestine Nyirahabimana", phone:"0788123456", location:"Nyamirambo", type:"wholesaler", segment:"vip",     total_orders:48, total_spent:12400000, last_purchase:"2026-05-30" },
+      { id:2, name:"Olivier Hakizimana",      phone:"0722334455", location:"Remera",     type:"retailer",   segment:"vip",     total_orders:31, total_spent:5800000,  last_purchase:"2026-05-28" },
+      { id:3, name:"Sandrine Uwera",          phone:"0733556677", location:"Kacyiru",    type:"retailer",   segment:"regular", total_orders:12, total_spent:1900000,  last_purchase:"2026-05-20" },
+    ],
+    INDUSTRY_RAW: [
+      { id:1, name:"Premium Cotton Fabric", category:"Fabric", size:"100m Roll", color:"White", quantity:45, cost_price_rwf:150000, sell_price_rwf:0, low_stock_threshold:10, barcode:"MAT-001" },
+      { id:2, name:"Polyester Yarn", category:"Thread", size:"5kg", color:"Blue", quantity:120, cost_price_rwf:12000, sell_price_rwf:0, low_stock_threshold:20, barcode:"MAT-002" },
+      { id:3, name:"Metallic Zippers", category:"Zippers", size:"20cm", color:"Silver", quantity:1500, cost_price_rwf:450, sell_price_rwf:0, low_stock_threshold:100, barcode:"MAT-003" },
+    ],
+    INDUSTRY_FINISHED: [
+      { id:1, name:"Wholesale T-Shirts (Bulk)", category:"T-Shirts", size:"Mixed", color:"Mixed", quantity:450, cost_price_rwf:3500, sell_price_rwf:6500, low_stock_threshold:50, barcode:"FG-101" },
+      { id:2, name:"Uniform Sets (School X)", category:"Suits", size:"Standard", color:"Green", quantity:120, cost_price_rwf:8000, sell_price_rwf:15000, low_stock_threshold:20, barcode:"FG-102" },
+    ],
+    INDUSTRY_PRODUCTION: [
+      { id:1, name:"Production Run #44", item:"Summer T-Shirt", quantity:500, status:"in_progress", progress:65, start_date:daysAgo(2) },
+      { id:2, name:"Uniform Batch B1", item:"Denim Jeans", quantity:200, status:"completed", progress:100, start_date:daysAgo(10) },
+    ],
+    INDUSTRY_SALES: [
+      { id:1, invoice_number:"ORD-10024", customer_name:"Alliance Fashion Ltd", worker_name:"Jean P.", items_count:500, payment_method:"bank", total_amount:4500000, created_at:daysAgo(1), is_voided:false },
+      { id:2, invoice_number:"ORD-10025", customer_name:"Kigali Boutique Chain", worker_name:"Jean P.", items_count:200, payment_method:"bank", total_amount:1800000, created_at:daysAgo(3), is_voided:false },
+    ],
+    ESTATE_PROPERTIES: [
+      { id:1, name:"Knotty Heights A1", address:"Gacuriro, Kigali", units:4, type:"Apartment", status:"occupied" },
+      { id:2, name:"Knotty Heights A2", address:"Gacuriro, Kigali", units:4, type:"Apartment", status:"occupied" },
+      { id:3, name:"Commercial Plaza", address:"Kiyovu, Kigali", units:10, type:"Commercial", status:"partial" },
+      { id:4, name:"Warehouse X", address:"Freezone, Kigali", units:1, type:"Industrial", status:"vacant" },
+    ],
+    ESTATE_TENANTS: [
+      { id:1, name:"Iradukunda Eric", property:"Knotty Heights A1", unit:"Unit 101", phone:"0788111222", status:"active", paid:true },
+      { id:2, name:"Mutesi Solange", property:"Knotty Heights A1", unit:"Unit 102", phone:"0788333444", status:"active", paid:false },
+    ],
+    ESTATE_MAINTENANCE: [
+      { id:1, title:"Plumbing Leak", property:"Knotty Heights A1", unit:"Unit 101", priority:"high", status:"pending", date:daysAgo(1) },
+      { id:2, title:"Electrical Repair", property:"Commercial Plaza", unit:"Suite 4", priority:"medium", status:"completed", date:daysAgo(5) },
+    ],
+    ESTATE_SALES: [
+      { id:1, invoice_number:"REC-5501", customer_name:"Iradukunda Eric", worker_name:"Admin", items_count:1, payment_method:"bank", total_amount:450000, created_at:daysAgo(1), is_voided:false },
+      { id:2, invoice_number:"REC-5502", customer_name:"Gasana Jean",     worker_name:"Admin", items_count:1, payment_method:"momo", total_amount:1200000, created_at:daysAgo(5), is_voided:false },
+    ],
+    DEBTS: [
+      { id:1, person_name:"Eric Ndayisabye", amount:45000, type:"receivable", due_date:daysAgo(-5), status:"pending", business_id:"b2" },
+      { id:2, person_name:"Alliance Fashion", amount:280000, type:"receivable", due_date:daysAgo(-10), status:"pending", business_id:"b1" },
+      { id:3, person_name:"Mutesi Solange", amount:450000, type:"receivable", due_date:daysAgo(2), status:"pending", business_id:"b3" },
+      { id:4, person_name:"Textile Rwanda Ltd", amount:1200000, type:"payable", due_date:daysAgo(-15), status:"pending", business_id:"b1" },
+      { id:5, person_name:"Kigali City Council", amount:85000, type:"payable", due_date:daysAgo(-2), status:"pending", business_id:"b2" },
+    ],
+    WORKERS: [
+      { id:1, name:"Jean Pierre Habimana", email:"jp@valano.rw", role:"manager", is_active:true, branch_id: 1, phone: "+250788111000", monthly_sales:42, monthly_revenue:4820000, monthly_target: 5000000, commission_rate: 5.0 },
+      { id:2, name:"Marie Uwamahoro",      email:"marie@valano.rw", role:"worker",  is_active:true, branch_id: 2, phone: "+250788222000", monthly_sales:28, monthly_revenue:2310000, monthly_target: 3000000, commission_rate: 4.0 },
+    ],
+    MOCK_BRANCHES: [
+      { id: 1, name: "Kigali Main Branch", location: "Kiyovu, Kigali", phone: "+250788111111", worker_count: 1 },
+      { id: 2, name: "Gisenyi Branch", location: "Rubavu, Gisenyi", phone: "+250788222222", worker_count: 1 }
+    ],
+    SUPPLIERS: [
+      { id: 1, name: "Guangzhou Fashion Co.", wechat: "gzfashion2024", whatsapp: "+8613800000001", city: "Guangzhou", country: "China", specialty: "T-Shirts, Casual Wear" },
+      { id: 2, name: "Yiwu Wholesale Hub", wechat: "yiwuhub_trade", whatsapp: "+8613800000002", city: "Yiwu", country: "China", specialty: "Accessories, Mixed Clothing" },
+      { id: 3, name: "Textile Rwanda Ltd", wechat: "textilerw", whatsapp: "+250788000111", city: "Kigali", country: "Rwanda", specialty: "Fabric, Cotton" }
+    ],
+    PROCUREMENT: [
+      { id: 1, supplier_name: "Guangzhou Fashion Co.", supplier_id: 1, order_date: daysAgo(5), status: "ordered", total_amount: 3500000, items_count: 3 },
+      { id: 2, supplier_name: "Textile Rwanda Ltd", supplier_id: 3, order_date: daysAgo(2), status: "arrived", total_amount: 1500000, items_count: 1 }
+    ],
+    EXPENSES: [
+      { id: 1, category: "Rent", amount: 450000, description: "Monthly shop rent", expense_date: daysAgo(10) },
+      { id: 2, category: "Electricity", amount: 25000, description: "Power bill", expense_date: daysAgo(5) },
+      { id: 3, category: "Transport", amount: 80000, description: "Cargo delivery cost", expense_date: daysAgo(3) }
+    ],
+    AUDIT: [
+      { id:1,  user_name:"Rukundo joseph", action:"LOGIN", entity_type:"user", details:"Logged in", created_at:daysAgo(0) },
+    ],
+  };
+}
 
-let FASHION_SALES = [
-  { id:1,  invoice_number:"VL-2026-001", customer_name:"Celestine Nyirahabimana", worker_name:"Jean Pierre Habimana", items_count:5, payment_method:"mtn_momo", total_amount:145000, created_at:daysAgo(1), is_voided:false },
-  { id:2,  invoice_number:"VL-2026-002", customer_name:"Walk-in",                  worker_name:"Marie Uwamahoro",       items_count:2, payment_method:"cash",     total_amount:52000,  created_at:daysAgo(1), is_voided:false },
-  { id:3,  invoice_number:"VL-2026-003", customer_name:"Alliance Fashion Shop",    worker_name:"Alice Mukamana",        items_count:8, payment_method:"mtn_momo", total_amount:280000, created_at:daysAgo(2), is_voided:false },
-  { id:4,  invoice_number:"VL-2026-004", customer_name:"Olivier Hakizimana",       worker_name:"Eric Ndayisabye",       items_count:3, payment_method:"cash",     total_amount:78000,  created_at:daysAgo(2), is_voided:false },
-  { id:5,  invoice_number:"VL-2026-005", customer_name:"Walk-in",                  worker_name:"Alice Mukamana",        items_count:1, payment_method:"airtel",   total_amount:25000,  created_at:daysAgo(3), is_voided:false },
-  { id:6,  invoice_number:"VL-2026-006", customer_name:"Style Hub Boutique",       worker_name:"Jean Pierre Habimana",  items_count:10,payment_method:"mtn_momo", total_amount:420000, created_at:daysAgo(3), is_voided:false },
-  { id:7,  invoice_number:"VL-2026-007", customer_name:"Sandrine Uwera",           worker_name:"Marie Uwamahoro",       items_count:2, payment_method:"cash",     total_amount:46000,  created_at:daysAgo(4), is_voided:false },
-  { id:8,  invoice_number:"VL-2026-008", customer_name:"Walk-in",                  worker_name:"Eric Ndayisabye",       items_count:1, payment_method:"cash",     total_amount:35000,  created_at:daysAgo(5), is_voided:true },
-];
+// ─── PERSISTENT STORE ────────────────────────────────────────────────────────
+const STORE_KEY = "valano_db_v2";
+const COLLECTIONS = Object.keys(buildDefaults());
 
-let FASHION_CUSTOMERS = [
-  { id:1, name:"Celestine Nyirahabimana", phone:"0788123456", location:"Nyamirambo", type:"wholesaler", segment:"vip",     total_orders:48, total_spent:12400000, last_purchase:"2026-05-30" },
-  { id:2, name:"Olivier Hakizimana",      phone:"0722334455", location:"Remera",     type:"retailer",   segment:"vip",     total_orders:31, total_spent:5800000,  last_purchase:"2026-05-28" },
-  { id:3, name:"Sandrine Uwera",          phone:"0733556677", location:"Kacyiru",    type:"retailer",   segment:"regular", total_orders:12, total_spent:1900000,  last_purchase:"2026-05-20" },
-];
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    // Merge in any collections that were added after the user's data was saved
+    const defaults = buildDefaults();
+    for (const key of COLLECTIONS) {
+      if (!(key in parsed)) parsed[key] = defaults[key];
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
 
-let INDUSTRY_RAW = [
-  { id:1, name:"Premium Cotton Fabric", category:"Fabric", size:"100m Roll", color:"White", quantity:45, cost_price_rwf:150000, sell_price_rwf:0, low_stock_threshold:10, barcode:"MAT-001" },
-  { id:2, name:"Polyester Yarn", category:"Thread", size:"5kg", color:"Blue", quantity:120, cost_price_rwf:12000, sell_price_rwf:0, low_stock_threshold:20, barcode:"MAT-002" },
-  { id:3, name:"Metallic Zippers", category:"Zippers", size:"20cm", color:"Silver", quantity:1500, cost_price_rwf:450, sell_price_rwf:0, low_stock_threshold:100, barcode:"MAT-003" },
-];
+const DB = loadState() || buildDefaults();
 
-let INDUSTRY_FINISHED = [
-  { id:1, name:"Wholesale T-Shirts (Bulk)", category:"T-Shirts", size:"Mixed", color:"Mixed", quantity:450, cost_price_rwf:3500, sell_price_rwf:6500, low_stock_threshold:50, barcode:"FG-101" },
-  { id:2, name:"Uniform Sets (School X)", category:"Suits", size:"Standard", color:"Green", quantity:120, cost_price_rwf:8000, sell_price_rwf:15000, low_stock_threshold:20, barcode:"FG-102" },
-];
-
-let INDUSTRY_PRODUCTION = [
-  { id:1, name:"Production Run #44", item:"Summer T-Shirt", quantity:500, status:"in_progress", progress:65, start_date:daysAgo(2) },
-  { id:2, name:"Uniform Batch B1", item:"Denim Jeans", quantity:200, status:"completed", progress:100, start_date:daysAgo(10) },
-];
-
-let INDUSTRY_SALES = [
-  { id:1, invoice_number:"ORD-10024", customer_name:"Alliance Fashion Ltd", worker_name:"Jean P.", items_count:500, payment_method:"bank", total_amount:4500000, created_at:daysAgo(1), is_voided:false },
-  { id:2, invoice_number:"ORD-10025", customer_name:"Kigali Boutique Chain", worker_name:"Jean P.", items_count:200, payment_method:"bank", total_amount:1800000, created_at:daysAgo(3), is_voided:false },
-];
-
-let ESTATE_PROPERTIES = [
-  { id:1, name:"Knotty Heights A1", address:"Gacuriro, Kigali", units:4, type:"Apartment", status:"occupied" },
-  { id:2, name:"Knotty Heights A2", address:"Gacuriro, Kigali", units:4, type:"Apartment", status:"occupied" },
-  { id:3, name:"Commercial Plaza", address:"Kiyovu, Kigali", units:10, type:"Commercial", status:"partial" },
-  { id:4, name:"Warehouse X", address:"Freezone, Kigali", units:1, type:"Industrial", status:"vacant" },
-];
-
-let ESTATE_TENANTS = [
-  { id:1, name:"Iradukunda Eric", property:"Knotty Heights A1", unit:"Unit 101", phone:"0788111222", status:"active", paid:true },
-  { id:2, name:"Mutesi Solange", property:"Knotty Heights A1", unit:"Unit 102", phone:"0788333444", status:"active", paid:false },
-];
-
-let ESTATE_MAINTENANCE = [
-  { id:1, title:"Plumbing Leak", property:"Knotty Heights A1", unit:"Unit 101", priority:"high", status:"pending", date:daysAgo(1) },
-  { id:2, title:"Electrical Repair", property:"Commercial Plaza", unit:"Suite 4", priority:"medium", status:"completed", date:daysAgo(5) },
-];
-
-let ESTATE_SALES = [
-  { id:1, invoice_number:"REC-5501", customer_name:"Iradukunda Eric", worker_name:"Admin", items_count:1, payment_method:"bank", total_amount:450000, created_at:daysAgo(1), is_voided:false },
-  { id:2, invoice_number:"REC-5502", customer_name:"Gasana Jean",     worker_name:"Admin", items_count:1, payment_method:"momo", total_amount:1200000, created_at:daysAgo(5), is_voided:false },
-];
-
-let DEBTS = [
-  { id:1, person_name:"Eric Ndayisabye", amount:45000, type:"receivable", due_date:daysAgo(-5), status:"pending", business_id:"b2" },
-  { id:2, person_name:"Alliance Fashion", amount:280000, type:"receivable", due_date:daysAgo(-10), status:"pending", business_id:"b1" },
-  { id:3, person_name:"Mutesi Solange", amount:450000, type:"receivable", due_date:daysAgo(2), status:"pending", business_id:"b3" },
-  { id:4, person_name:"Textile Rwanda Ltd", amount:1200000, type:"payable", due_date:daysAgo(-15), status:"pending", business_id:"b1" },
-  { id:5, person_name:"Kigali City Council", amount:85000, type:"payable", due_date:daysAgo(-2), status:"pending", business_id:"b2" },
-];
-
-let WORKERS = [
-  { id:1, name:"Jean Pierre Habimana", email:"jp@valano.rw", role:"manager", is_active:true, branch_id: 1, phone: "+250788111000", monthly_sales:42, monthly_revenue:4820000, monthly_target: 5000000, commission_rate: 5.0 },
-  { id:2, name:"Marie Uwamahoro",      email:"marie@valano.rw", role:"worker",  is_active:true, branch_id: 2, phone: "+250788222000", monthly_sales:28, monthly_revenue:2310000, monthly_target: 3000000, commission_rate: 4.0 },
-];
-
-let MOCK_BRANCHES = [
-  { id: 1, name: "Kigali Main Branch", location: "Kiyovu, Kigali", phone: "+250788111111", worker_count: 1 },
-  { id: 2, name: "Gisenyi Branch", location: "Rubavu, Gisenyi", phone: "+250788222222", worker_count: 1 }
-];
-
-let SUPPLIERS = [
-  { id: 1, name: "Guangzhou Fashion Co.", wechat: "gzfashion2024", whatsapp: "+8613800000001", city: "Guangzhou", country: "China", specialty: "T-Shirts, Casual Wear" },
-  { id: 2, name: "Yiwu Wholesale Hub", wechat: "yiwuhub_trade", whatsapp: "+8613800000002", city: "Yiwu", country: "China", specialty: "Accessories, Mixed Clothing" },
-  { id: 3, name: "Textile Rwanda Ltd", wechat: "textilerw", whatsapp: "+250788000111", city: "Kigali", country: "Rwanda", specialty: "Fabric, Cotton" }
-];
-
-let PROCUREMENT = [
-  { id: 1, supplier_name: "Guangzhou Fashion Co.", supplier_id: 1, order_date: daysAgo(5), status: "ordered", total_amount: 3500000, items_count: 3 },
-  { id: 2, supplier_name: "Textile Rwanda Ltd", supplier_id: 3, order_date: daysAgo(2), status: "arrived", total_amount: 1500000, items_count: 1 }
-];
-
-let EXPENSES = [
-  { id: 1, category: "Rent", amount: 450000, description: "Monthly shop rent", expense_date: daysAgo(10) },
-  { id: 2, category: "Electricity", amount: 25000, description: "Power bill", expense_date: daysAgo(5) },
-  { id: 3, category: "Transport", amount: 80000, description: "Cargo delivery cost", expense_date: daysAgo(3) }
-];
-
-let AUDIT = [
-  { id:1,  user_name:"Rukundo joseph", action:"LOGIN", entity_type:"user", details:"Logged in", created_at:daysAgo(0) },
-];
+let saveScheduled = false;
+function saveState() {
+  // Debounce writes so bursts of mutations only serialize once per tick
+  if (saveScheduled) return;
+  saveScheduled = true;
+  Promise.resolve().then(() => {
+    saveScheduled = false;
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(DB));
+    } catch {
+      // Storage full or unavailable — keep working from memory
+    }
+  });
+}
 
 const enrichStock = (item) => ({
   ...item,
@@ -196,27 +231,30 @@ const enrichStock = (item) => ({
 function handle(method, url, body) {
   const path = url.replace(/^\/api/, "").split("?")[0];
   const parts = path.split("/").filter(Boolean);
-  const [r0, r1, r2] = parts;
+  const [r0, r1, r2, r3] = parts;
 
-  const businessId = localStorage.getItem("active_business_id") || "b2"; 
+  const businessId = localStorage.getItem("active_business_id") || "b2";
   const businessType = businessId === "b1" ? "industry" : businessId === "b3" ? "real_estate" : "shop";
 
-  let currentStock = FASHION_STOCK;
-  let currentSales = FASHION_SALES;
-  let currentCustomers = FASHION_CUSTOMERS;
+  let currentStock = DB.FASHION_STOCK;
+  let currentSales = DB.FASHION_SALES;
+  let currentCustomers = DB.FASHION_CUSTOMERS;
 
   if (businessType === "industry") {
-    currentStock = INDUSTRY_RAW; 
-    currentSales = INDUSTRY_SALES;
+    currentStock = DB.INDUSTRY_RAW;
+    currentSales = DB.INDUSTRY_SALES;
   } else if (businessType === "real_estate") {
-    currentStock = []; 
-    currentSales = ESTATE_SALES;
-    currentCustomers = ESTATE_TENANTS;
+    currentStock = [];
+    currentSales = DB.ESTATE_SALES;
+    currentCustomers = DB.ESTATE_TENANTS;
   }
 
   // Auth
   if (path === "/auth/refresh") {
-    return { accessToken: "mock-access-token" };
+    return { accessToken: "local-access-token" };
+  }
+  if (path === "/auth/logout") {
+    return { ok: true };
   }
 
   if (path === "/auth/login") {
@@ -239,41 +277,41 @@ function handle(method, url, body) {
       err.response = { status: 401, data: { error: "Invalid credentials" } };
       throw err;
     }
-    return { user:u, accessToken:"mock-access-token", refreshToken:"mock-refresh-token" };
+    return { user:u, accessToken:"local-access-token", refreshToken:"local-refresh-token" };
   }
 
   // Dashboard Stats
   if (r0 === "dashboard") {
     if (r1 === "stats") {
       const totalRev = currentSales.filter(s => !s.is_voided).reduce((sum, x) => sum + x.total_amount, 0);
-      const totalExp = EXPENSES.reduce((sum, x) => sum + x.amount, 0);
+      const totalExp = DB.EXPENSES.reduce((sum, x) => sum + x.amount, 0);
       const totalVal = currentStock.reduce((sum, x) => sum + x.quantity * x.cost_price_rwf, 0);
       return {
         totalStockValue: totalVal,
         todayRevenue: currentSales.filter(s => !s.is_voided && s.created_at >= daysAgo(1)).reduce((sum, x) => sum + x.total_amount, 0),
         monthlyProfit: totalRev - (totalRev * 0.45) - totalExp,
-        activeWorkers: WORKERS.filter(w => w.is_active).length,
+        activeWorkers: DB.WORKERS.filter(w => w.is_active).length,
       };
     }
     if (r1 === "sales-trend") return Array(30).fill(0).map((_,i)=>({ date:daysAgo(29-i).slice(0,10), revenue:Math.floor(200000+Math.random()*400000) }));
     if (r1 === "stock-health") return { in_stock: currentStock.filter(x => x.quantity > 5).length, low_stock: currentStock.filter(x => x.quantity <= 5 && x.quantity > 0).length, out_of_stock: currentStock.filter(x => x.quantity === 0).length };
     if (r1 === "top-items") {
-      if (businessType === 'shop') return FASHION_STOCK.map(i=>({ name:i.name, total_sold: 12, revenue: 350000 }));
-      if (businessType === 'industry') return INDUSTRY_FINISHED.map(i=>({ name:i.name, total_sold: 500, revenue: 4500000 }));
-      return ESTATE_PROPERTIES.slice(0,3).map(i=>({ name:i.name, total_sold: 'Occupied', revenue: 450000 }));
+      if (businessType === 'shop') return DB.FASHION_STOCK.map(i=>({ name:i.name, total_sold: 12, revenue: 350000 }));
+      if (businessType === 'industry') return DB.INDUSTRY_FINISHED.map(i=>({ name:i.name, total_sold: 500, revenue: 4500000 }));
+      return DB.ESTATE_PROPERTIES.slice(0,3).map(i=>({ name:i.name, total_sold: 'Occupied', revenue: 450000 }));
     }
-    if (r1 === "worker-leaderboard") return WORKERS.map(w=>({ id:w.id, name:w.name, revenue:w.monthly_revenue, monthly_target:5000000 }));
+    if (r1 === "worker-leaderboard") return DB.WORKERS.map(w=>({ id:w.id, name:w.name, revenue:w.monthly_revenue, monthly_target:5000000 }));
     if (r1 === "low-stock-alerts") return [];
-    if (r1 === "activity-feed") return AUDIT.slice(0,5);
+    if (r1 === "activity-feed") return DB.AUDIT.slice(0,5);
   }
 
   // ─── STOCK CRUD ───────────────────────────────────────────────────────────
   if (r0 === "stock") {
-    let dataList = r2 === 'finished' ? INDUSTRY_FINISHED : currentStock;
     const isFinished = r2 === 'finished';
+    let dataList = isFinished ? DB.INDUSTRY_FINISHED : currentStock;
 
     if (method === "GET") {
-      if (!r1) return { data: dataList.map(enrichStock), total: dataList.length };
+      if (!r1 || r1 === 'finished') return { data: dataList.map(enrichStock), total: dataList.length };
       return enrichStock(dataList.find(x=>x.id===parseInt(r1)) || dataList[0]);
     }
 
@@ -281,12 +319,12 @@ function handle(method, url, body) {
       const id = parseInt(r1);
       if (businessType === "industry") {
         if (isFinished) {
-          INDUSTRY_FINISHED = INDUSTRY_FINISHED.filter(x => x.id !== id);
+          DB.INDUSTRY_FINISHED = DB.INDUSTRY_FINISHED.filter(x => x.id !== id);
         } else {
-          INDUSTRY_RAW = INDUSTRY_RAW.filter(x => x.id !== id);
+          DB.INDUSTRY_RAW = DB.INDUSTRY_RAW.filter(x => x.id !== id);
         }
       } else {
-        FASHION_STOCK = FASHION_STOCK.filter(x => x.id !== id);
+        DB.FASHION_STOCK = DB.FASHION_STOCK.filter(x => x.id !== id);
       }
       return { message: "Item deleted" };
     }
@@ -308,12 +346,12 @@ function handle(method, url, body) {
       };
       if (businessType === "industry") {
         if (isFinished) {
-          INDUSTRY_FINISHED.unshift(newItem);
+          DB.INDUSTRY_FINISHED.unshift(newItem);
         } else {
-          INDUSTRY_RAW.unshift(newItem);
+          DB.INDUSTRY_RAW.unshift(newItem);
         }
       } else {
-        FASHION_STOCK.unshift(newItem);
+        DB.FASHION_STOCK.unshift(newItem);
       }
       return newItem;
     }
@@ -357,9 +395,9 @@ function handle(method, url, body) {
         last_purchase: "-"
       };
       if (businessType === "real_estate") {
-        ESTATE_TENANTS.unshift(newCust);
+        DB.ESTATE_TENANTS.unshift(newCust);
       } else {
-        FASHION_CUSTOMERS.unshift(newCust);
+        DB.FASHION_CUSTOMERS.unshift(newCust);
       }
       return newCust;
     }
@@ -374,9 +412,9 @@ function handle(method, url, body) {
     if (method === "DELETE") {
       const id = parseInt(r1);
       if (businessType === "real_estate") {
-        ESTATE_TENANTS = ESTATE_TENANTS.filter(x => x.id !== id);
+        DB.ESTATE_TENANTS = DB.ESTATE_TENANTS.filter(x => x.id !== id);
       } else {
-        FASHION_CUSTOMERS = FASHION_CUSTOMERS.filter(x => x.id !== id);
+        DB.FASHION_CUSTOMERS = DB.FASHION_CUSTOMERS.filter(x => x.id !== id);
       }
       return { message: "Customer deleted" };
     }
@@ -385,24 +423,24 @@ function handle(method, url, body) {
   // ─── SUPPLIERS CRUD ───────────────────────────────────────────────────────
   if (r0 === "suppliers") {
     if (method === "GET") {
-      if (!r1) return SUPPLIERS;
-      return SUPPLIERS.find(x => x.id === parseInt(r1)) || SUPPLIERS[0];
+      if (!r1) return DB.SUPPLIERS;
+      return DB.SUPPLIERS.find(x => x.id === parseInt(r1)) || DB.SUPPLIERS[0];
     }
     if (method === "POST") {
-      const id = nextId(SUPPLIERS);
+      const id = nextId(DB.SUPPLIERS);
       const newSup = { id, ...body };
-      SUPPLIERS.unshift(newSup);
+      DB.SUPPLIERS.unshift(newSup);
       return newSup;
     }
     if (method === "PUT") {
       const id = parseInt(r1);
-      const sup = SUPPLIERS.find(x => x.id === id);
+      const sup = DB.SUPPLIERS.find(x => x.id === id);
       if (sup) Object.assign(sup, body);
       return sup;
     }
     if (method === "DELETE") {
       const id = parseInt(r1);
-      SUPPLIERS = SUPPLIERS.filter(x => x.id !== id);
+      DB.SUPPLIERS = DB.SUPPLIERS.filter(x => x.id !== id);
       return { message: "Supplier deleted" };
     }
   }
@@ -410,33 +448,33 @@ function handle(method, url, body) {
   // ─── PROCUREMENT CRUD ─────────────────────────────────────────────────────
   if (r0 === "procurement") {
     if (method === "GET") {
-      if (!r1) return { data: PROCUREMENT, total: PROCUREMENT.length };
-      return PROCUREMENT.find(x => x.id === parseInt(r1)) || PROCUREMENT[0];
+      if (!r1) return { data: DB.PROCUREMENT, total: DB.PROCUREMENT.length };
+      return DB.PROCUREMENT.find(x => x.id === parseInt(r1)) || DB.PROCUREMENT[0];
     }
     if (method === "POST") {
-      const id = nextId(PROCUREMENT);
+      const id = nextId(DB.PROCUREMENT);
       const newProc = {
         id,
         supplier_id: body.supplier_id,
-        supplier_name: SUPPLIERS.find(x=>x.id===parseInt(body.supplier_id))?.name || "Unknown Supplier",
+        supplier_name: DB.SUPPLIERS.find(x=>x.id===parseInt(body.supplier_id))?.name || "Unknown Supplier",
         order_date: body.order_date || daysAgo(0),
         status: body.status || "ordered",
         total_amount: parseInt(body.total_amount) || 0,
         items_count: body.items?.length || 1,
         items: body.items || []
       };
-      PROCUREMENT.unshift(newProc);
+      DB.PROCUREMENT.unshift(newProc);
       return newProc;
     }
     if (method === "PUT") {
       const id = parseInt(r1);
-      const proc = PROCUREMENT.find(x => x.id === id);
+      const proc = DB.PROCUREMENT.find(x => x.id === id);
       if (proc) Object.assign(proc, body);
       return proc;
     }
     if (method === "DELETE") {
       const id = parseInt(r1);
-      PROCUREMENT = PROCUREMENT.filter(x => x.id !== id);
+      DB.PROCUREMENT = DB.PROCUREMENT.filter(x => x.id !== id);
       return { message: "Order deleted" };
     }
   }
@@ -444,11 +482,11 @@ function handle(method, url, body) {
   // ─── EXPENSES CRUD ────────────────────────────────────────────────────────
   if (r0 === "expenses") {
     if (method === "GET") {
-      if (!r1) return { data: EXPENSES, total: EXPENSES.length, byCategory: [] };
-      return EXPENSES.find(x => x.id === parseInt(r1)) || EXPENSES[0];
+      if (!r1) return { data: DB.EXPENSES, total: DB.EXPENSES.length, byCategory: [] };
+      return DB.EXPENSES.find(x => x.id === parseInt(r1)) || DB.EXPENSES[0];
     }
     if (method === "POST") {
-      const id = nextId(EXPENSES);
+      const id = nextId(DB.EXPENSES);
       const newExp = {
         id,
         category: body.category,
@@ -456,34 +494,34 @@ function handle(method, url, body) {
         description: body.description,
         expense_date: body.expense_date || daysAgo(0)
       };
-      EXPENSES.unshift(newExp);
+      DB.EXPENSES.unshift(newExp);
       return newExp;
     }
     if (method === "PUT") {
       const id = parseInt(r1);
-      const exp = EXPENSES.find(x => x.id === id);
+      const exp = DB.EXPENSES.find(x => x.id === id);
       if (exp) Object.assign(exp, body);
       return exp;
     }
     if (method === "DELETE") {
       const id = parseInt(r1);
-      EXPENSES = EXPENSES.filter(x => x.id !== id);
+      DB.EXPENSES = DB.EXPENSES.filter(x => x.id !== id);
       return { message: "Expense deleted" };
     }
   }
 
   // ─── DEBTS CRUD ───────────────────────────────────────────────────────────
   if (r0 === "debts") {
-    const bizDebts = DEBTS.filter(d => d.business_id === businessId);
+    const bizDebts = DB.DEBTS.filter(d => d.business_id === businessId);
     if (!r1 && method === "GET") return bizDebts;
     if (r2 === "pay" && method === "PUT") {
-      const idx = DEBTS.findIndex(d => d.id === parseInt(r1));
-      if (idx !== -1) DEBTS[idx].status = "paid";
+      const idx = DB.DEBTS.findIndex(d => d.id === parseInt(r1));
+      if (idx !== -1) DB.DEBTS[idx].status = "paid";
       return { ok: true };
     }
     if (method === "POST") {
-      const debt = { id: nextId(DEBTS), ...body, business_id: businessId, status: "pending" };
-      DEBTS.unshift(debt);
+      const debt = { id: nextId(DB.DEBTS), ...body, business_id: businessId, status: "pending" };
+      DB.DEBTS.unshift(debt);
       return debt;
     }
   }
@@ -492,7 +530,7 @@ function handle(method, url, body) {
   if (r0 === "finance" && r1 === "pnl") {
     const totalRev = currentSales.filter(s => !s.is_voided).reduce((sum, x) => sum + x.total_amount, 0);
     const totalCogs = currentSales.filter(s => !s.is_voided).reduce((sum, x) => sum + (x.total_amount * 0.45), 0);
-    const totalExp = EXPENSES.reduce((sum, x) => sum + x.amount, 0);
+    const totalExp = DB.EXPENSES.reduce((sum, x) => sum + x.amount, 0);
     const gross = totalRev - totalCogs;
     const net = gross - totalExp;
     return {
@@ -516,13 +554,45 @@ function handle(method, url, body) {
     ];
   }
 
+  if (r0 === "reports" && r1 === "stock") {
+    const list = (businessType === "industry" ? DB.INDUSTRY_RAW : DB.FASHION_STOCK).map(x => ({
+      ...enrichStock(x),
+      total_value: x.quantity * x.cost_price_rwf,
+    }));
+    return {
+      data: list,
+      total: list.length,
+      totals: {
+        items: list.length,
+        value: list.reduce((s, x) => s + x.total_value, 0),
+        low: list.filter(x => x.status === "low_stock").length,
+        out: list.filter(x => x.status === "out_of_stock").length,
+      },
+    };
+  }
+
+  if (r0 === "reports" && r1 === "procurement") {
+    const list = DB.PROCUREMENT.map(p => ({
+      id: p.id,
+      supplier_name: p.supplier_name,
+      order_date: p.order_date,
+      currency: "CNY",
+      items_cost_cny: Math.round((p.total_amount || 0) / 190),
+      shipping_cost: 0,
+      customs_cost: 0,
+      items_cost_rwf: p.total_amount || 0,
+      status: p.status,
+    }));
+    return { data: list, total: list.length };
+  }
+
   // Industry Specific
-  if (r0 === "production") return INDUSTRY_PRODUCTION;
+  if (r0 === "production") return DB.INDUSTRY_PRODUCTION;
 
   // Real Estate Specific
-  if (r0 === "properties") return ESTATE_PROPERTIES;
-  if (r0 === "tenants") return ESTATE_TENANTS;
-  if (r0 === "maintenance") return ESTATE_MAINTENANCE;
+  if (r0 === "properties") return DB.ESTATE_PROPERTIES;
+  if (r0 === "tenants") return DB.ESTATE_TENANTS;
+  if (r0 === "maintenance") return DB.ESTATE_MAINTENANCE;
 
   // Sales
   if (r0 === "sales") {
@@ -531,25 +601,42 @@ function handle(method, url, body) {
       const s = currentSales.find(x=>x.id===parseInt(r1)) || currentSales[0];
       return { ...s, items: [{ item_name: s.invoice_number, quantity: 1, unit_price: s.total_amount }] };
     }
+    if (method === "POST") {
+      const id = nextId(currentSales);
+      const sale = {
+        id,
+        invoice_number: body.invoice_number || `VL-${new Date().getFullYear()}-${String(id).padStart(3, '0')}`,
+        customer_name: body.customer_name || "Walk-in",
+        worker_name: body.worker_name || "Staff",
+        items_count: body.items?.length || body.items_count || 1,
+        payment_method: body.payment_method || "cash",
+        total_amount: parseInt(body.total_amount) || 0,
+        created_at: nowIso(),
+        is_voided: false,
+      };
+      currentSales.unshift(sale);
+      return sale;
+    }
   }
 
-  if (r0 === "suppliers") return businessType === 'industry' ? SUPPLIERS.filter(x=>x.country==="Rwanda") : SUPPLIERS.filter(x=>x.country!=="Rwanda");
   if (r0 === "invoices") return [ { id:1, invoice_number:"INV-001", customer_name:"Walk-in", issued_at:nowIso(), total_amount:70000, status:"paid" }];
+  if (r0 === "notifications") return [];
+  if (r0 === "audit") return DB.AUDIT;
   if (r0 === "workers") {
     const bId = body?.branch_id;
-    let list = WORKERS;
+    let list = DB.WORKERS;
     if (bId) {
       list = list.filter(w => w.branch_id === parseInt(bId));
     }
     if (method === "GET") return list;
     if (method === "POST") {
-      const w = { id: nextId(WORKERS), ...body, is_active: true };
-      WORKERS.push(w);
+      const w = { id: nextId(DB.WORKERS), ...body, is_active: true };
+      DB.WORKERS.push(w);
       return w;
     }
     if (method === "PUT") {
       const id = parseInt(r1);
-      const w = WORKERS.find(x => x.id === id);
+      const w = DB.WORKERS.find(x => x.id === id);
       if (w) Object.assign(w, body);
       return w;
     }
@@ -558,13 +645,13 @@ function handle(method, url, body) {
   if (r0 === "settings") {
     if (r1 === "branches") {
       if (method === "POST") {
-        const b = { id: nextId(MOCK_BRANCHES), name: body.name, location: body.location, phone: body.phone, worker_count: 0 };
-        MOCK_BRANCHES.push(b);
+        const b = { id: nextId(DB.MOCK_BRANCHES), name: body.name, location: body.location, phone: body.phone, worker_count: 0 };
+        DB.MOCK_BRANCHES.push(b);
         return b;
       }
       if (method === "PUT") {
         const id = parseInt(r2);
-        const b = MOCK_BRANCHES.find(x => x.id === id);
+        const b = DB.MOCK_BRANCHES.find(x => x.id === id);
         if (b) Object.assign(b, body);
         return b;
       }
@@ -574,7 +661,7 @@ function handle(method, url, body) {
     }
     return {
       settings: { shop_name: "VALANO SHOP", shop_address: "Kigali, Rwanda", shop_phone: "+250788123456", default_low_stock_threshold: 5, default_commission_rate: 5.0, invoice_footer_text: "Thank you for your business!" },
-      branches: MOCK_BRANCHES,
+      branches: DB.MOCK_BRANCHES,
       exchangeRates: []
     };
   }
@@ -582,74 +669,50 @@ function handle(method, url, body) {
   return { ok:true };
 }
 
+// Run the local engine and persist any state changes for non-GET operations.
+function runLocal(method, url, body) {
+  const result = handle(method, url, body);
+  if (method !== "GET") saveState();
+  return { data: result };
+}
+
 // ─── API INTERFACE EXPORT ────────────────────────────────────────────────────
+// `isMock` is only true when a REAL backend was configured but is currently
+// unreachable, so the UI can warn about it. In pure local mode (no backend
+// configured) it stays false — local persistence is the intended behaviour.
+
+async function request(method, url, { body, config } = {}) {
+  if (!HAS_BACKEND) {
+    await delay();
+    return runLocal(method, url, method === "GET" ? config?.params : body);
+  }
+
+  try {
+    let res;
+    if (method === "GET") res = await realApi.get(url, config);
+    else if (method === "POST") res = await realApi.post(url, body, config);
+    else if (method === "PUT") res = await realApi.put(url, body, config);
+    else if (method === "DELETE") res = await realApi.delete(url, config);
+    if (isHtmlResponse(res)) throw new Error("HTML response detected");
+    api.isMock = false;
+    return res;
+  } catch (err) {
+    if (isNetworkError(err)) {
+      await delay();
+      api.isMock = true;
+      return runLocal(method, url, method === "GET" ? config?.params : body);
+    }
+    throw err;
+  }
+}
 
 const api = {
   isMock: false,
-  get: async (url, config) => {
-    try {
-      const res = await realApi.get(url, config);
-      if (isHtmlResponse(res)) {
-        throw new Error("HTML response detected");
-      }
-      return res;
-    } catch (err) {
-      if (isNetworkError(err)) {
-        await delay();
-        api.isMock = true;
-        return { data: handle("GET", url, config?.params) };
-      }
-      throw err;
-    }
-  },
-  post: async (url, body, config) => {
-    try {
-      const res = await realApi.post(url, body, config);
-      if (isHtmlResponse(res)) {
-        throw new Error("HTML response detected");
-      }
-      return res;
-    } catch (err) {
-      if (isNetworkError(err)) {
-        await delay();
-        api.isMock = true;
-        return { data: handle("POST", url, body) };
-      }
-      throw err;
-    }
-  },
-  put: async (url, body, config) => {
-    try {
-      const res = await realApi.put(url, body, config);
-      if (isHtmlResponse(res)) {
-        throw new Error("HTML response detected");
-      }
-      return res;
-    } catch (err) {
-      if (isNetworkError(err)) {
-        await delay();
-        api.isMock = true;
-        return { data: handle("PUT", url, body) };
-      }
-      throw err;
-    }
-  },
-  delete: async (url, config) => {
-    try {
-      const res = await realApi.delete(url, config);
-      if (isHtmlResponse(res)) {
-        throw new Error("HTML response detected");
-      }
-      return res;
-    } catch (err) {
-      if (isNetworkError(err)) {
-        await delay();
-        api.isMock = true;
-        return { data: handle("DELETE", url, null) };
-      }
-      throw err;
-    }
-  },
+  hasBackend: HAS_BACKEND,
+  get: (url, config) => request("GET", url, { config }),
+  post: (url, body, config) => request("POST", url, { body, config }),
+  put: (url, body, config) => request("PUT", url, { body, config }),
+  delete: (url, config) => request("DELETE", url, { config }),
   interceptors: {
     request: { use: (onFulfilled, onRejected) => realApi.interceptors.request.use(onFulfilled, onRejected) },
     response: { use: (onFulfilled, onRejected) => realApi.interceptors.response.use(onFulfilled, onRejected) },

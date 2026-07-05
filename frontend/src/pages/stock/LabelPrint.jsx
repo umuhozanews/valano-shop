@@ -26,10 +26,41 @@ export default function LabelPrint() {
   }
 
   function printLabels() {
-    const ids = Object.keys(selected).join(",");
-    if (!ids) return toast.error("Select at least one item");
-    const url = `${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/stock/print-labels?ids=${ids}`;
-    window.open(url, "_blank");
+    const ids = Object.keys(selected).map(Number);
+    if (!ids.length) return toast.error("Select at least one item");
+
+    // When a real backend is configured it renders barcode labels server-side.
+    if (api.hasBackend) {
+      const url = `${import.meta.env.VITE_API_URL}/stock/print-labels?ids=${ids.join(",")}`;
+      window.open(url, "_blank");
+      return;
+    }
+
+    // No backend: build a printable label sheet in the browser.
+    const chosen = items.filter(i => ids.includes(i.id));
+    const win = window.open("", "_blank");
+    if (!win) return toast.error("Please allow pop-ups to print labels");
+    const labels = chosen.map(i => `
+      <div class="label">
+        <div class="name">${i.name}</div>
+        <div class="meta">${[i.size, i.color].filter(Boolean).join(" · ")}</div>
+        <div class="code">${i.barcode || ""}</div>
+        <div class="price">${formatRWF(i.sell_price_rwf)}</div>
+      </div>`).join("");
+    win.document.write(`<!DOCTYPE html><html><head><title>Shelf Labels</title><style>
+      body{font-family:Inter,Arial,sans-serif;margin:16px;}
+      .sheet{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+      .label{border:1px solid #ccc;border-radius:8px;padding:12px;text-align:center;}
+      .name{font-weight:700;font-size:13px;}
+      .meta{color:#666;font-size:11px;margin:2px 0;}
+      .code{font-family:monospace;font-size:11px;margin-top:4px;}
+      .price{font-weight:700;color:#1e3a8a;margin-top:4px;font-size:15px;}
+      @media print{button{display:none;}}
+    </style></head><body>
+      <button onclick="window.print()" style="margin-bottom:12px;padding:8px 14px;">Print</button>
+      <div class="sheet">${labels}</div>
+    </body></html>`);
+    win.document.close();
   }
 
   const count = Object.keys(selected).length;

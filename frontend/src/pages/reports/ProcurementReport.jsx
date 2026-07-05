@@ -10,7 +10,6 @@ import { formatRWF, formatDate } from "../../utils/formatters";
 import toast from "react-hot-toast";
 
 const STATUS_MAP = { ordered:"neutral", in_transit:"warning", at_customs:"danger", arrived:"success", stocked:"success" };
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 export default function ProcurementReport() {
   const [data, setData] = useState([]);

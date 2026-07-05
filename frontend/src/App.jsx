@@ -1,6 +1,7 @@
-import { lazy, Suspense, Component } from "react";
+import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/layout/ProtectedRoute";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 const Loading = () => (
   <div className="flex h-screen items-center justify-center bg-background">
@@ -8,28 +9,17 @@ const Loading = () => (
   </div>
 );
 
-class ErrorBoundary extends Component {
-  state = { error: null };
-  static getDerivedStateFromError(error) { return { error }; }
-  render() {
-    if (this.state.error) {
-      return (
-        <div className="flex h-screen items-center justify-center bg-background flex-col gap-4 p-8 text-center">
-          <div className="text-4xl">⚠️</div>
-          <h1 className="text-headline font-semibold text-text-primary">Something went wrong</h1>
-          <p className="text-text-secondary text-[13px] max-w-sm">{this.state.error?.message || "Unexpected error"}</p>
-          <button onClick={() => window.location.href = "/app/login"}
-            className="mt-2 px-4 py-2 bg-primary text-white rounded-btn text-[13px] font-medium">
-            Go to Login
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
-const L = (imp) => lazy(imp);
+// Retry a failed dynamic import once before giving up. This smooths over the
+// transient chunk-fetch failures that happen right after a new deployment.
+const L = (imp) =>
+  lazy(() =>
+    imp().catch(async (err) => {
+      await new Promise((r) => setTimeout(r, 400));
+      return imp().catch(() => {
+        throw err;
+      });
+    })
+  );
 
 const Login = L(() => import("./pages/auth/Login"));
 const Dashboard = L(() => import("./pages/dashboard/Dashboard"));

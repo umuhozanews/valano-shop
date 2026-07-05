@@ -11,7 +11,6 @@ import { formatRWF } from "../../utils/formatters";
 import toast from "react-hot-toast";
 
 const STATUS_MAP = { in_stock:"success", low_stock:"warning", out_of_stock:"danger" };
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 export default function StockReport() {
   const [data, setData] = useState(null);
