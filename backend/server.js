@@ -6,8 +6,6 @@ const path = require("path");
 const logger = require("./src/middleware/logger");
 const errorHandler = require("./src/middleware/errorHandler");
 const routes = require("./src/routes/index.js");
-const { startCronJobs } = require("./src/cron");
-const { runDatabaseBackup } = require("./src/utils/backup");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -36,14 +34,27 @@ app.use("/api", routes);
 app.use("/", routes);
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  console.log(`KNOTTY SYSTEM backend → http://localhost:${PORT} [${process.env.NODE_ENV || "development"}]`);
-  startCronJobs();
-  
-  // Create a backup of the database on server startup
-  runDatabaseBackup().catch(e => {
-    console.error("[BACKUP ERROR] Startup database backup failed:", e.message);
+// Only start a long-running server (with cron + local backups) when this file
+// is executed directly. Under serverless (Vercel), the app is imported by
+// api/index.js instead, so we must NOT call listen(), cron, or filesystem
+// backups here — those would crash on a read-only serverless filesystem.
+if (require.main === module) {
+  const { startCronJobs } = require("./src/cron");
+  const { runDatabaseBackup } = require("./src/utils/backup");
+  const { ensureDbReady } = require("./src/config/initDb");
+
+  app.listen(PORT, async () => {
+    console.log(`KNOTTY SYSTEM backend → http://localhost:${PORT} [${process.env.NODE_ENV || "development"}]`);
+    try {
+      await ensureDbReady();
+    } catch (e) {
+      console.error("[DB INIT ERROR] Could not initialize database:", e.message);
+    }
+    startCronJobs();
+    runDatabaseBackup().catch(e => {
+      console.error("[BACKUP ERROR] Startup database backup failed:", e.message);
+    });
   });
-});
+}
 
 module.exports = app;
