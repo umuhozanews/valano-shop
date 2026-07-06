@@ -120,12 +120,14 @@ router.post("/", async (req, res, next) => {
     // Validate stock & calculate total
     let total = 0;
     for (const item of items) {
-      const { rows: [stk] } = await pool.query(
-        "SELECT * FROM stock_items WHERE id=$1 AND is_active=true FOR UPDATE", [item.stock_item_id]
-      );
-      if (!stk) throw Object.assign(new Error(`Item ${item.stock_item_id} not found`), { status: 400 });
-      if (stk.quantity < item.quantity) throw Object.assign(new Error(`Insufficient stock for ${stk.name}`), { status: 400 });
-      item._cost = stk.cost_price_rwf;
+      if (item.stock_item_id) {
+        const { rows: [stk] } = await pool.query(
+          "SELECT * FROM stock_items WHERE id=$1 AND is_active=true FOR UPDATE", [item.stock_item_id]
+        );
+        if (!stk) throw Object.assign(new Error(`Item ${item.stock_item_id} not found`), { status: 400 });
+        if (stk.quantity < item.quantity) throw Object.assign(new Error(`Insufficient stock for ${stk.name}`), { status: 400 });
+        item._cost = stk.cost_price_rwf;
+      }
       total += item.unit_price * item.quantity;
     }
 
@@ -151,16 +153,16 @@ router.post("/", async (req, res, next) => {
       await pool.query(
         `INSERT INTO sale_items (sale_id, stock_item_id, quantity, unit_price, subtotal)
          VALUES ($1,$2,$3,$4,$5)`,
-        [sale.id, item.stock_item_id, item.quantity, item.unit_price, item.unit_price * item.quantity]
+        [sale.id, item.stock_item_id || null, item.quantity, item.unit_price, item.unit_price * item.quantity]
       );
-      await pool.query("UPDATE stock_items SET quantity = quantity - $1 WHERE id = $2", [item.quantity, item.stock_item_id]);
-
-      // Check low stock
-      const { rows: [updated] } = await pool.query("SELECT * FROM stock_items WHERE id=$1", [item.stock_item_id]);
-      if (updated.quantity === 0) {
-        await notifyAdminsAndManagers("OUT_OF_STOCK", "Out of Stock Alert", `${updated.name} is out of stock`);
-      } else if (updated.quantity <= updated.low_stock_threshold) {
-        await notifyAdminsAndManagers("LOW_STOCK", "Low Stock Alert", `${updated.name} has only ${updated.quantity} left`);
+      if (item.stock_item_id) {
+        await pool.query("UPDATE stock_items SET quantity = quantity - $1 WHERE id = $2", [item.quantity, item.stock_item_id]);
+        const { rows: [updated] } = await pool.query("SELECT * FROM stock_items WHERE id=$1", [item.stock_item_id]);
+        if (updated.quantity === 0) {
+          await notifyAdminsAndManagers("OUT_OF_STOCK", "Out of Stock Alert", `${updated.name} is out of stock`);
+        } else if (updated.quantity <= updated.low_stock_threshold) {
+          await notifyAdminsAndManagers("LOW_STOCK", "Low Stock Alert", `${updated.name} has only ${updated.quantity} left`);
+        }
       }
     }
 

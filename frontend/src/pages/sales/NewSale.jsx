@@ -113,7 +113,7 @@ export default function NewSale() {
       const { data } = await api.post("/sales", {
         customer_name: customerName || (isRealEstate ? "Unnamed Tenant" : "Walk-in"),
         payment_method: payment,
-        items: cart.map(i => ({ stock_item_id: i.stock_item_id, quantity: i.quantity, unit_price: i.unit_price })),
+        items: cart.map(i => ({ stock_item_id: isRealEstate ? null : i.stock_item_id, quantity: i.quantity, unit_price: i.unit_price })),
         amount_paid: isPartial ? parseFloat(amountPaid) : total,
         due_date: isPartial ? dueDate : null,
       });
