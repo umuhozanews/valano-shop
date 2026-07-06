@@ -9,9 +9,11 @@ const connectionString =
   process.env.POSTGRES_PRISMA_URL ||
   process.env.POSTGRES_URL_NON_POOLING;
 
-// Enable SSL for any remote/hosted database. Local dev (localhost) stays plain.
+// Enable SSL for public remote databases only.
+// Railway internal connections (.railway.internal) are on a private network and don't need SSL.
 const isLocal = /localhost|127\.0\.0\.1/.test(connectionString || "");
-const useSsl = !isLocal && (process.env.NODE_ENV === "production" || !!connectionString && !isLocal);
+const isRailwayInternal = /\.railway\.internal/.test(connectionString || "");
+const useSsl = !isLocal && !isRailwayInternal;
 
 const pool = new Pool({
   connectionString,
