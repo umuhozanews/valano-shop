@@ -13,7 +13,13 @@ const PORT = process.env.PORT || 5000;
 app.use(compression());
 const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:3000").split(",").map(s => s.trim());
 app.use(cors({
-  origin: (origin, cb) => cb(null, !origin || allowedOrigins.some(o => origin.startsWith(o))),
+  origin: (origin, cb) => {
+    const allowed = !origin
+      || origin.endsWith(".vercel.app")
+      || origin.endsWith(".up.railway.app")
+      || allowedOrigins.some(o => origin.startsWith(o));
+    cb(null, allowed);
+  },
   credentials: true,
 }));
 app.use(express.json({ limit: "10mb" }));
