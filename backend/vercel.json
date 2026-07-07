@@ -1,11 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "functions": {
-    "api/index.js": {
-      "maxDuration": 30
+  "services": {
+    "web": {
+      "root": ".",
+      "entrypoint": "api/index.js"
     }
   },
   "rewrites": [
-    { "source": "/(.*)", "destination": "/api" }
+    { "source": "/(.*)", "destination": { "type": "service", "service": "web" } }
   ]
 }
