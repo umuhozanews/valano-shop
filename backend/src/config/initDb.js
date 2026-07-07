@@ -218,22 +218,25 @@ CREATE TABLE IF NOT EXISTS settings (
 
 -- Health Score & Credit Scoring
 CREATE TABLE IF NOT EXISTS health_score_log (
-  id             SERIAL PRIMARY KEY,
-  user_id        INTEGER REFERENCES users(id) ON DELETE CASCADE,
-  score          INTEGER NOT NULL,
-  band           VARCHAR(10) NOT NULL CHECK (band IN ('red','amber','green')),
-  factors        JSONB,
-  model_version  VARCHAR(20),
-  calculated_at  TIMESTAMP DEFAULT NOW()
+  id              SERIAL PRIMARY KEY,
+  user_id         INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  score           INTEGER NOT NULL,
+  band            VARCHAR(10) NOT NULL CHECK (band IN ('red','amber','green')),
+  factors         JSONB,
+  recommendations JSONB,
+  advisory_token  VARCHAR(64),
+  model_version   VARCHAR(20),
+  created_at      TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS credit_scores (
   id             SERIAL PRIMARY KEY,
-  user_id        INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  user_id        INTEGER UNIQUE REFERENCES users(id) ON DELETE CASCADE,
   score          INTEGER NOT NULL,
   band           VARCHAR(10) NOT NULL CHECK (band IN ('red','amber','green')),
   factors        JSONB,
   risk_flags     JSONB,
+  advisory_token VARCHAR(64),
   model_version  VARCHAR(20),
   calculated_at  TIMESTAMP DEFAULT NOW()
 );
@@ -259,26 +262,26 @@ CREATE TABLE IF NOT EXISTS advisory_outcomes (
   recorded_at  TIMESTAMP DEFAULT NOW()
 );
 
--- Lender / Institution
+-- Lender / Institution (user-to-SME join table)
 CREATE TABLE IF NOT EXISTS lender_clients (
-  id           SERIAL PRIMARY KEY,
-  name         VARCHAR(100) NOT NULL,
-  type         VARCHAR(30) NOT NULL CHECK (type IN ('sacco','bank','ngo','government','investor')),
-  contact_name VARCHAR(100),
-  contact_email VARCHAR(100),
-  contact_phone VARCHAR(20),
-  is_active    BOOLEAN DEFAULT true,
-  created_at   TIMESTAMP DEFAULT NOW()
+  id              SERIAL PRIMARY KEY,
+  lender_user_id  INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  sme_user_id     INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  notes           TEXT,
+  created_at      TIMESTAMP DEFAULT NOW(),
+  UNIQUE(lender_user_id, sme_user_id)
 );
 
 CREATE TABLE IF NOT EXISTS referrals (
-  id            SERIAL PRIMARY KEY,
-  lender_id     INTEGER REFERENCES lender_clients(id) ON DELETE SET NULL,
-  business_id   INTEGER REFERENCES users(id) ON DELETE SET NULL,
-  referral_code VARCHAR(20) UNIQUE NOT NULL,
-  status        VARCHAR(20) DEFAULT 'active'
-                  CHECK (status IN ('active','completed','withdrawn')),
-  referred_at   TIMESTAMP DEFAULT NOW()
+  id              SERIAL PRIMARY KEY,
+  lender_user_id  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  sme_user_id     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  referral_code   VARCHAR(20) UNIQUE NOT NULL,
+  status          VARCHAR(20) DEFAULT 'pending'
+                    CHECK (status IN ('pending','active','closed','rejected')),
+  notes           TEXT,
+  updated_at      TIMESTAMP DEFAULT NOW(),
+  created_at      TIMESTAMP DEFAULT NOW()
 );
 
 -- Indexes
@@ -288,7 +291,7 @@ CREATE INDEX IF NOT EXISTS idx_sale_items_sale  ON sale_items(sale_id);
 CREATE INDEX IF NOT EXISTS idx_stock_barcode    ON stock_items(barcode);
 CREATE INDEX IF NOT EXISTS idx_notif_user       ON notifications(user_id, is_read);
 CREATE INDEX IF NOT EXISTS idx_audit_created    ON audit_log(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_health_user      ON health_score_log(user_id, calculated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_health_user      ON health_score_log(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_credit_user      ON credit_scores(user_id, calculated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_ar_customer      ON accounts_receivable(customer_id);
 CREATE INDEX IF NOT EXISTS idx_ar_status        ON accounts_receivable(status);
@@ -344,6 +347,27 @@ ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sms_sent_at TIMESTAMP;
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS language VARCHAR(5) DEFAULT 'en';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS sector_default VARCHAR(50);
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS district_default VARCHAR(50);
+
+-- Health score log: add Sprint 4 columns
+ALTER TABLE health_score_log ADD COLUMN IF NOT EXISTS recommendations JSONB;
+ALTER TABLE health_score_log ADD COLUMN IF NOT EXISTS advisory_token VARCHAR(64);
+ALTER TABLE health_score_log ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
+
+-- Credit scores: add advisory token and unique constraint
+ALTER TABLE credit_scores ADD COLUMN IF NOT EXISTS advisory_token VARCHAR(64);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_credit_scores_user ON credit_scores(user_id);
+
+-- Lender clients: convert to user-to-user join table
+ALTER TABLE lender_clients ADD COLUMN IF NOT EXISTS lender_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
+ALTER TABLE lender_clients ADD COLUMN IF NOT EXISTS sme_user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE;
+ALTER TABLE lender_clients ADD COLUMN IF NOT EXISTS notes TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_lender_clients ON lender_clients(lender_user_id, sme_user_id) WHERE lender_user_id IS NOT NULL AND sme_user_id IS NOT NULL;
+
+-- Referrals: convert to user-to-user references
+ALTER TABLE referrals ADD COLUMN IF NOT EXISTS lender_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE referrals ADD COLUMN IF NOT EXISTS sme_user_id    INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE referrals ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE referrals ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
 `;
 
 const SEED_SQL = `

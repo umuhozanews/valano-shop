@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
+// ── Core SME routes ───────────────────────────────────────────────────────────
 router.use("/auth",               require("./auth"));
 router.use("/dashboard",          require("./dashboard"));
 router.use("/stock",              require("./stock"));
@@ -17,5 +18,10 @@ router.use("/settings",           require("./settings"));
 router.use("/purchase-orders",    require("./purchase-orders"));
 router.use("/accounts-receivable",require("./accounts-receivable"));
 router.use("/payments",           require("./payments"));
+
+// ── v2: Health Score, Lender, Pulse Admin ────────────────────────────────────
+router.use("/v2/score",           require("./score"));
+router.use("/v2/lender",          require("./lender"));
+router.use("/v2/admin",           require("./admin"));
 
 module.exports = router;
