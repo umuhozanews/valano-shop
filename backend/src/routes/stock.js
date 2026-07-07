@@ -225,6 +225,38 @@ router.delete("/:id", requireRole("admin", "manager", "worker"), async (req, res
   }
 });
 
+router.get("/print-labels", async (req, res, next) => {
+  try {
+    const { ids } = req.query;
+    const idList = String(ids).split(",").map(Number).filter(Boolean);
+    if (!idList.length) return res.status(400).json({ error: "No item IDs" });
+
+    const { rows } = await pool.query(
+      `SELECT * FROM stock_items WHERE id = ANY($1::int[]) AND is_active=true`, [idList]
+    );
+
+    const PDFDocument = require("pdfkit");
+    const doc = new PDFDocument({ margin: 10, size: [170, 100] });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=labels.pdf");
+    doc.pipe(res);
+
+    for (let i = 0; i < rows.length; i++) {
+      const item = rows[i];
+      if (i > 0) doc.addPage();
+      try {
+        const barBuf = await generateBarcodeBuffer(item.barcode);
+        doc.image(barBuf, 10, 5, { width: 150, height: 40 });
+      } catch (_) {}
+      doc.fontSize(7).font("Helvetica-Bold").text("VALANO SHOP", 10, 50, { align: "center", width: 150 });
+      doc.fontSize(8).font("Helvetica").text(`${item.name} ${item.size || ""} ${item.color || ""}`.trim(), 10, 60, { align: "center", width: 150 });
+      doc.fontSize(9).font("Helvetica-Bold").fillColor("#10B981")
+         .text(`${new Intl.NumberFormat("en-RW").format(item.sell_price_rwf)} RWF`, 10, 74, { align: "center", width: 150 });
+    }
+    doc.end();
+  } catch (err) { next(err); }
+});
+
 router.post("/transfer", requireRole("admin", "manager", "worker"), async (req, res, next) => {
   try {
     const { item_id, from_branch, to_branch, quantity, notes } = req.body;
@@ -268,38 +300,6 @@ router.post("/transfer", requireRole("admin", "manager", "worker"), async (req, 
     await pool.query("ROLLBACK").catch(() => {});
     next(err);
   }
-});
-
-router.get("/print-labels", async (req, res, next) => {
-  try {
-    const { ids } = req.query;
-    const idList = String(ids).split(",").map(Number).filter(Boolean);
-    if (!idList.length) return res.status(400).json({ error: "No item IDs" });
-
-    const { rows } = await pool.query(
-      `SELECT * FROM stock_items WHERE id = ANY($1::int[]) AND is_active=true`, [idList]
-    );
-
-    const PDFDocument = require("pdfkit");
-    const doc = new PDFDocument({ margin: 10, size: [170, 100] });
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", "attachment; filename=labels.pdf");
-    doc.pipe(res);
-
-    for (let i = 0; i < rows.length; i++) {
-      const item = rows[i];
-      if (i > 0) doc.addPage();
-      try {
-        const barBuf = await generateBarcodeBuffer(item.barcode);
-        doc.image(barBuf, 10, 5, { width: 150, height: 40 });
-      } catch (_) {}
-      doc.fontSize(7).font("Helvetica-Bold").text("VALANO SHOP", 10, 50, { align: "center", width: 150 });
-      doc.fontSize(8).font("Helvetica").text(`${item.name} ${item.size || ""} ${item.color || ""}`.trim(), 10, 60, { align: "center", width: 150 });
-      doc.fontSize(9).font("Helvetica-Bold").fillColor("#10B981")
-         .text(`${new Intl.NumberFormat("en-RW").format(item.sell_price_rwf)} RWF`, 10, 74, { align: "center", width: 150 });
-    }
-    doc.end();
-  } catch (err) { next(err); }
 });
 
 module.exports = router;

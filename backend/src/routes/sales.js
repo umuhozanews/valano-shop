@@ -204,7 +204,9 @@ router.post("/", async (req, res, next) => {
         "SELECT COUNT(*) as orders, SUM(total_amount) as spent FROM sales WHERE customer_id=$1 AND is_voided=false",
         [custId]
       );
-      const seg = cs.spent > 500000 ? "vip" : cs.orders >= 3 ? "regular" : "new";
+      const spent = parseFloat(cs?.spent || 0);
+      const orders = parseInt(cs?.orders || 0);
+      const seg = spent > 500000 ? "vip" : orders >= 3 ? "regular" : "new";
       await pool.query("UPDATE customers SET segment=$1 WHERE id=$2", [seg, custId]);
     }
 
