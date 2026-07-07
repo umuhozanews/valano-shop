@@ -244,11 +244,12 @@ ON CONFLICT DO NOTHING;
 
 INSERT INTO users (name, email, password_hash, role, branch_id, phone, monthly_target, commission_rate) VALUES
   ('Rukundo joseph', 'rukundojosephtuyishime@gmail.com', '$2a$12$pqAP/gTVtss0cQuzuEMpdOTk5TRlOTLHgUR/pZ5QuXml07pFCXyza', 'admin',      1, '+250780000001', 5000000, 0),
-  ('Habimana Jean Pierre','manager@valano.rw',   '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBaXMGJ0eDuBau', 'manager',    1, '+250780000002', 3000000, 2),
-  ('Uwimana Angélique',   'accounts@valano.rw',  '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBaXMGJ0eDuBau', 'accountant', 1, '+250780000003', 0, 0),
-  ('Uwamahoro Marie',     'worker1@valano.rw',   '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBaXMGJ0eDuBau', 'worker',     1, '+250780000004', 1500000, 3),
-  ('Ndayisabye Eric',     'worker2@valano.rw',   '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBaXMGJ0eDuBau', 'worker',     2, '+250780000005', 1500000, 3)
-ON CONFLICT (email) DO NOTHING;
+  ('Habimana Jean Pierre','manager@valano.rw',   '$2a$12$s1O42VRPCBl1KIvmeIxatu2nE8VW5Wrfy/eVjJZWzPXEMffaA8d0K', 'manager',    1, '+250780000002', 3000000, 2),
+  ('Uwimana Angélique',   'accounts@valano.rw',  '$2a$12$s1O42VRPCBl1KIvmeIxatu2nE8VW5Wrfy/eVjJZWzPXEMffaA8d0K', 'accountant', 1, '+250780000003', 0, 0),
+  ('Uwamahoro Marie',     'worker1@valano.rw',   '$2a$12$s1O42VRPCBl1KIvmeIxatu2nE8VW5Wrfy/eVjJZWzPXEMffaA8d0K', 'worker',     1, '+250780000004', 1500000, 3),
+  ('Ndayisabye Eric',     'worker2@valano.rw',   '$2a$12$s1O42VRPCBl1KIvmeIxatu2nE8VW5Wrfy/eVjJZWzPXEMffaA8d0K', 'worker',     2, '+250780000005', 1500000, 3)
+ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash
+WHERE users.role != 'admin';
 
 INSERT INTO suppliers (name, wechat, whatsapp, city, country, specialty) VALUES
   ('Guangzhou Fashion Co.',  'gzfashion2024',  '+8613800000001', 'Guangzhou', 'China', 'T-Shirts, Casual Wear'),
@@ -285,12 +286,34 @@ WHERE NOT EXISTS (SELECT 1 FROM settings);
 COMMIT;
 `;
 
+const BOOTSTRAP_SQL = `
+INSERT INTO branches (name, location, phone) VALUES
+  ('Main Branch', 'Kigali - Nyabugogo Market', '+250788000001'),
+  ('City Branch',  'Kigali - Kimironko Market', '+250788000002')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO users (name, email, password_hash, role, branch_id, phone, monthly_target, commission_rate) VALUES
+  ('Rukundo joseph',       'rukundojosephtuyishime@gmail.com', '$2a$12$pqAP/gTVtss0cQuzuEMpdOTk5TRlOTLHgUR/pZ5QuXml07pFCXyza', 'admin',      1, '+250780000001', 5000000, 0),
+  ('Habimana Jean Pierre', 'manager@valano.rw',                '$2a$12$s1O42VRPCBl1KIvmeIxatu2nE8VW5Wrfy/eVjJZWzPXEMffaA8d0K', 'manager',    1, '+250780000002', 3000000, 2),
+  ('Uwimana Angélique',    'accounts@valano.rw',               '$2a$12$s1O42VRPCBl1KIvmeIxatu2nE8VW5Wrfy/eVjJZWzPXEMffaA8d0K', 'accountant', 1, '+250780000003', 0, 0),
+  ('Uwamahoro Marie',      'worker1@valano.rw',                '$2a$12$s1O42VRPCBl1KIvmeIxatu2nE8VW5Wrfy/eVjJZWzPXEMffaA8d0K', 'worker',     1, '+250780000004', 1500000, 3),
+  ('Ndayisabye Eric',      'worker2@valano.rw',                '$2a$12$s1O42VRPCBl1KIvmeIxatu2nE8VW5Wrfy/eVjJZWzPXEMffaA8d0K', 'worker',     2, '+250780000005', 1500000, 3)
+ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash
+WHERE users.role != 'admin';
+`;
+
 let initPromise = null;
 
 async function runInit() {
-  // Create the schema (safe/idempotent), then seed only if there are no users yet.
   await pool.query(SCHEMA_SQL);
-  const { rows } = await pool.query("SELECT COUNT(*)::int AS count FROM users");
+
+  // Always ensure core branches + users exist (idempotent).
+  // Non-admin passwords are reset to the known default on every boot
+  // so accounts are never locked out. Admin password is never touched.
+  await pool.query(BOOTSTRAP_SQL);
+
+  // Full sample data only on a truly empty database.
+  const { rows } = await pool.query("SELECT COUNT(*)::int AS count FROM stock_items");
   if (rows[0].count === 0) {
     await pool.query(SEED_SQL);
     console.log("[DB INIT] Schema created and seed data inserted.");

@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/layout/ProtectedRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { useAuth } from "./context/AuthContext";
 
 const Loading = () => (
   <div className="flex h-screen items-center justify-center bg-background">
@@ -68,6 +69,12 @@ const ALLA = ["admin","manager","worker","accountant"];
 
 const P = ({ children, roles }) => <ProtectedRoute roles={roles}>{children}</ProtectedRoute>;
 
+function AppRoot() {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/app/login" replace />;
+  return <Navigate to={user.role === "worker" ? "/app/sales" : "/app/dashboard"} replace />;
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -112,7 +119,7 @@ export default function App() {
         <Route path="/app/reports/audit" element={<P roles={AO}><AuditLog /></P>} />
         <Route path="/app/notifications" element={<P roles={ALLA}><NotificationsPage /></P>} />
         <Route path="/app/settings" element={<P roles={AO}><SettingsPage /></P>} />
-        <Route path="/app" element={<Navigate to="/app/dashboard" replace />} />
+        <Route path="/app" element={<AppRoot />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>

@@ -18,17 +18,9 @@ export default function ProtectedRoute({ children, roles }) {
   if (!user) return <Navigate to="/app/login" replace />;
 
   if (roles && !roles.includes(user.role)) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <p className="text-[32px] font-bold text-border mb-2">403</p>
-          <p className="text-[15px] font-semibold text-text-primary mb-1">Access Denied</p>
-          <p className="text-[13px] text-text-secondary">
-            You don't have permission to view this page.
-          </p>
-        </div>
-      </div>
-    );
+    // Workers land on sales; everyone else goes to dashboard
+    const fallback = user.role === "worker" ? "/app/sales" : "/app/dashboard";
+    return <Navigate to={fallback} replace />;
   }
 
   return children;
