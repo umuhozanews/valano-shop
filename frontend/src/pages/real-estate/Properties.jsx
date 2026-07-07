@@ -11,8 +11,8 @@ import toast from "react-hot-toast";
 import { useLanguage } from "../../context/LanguageContext";
 
 const INITIAL_PROPERTIES = [
-  { id: 1, name: "Knotty Heights A1", address: "Gacuriro, Kigali", units: 4, type: "Apartment", status: "occupied" },
-  { id: 2, name: "Knotty Heights A2", address: "Gacuriro, Kigali", units: 4, type: "Apartment", status: "occupied" },
+  { id: 1, name: "Inzira Properties A1", address: "Gacuriro, Kigali", units: 4, type: "Apartment", status: "occupied" },
+  { id: 2, name: "Inzira Properties A2", address: "Gacuriro, Kigali", units: 4, type: "Apartment", status: "occupied" },
   { id: 3, name: "Commercial Plaza", address: "Kiyovu, Kigali", units: 10, type: "Commercial", status: "partial" },
   { id: 4, name: "Warehouse X", address: "Freezone, Kigali", units: 1, type: "Industrial", status: "vacant" },
 ];

@@ -60,7 +60,7 @@ export default function Login() {
             <div className="w-10 h-10 bg-white/20 rounded-btn flex items-center justify-center">
               <Store size={20} className="text-white" />
             </div>
-            <span className="text-white text-[22px] font-bold tracking-tight">KNOTTY SYSTEM</span>
+            <span className="text-white text-[22px] font-bold tracking-tight">INZIRA INSIGHTS</span>
           </div>
           <p className="text-white/70 text-[14px]">Business Management System</p>
         </div>
@@ -91,7 +91,7 @@ export default function Login() {
             <div className="w-8 h-8 bg-primary rounded-btn flex items-center justify-center">
               <Store size={16} className="text-white" />
             </div>
-            <span className="text-[16px] font-bold text-text-primary">KNOTTY SYSTEM</span>
+            <span className="text-[16px] font-bold text-text-primary">INZIRA INSIGHTS</span>
           </div>
 
           <h2 className="text-[24px] font-bold text-text-primary mb-1">{t("welcome_back")}</h2>
@@ -112,7 +112,7 @@ export default function Login() {
                 <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
                 <input
                   type="email" value={email} onChange={e => setEmail(e.target.value)}
-                  placeholder="you@valano.rw" required
+                  placeholder="you@inzira-insights.rw" required
                   className="w-full h-10 pl-9 pr-3 border border-border rounded-card bg-surface text-[14px] focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                 />
               </div>

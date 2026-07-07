@@ -2,9 +2,6 @@ import { useState, useEffect } from "react";
 import { Download, FileText } from "lucide-react";
 import PageWrapper from "../../components/layout/PageWrapper";
 import Card from "../../components/ui/Card";
-import Button from "../../components/ui/Button";
-import StatCard from "../../components/ui/StatCard";
-import Table from "../../components/ui/Table";
 import Badge from "../../components/ui/Badge";
 import api from "../../utils/api";
 import { formatRWF } from "../../utils/formatters";
@@ -13,100 +10,107 @@ import toast from "react-hot-toast";
 const STATUS_MAP = { in_stock:"success", low_stock:"warning", out_of_stock:"danger" };
 
 export default function StockReport() {
-  const [data, setData] = useState(null);
+  const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(false);
-  const [branchId, setBranchId] = useState("");
-  const [branches, setBranches] = useState([]);
 
-  useEffect(() => { api.get("/settings").then(d => setBranches(d.data.branches||[])); }, []);
+  useEffect(() => { generate(); }, []);
 
   async function generate() {
     setLoading(true);
     try {
-      const { data: d } = await api.get("/reports/stock", { params: branchId ? { branch_id: branchId } : {} });
+      const { data: d } = await api.get("/reports/stock");
       setData(d);
-    } catch { toast.error("Failed to generate"); }
-    finally { setLoading(false); }
+    } catch { toast.error("Failed to generate stock report"); }
+    finally   { setLoading(false); }
   }
 
-  const exportExcel = async () => {
+  async function exportExcel() {
     try {
-      const response = await api.get("/reports/stock", {
-        params: { branch_id: branchId || undefined, export: "excel" },
-        responseType: "blob",
-      });
-      const blob = new Blob([response.data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `stock_report_${new Date().toISOString().slice(0, 10)}.xlsx`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch {
-      toast.error("Failed to export Excel");
-    }
-  };
+      const res = await api.get("/reports/stock", { params: { export:"excel" }, responseType:"blob" });
+      const url = URL.createObjectURL(new Blob([res.data]));
+      const a   = document.createElement("a"); a.href = url;
+      a.download = `stock_report_${new Date().toISOString().slice(0,10)}.xlsx`; a.click();
+      URL.revokeObjectURL(url);
+    } catch { toast.error("Export failed"); }
+  }
 
-  const exportPDF = async () => {
-    try {
-      const response = await api.get("/reports/stock", {
-        params: { branch_id: branchId || undefined, export: "pdf" },
-        responseType: "blob",
-      });
-      const blob = new Blob([response.data], { type: "application/pdf" });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `stock_report_${new Date().toISOString().slice(0, 10)}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch {
-      toast.error("Failed to export PDF");
-    }
-  };
-
-  const columns = [
-    { key:"name", label:"Item" }, { key:"category", label:"Category" }, { key:"size", label:"Size" },
-    { key:"branch_name", label:"Branch" },
-    { key:"quantity", label:"Qty", render:(v,r) => <span className={r.status==="out_of_stock"?"text-danger font-bold":r.status==="low_stock"?"text-warning font-bold":"font-medium"}>{v}</span> },
-    { key:"cost_price_rwf", label:"Cost", render:v=>formatRWF(v) },
-    { key:"sell_price_rwf", label:"Sell", render:v=>formatRWF(v) },
-    { key:"total_value", label:"Value", render:v=><span className="font-medium text-primary">{formatRWF(v)}</span> },
-    { key:"status", label:"Status", render:v=><Badge status={STATUS_MAP[v]||"neutral"} label={v?.replace("_"," ")||"—"} /> },
-  ];
+  const rows   = data?.data   || [];
+  const totals = data?.totals || {};
 
   return (
-    <PageWrapper title="Stock Report" breadcrumbs={[{label:"Reports",path:"/app/reports/stock"},{label:"Stock",path:"/app/reports/stock"}]}>
-      <Card className="mb-4">
-        <div className="flex gap-3">
-          <select value={branchId} onChange={e=>setBranchId(e.target.value)} className="h-9 px-3 border border-border rounded-card text-[13px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary">
-            <option value="">All Branches</option>
-            {branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-          <div className="flex gap-2 ml-auto">
-            <Button loading={loading} onClick={generate}>Generate</Button>
-            {data && <><Button variant="secondary" size="sm" icon={FileText} onClick={exportPDF}>PDF</Button><Button variant="secondary" size="sm" icon={Download} onClick={exportExcel}>Excel</Button></>}
-          </div>
+    <PageWrapper title="Stock Report" subtitle="Full inventory snapshot"
+      breadcrumbs={[{ label:"Reports", path:"/app/reports/sales" }, { label:"Stock Report", path:"/app/reports/stock" }]}
+      action={
+        <div className="flex gap-2">
+          <button onClick={generate}
+            className="px-3 py-2 border border-border rounded-[6px] text-[13px] text-text-primary hover:bg-background">
+            Refresh
+          </button>
+          {data && (
+            <button onClick={exportExcel}
+              className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-[6px] text-[13px] text-text-secondary hover:text-text-primary">
+              <Download size={13} /> Excel
+            </button>
+          )}
         </div>
-      </Card>
-
-      {data && (
-        <>
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
-            <StatCard title="Total Items" value={data.totals?.items||0} />
-            <StatCard title="Total Value" value={formatRWF(data.totals?.value||0)} />
-            <StatCard title="Low Stock" value={data.totals?.low||0} />
-            <StatCard title="Out of Stock" value={data.totals?.out||0} />
+      }
+    >
+      {/* KPI cards */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
+        {[
+          { label: "Total Items",    value: totals.items || 0 },
+          { label: "Stock Value",    value: formatRWF(totals.value || 0) },
+          { label: "Low Stock",      value: totals.low  || 0 },
+          { label: "Out of Stock",   value: totals.out  || 0 },
+        ].map(({ label, value }) => (
+          <div key={label} className="bg-surface border border-border rounded-[8px] p-4">
+            <p className="text-[11px] text-text-secondary">{label}</p>
+            <p className="text-[20px] font-bold text-text-primary mt-1">{value}</p>
           </div>
-          <Card>
-            <Table columns={columns} data={data.data} emptyMessage="No items" />
-          </Card>
-        </>
-      )}
+        ))}
+      </div>
+
+      <Card>
+        {loading ? (
+          <div className="py-12 text-center text-[13px] text-text-secondary">Loading stock report…</div>
+        ) : !rows.length ? (
+          <div className="py-12 text-center text-[13px] text-text-secondary">No stock items found</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="border-b border-border">
+                  {["Product","Kinyarwanda","Category","Unit","Qty","Cost (RWF)","Sell (RWF)","Total Value","Status"].map(h => (
+                    <th key={h} className="pb-2 text-left text-[11px] font-semibold text-text-secondary uppercase tracking-wide pr-3">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {rows.map(r => (
+                  <tr key={r.id}>
+                    <td className="py-2 pr-3 font-medium text-text-primary">{r.name}</td>
+                    <td className="py-2 pr-3 text-text-secondary">{r.name_rw || "—"}</td>
+                    <td className="py-2 pr-3 text-text-secondary">{r.category || "—"}</td>
+                    <td className="py-2 pr-3 text-text-secondary">{r.unit || "pcs"}</td>
+                    <td className={`py-2 pr-3 font-bold ${r.stock_status==="out_of_stock"?"text-danger":r.stock_status==="low_stock"?"text-warning":"text-text-primary"}`}>{r.quantity}</td>
+                    <td className="py-2 pr-3 text-text-secondary">{formatRWF(r.cost_price_rwf)}</td>
+                    <td className="py-2 pr-3 text-text-secondary">{formatRWF(r.sell_price_rwf)}</td>
+                    <td className="py-2 pr-3 font-medium text-primary">{formatRWF(r.total_cost_value)}</td>
+                    <td className="py-2"><Badge status={STATUS_MAP[r.stock_status]||"neutral"} label={r.stock_status?.replace(/_/g," ")||"—"} /></td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-border">
+                  <td colSpan={7} className="pt-2 font-bold text-text-primary text-[13px]">TOTAL</td>
+                  <td className="pt-2 font-bold text-primary">{formatRWF(totals.value)}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </Card>
     </PageWrapper>
   );
 }

@@ -31,7 +31,7 @@ export default function LandingNav() {
           {/* Logo */}
           <Link to="/" className="shrink-0 flex flex-col leading-none">
             <span className="text-[11px] tracking-[0.2em] uppercase" style={{ color: "#1B4332", fontFamily: "Inter, sans-serif", fontStyle: "italic" }}>Fashion</span>
-            <span className="text-[32px] sm:text-[38px] font-black tracking-tight" style={{ color: "#1B4332", fontFamily: "'Bebas Neue', sans-serif", letterSpacing: "0.04em", lineHeight: 1 }}>VALANO</span>
+            <span className="text-[32px] sm:text-[38px] font-black tracking-tight" style={{ color: "#1B4332", fontFamily: "'Bebas Neue', sans-serif", letterSpacing: "0.04em", lineHeight: 1 }}>INZIRA INSIGHTS</span>
             <span className="text-[11px] font-bold tracking-[0.3em] uppercase text-center" style={{ color: "#1B4332" }}>SHOP</span>
           </Link>
 

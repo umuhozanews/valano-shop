@@ -253,7 +253,7 @@ router.get("/monthly", async (req, res, next) => {
          FROM accounts_receivable WHERE status IN ('pending','partial','overdue')`
       ),
       pool.query(
-        "SELECT score, band, factors FROM health_score_log WHERE user_id=$1 ORDER BY calculated_at DESC LIMIT 1",
+        "SELECT score, band, factors FROM health_score_log WHERE user_id=$1 ORDER BY created_at DESC LIMIT 1",
         [req.user.id]
       ),
       pool.query(
@@ -301,8 +301,8 @@ router.get("/tax/vat", async (req, res, next) => {
         DATE_TRUNC('month', s.created_at) as month,
         COUNT(*) as transactions,
         COALESCE(SUM(s.total_amount),0) as gross_sales,
-        ROUND(COALESCE(SUM(s.total_amount),0) / (1+$${params.length+1})) as net_sales,
-        ROUND(COALESCE(SUM(s.total_amount),0) - COALESCE(SUM(s.total_amount),0) / (1+$${params.length+1})) as vat_collected
+        ROUND(COALESCE(SUM(s.total_amount),0)::numeric / (1+$${params.length+1}::numeric)) as net_sales,
+        ROUND(COALESCE(SUM(s.total_amount),0)::numeric - COALESCE(SUM(s.total_amount),0)::numeric / (1+$${params.length+1}::numeric)) as vat_collected
        FROM sales s WHERE ${conds.join(" AND ")}
        GROUP BY DATE_TRUNC('month', s.created_at)
        ORDER BY month`,

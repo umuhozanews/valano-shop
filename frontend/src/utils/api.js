@@ -17,7 +17,7 @@ const realApi = axios.create({
 
 // Attach JWT token to headers if present in localStorage
 realApi.interceptors.request.use((config) => {
-  const token = localStorage.getItem("valano_token");
+  const token = localStorage.getItem("inzira_token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -36,17 +36,17 @@ realApi.interceptors.response.use(
     ) {
       originalRequest._retry = true;
       try {
-        const refreshToken = localStorage.getItem("valano_refresh");
+        const refreshToken = localStorage.getItem("inzira_refresh");
         if (refreshToken) {
           const { data } = await axios.post(`${API_BASE}/auth/refresh`, { refreshToken });
-          localStorage.setItem("valano_token", data.accessToken);
+          localStorage.setItem("inzira_token", data.accessToken);
           originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
           return realApi(originalRequest);
         }
       } catch (refreshError) {
-        localStorage.removeItem("valano_token");
-        localStorage.removeItem("valano_refresh");
-        localStorage.removeItem("valano_user");
+        localStorage.removeItem("inzira_token");
+        localStorage.removeItem("inzira_refresh");
+        localStorage.removeItem("inzira_user");
         window.location.href = "/";
       }
     }
@@ -131,17 +131,17 @@ function buildDefaults() {
       { id:2, invoice_number:"ORD-10025", customer_name:"Kigali Boutique Chain", worker_name:"Jean P.", items_count:200, payment_method:"bank", total_amount:1800000, created_at:daysAgo(3), is_voided:false },
     ],
     ESTATE_PROPERTIES: [
-      { id:1, name:"Knotty Heights A1", address:"Gacuriro, Kigali", units:4, type:"Apartment", status:"occupied" },
-      { id:2, name:"Knotty Heights A2", address:"Gacuriro, Kigali", units:4, type:"Apartment", status:"occupied" },
+      { id:1, name:"Inzira Properties A1", address:"Gacuriro, Kigali", units:4, type:"Apartment", status:"occupied" },
+      { id:2, name:"Inzira Properties A2", address:"Gacuriro, Kigali", units:4, type:"Apartment", status:"occupied" },
       { id:3, name:"Commercial Plaza", address:"Kiyovu, Kigali", units:10, type:"Commercial", status:"partial" },
       { id:4, name:"Warehouse X", address:"Freezone, Kigali", units:1, type:"Industrial", status:"vacant" },
     ],
     ESTATE_TENANTS: [
-      { id:1, name:"Iradukunda Eric", property:"Knotty Heights A1", unit:"Unit 101", phone:"0788111222", status:"active", paid:true },
-      { id:2, name:"Mutesi Solange", property:"Knotty Heights A1", unit:"Unit 102", phone:"0788333444", status:"active", paid:false },
+      { id:1, name:"Iradukunda Eric", property:"Inzira Properties A1", unit:"Unit 101", phone:"0788111222", status:"active", paid:true },
+      { id:2, name:"Mutesi Solange", property:"Inzira Properties A1", unit:"Unit 102", phone:"0788333444", status:"active", paid:false },
     ],
     ESTATE_MAINTENANCE: [
-      { id:1, title:"Plumbing Leak", property:"Knotty Heights A1", unit:"Unit 101", priority:"high", status:"pending", date:daysAgo(1) },
+      { id:1, title:"Plumbing Leak", property:"Inzira Properties A1", unit:"Unit 101", priority:"high", status:"pending", date:daysAgo(1) },
       { id:2, title:"Electrical Repair", property:"Commercial Plaza", unit:"Suite 4", priority:"medium", status:"completed", date:daysAgo(5) },
     ],
     ESTATE_SALES: [
@@ -156,8 +156,8 @@ function buildDefaults() {
       { id:5, person_name:"Kigali City Council", amount:85000, type:"payable", due_date:daysAgo(-2), status:"pending", business_id:"b2" },
     ],
     WORKERS: [
-      { id:1, name:"Jean Pierre Habimana", email:"jp@valano.rw", role:"manager", is_active:true, branch_id: 1, phone: "+250788111000", monthly_sales:42, monthly_revenue:4820000, monthly_target: 5000000, commission_rate: 5.0 },
-      { id:2, name:"Marie Uwamahoro",      email:"marie@valano.rw", role:"worker",  is_active:true, branch_id: 2, phone: "+250788222000", monthly_sales:28, monthly_revenue:2310000, monthly_target: 3000000, commission_rate: 4.0 },
+      { id:1, name:"Jean Pierre Habimana", email:"jp@inzira-insights.rw", role:"manager", is_active:true, branch_id: 1, phone: "+250788111000", monthly_sales:42, monthly_revenue:4820000, monthly_target: 5000000, commission_rate: 5.0 },
+      { id:2, name:"Marie Uwamahoro",      email:"marie@inzira-insights.rw", role:"worker",  is_active:true, branch_id: 2, phone: "+250788222000", monthly_sales:28, monthly_revenue:2310000, monthly_target: 3000000, commission_rate: 4.0 },
     ],
     MOCK_BRANCHES: [
       { id: 1, name: "Kigali Main Branch", location: "Kiyovu, Kigali", phone: "+250788111111", worker_count: 1 },
@@ -184,7 +184,7 @@ function buildDefaults() {
 }
 
 // ─── PERSISTENT STORE ────────────────────────────────────────────────────────
-const STORE_KEY = "valano_db_v2";
+const STORE_KEY = "inzira_db_v1";
 const COLLECTIONS = Object.keys(buildDefaults());
 
 function loadState() {
@@ -260,15 +260,15 @@ function handle(method, url, body) {
   if (path === "/auth/login") {
     const USERS = {
       "rukundojosephtuyishime@gmail.com": { id:1, name:"Rukundo joseph", email:"rukundojosephtuyishime@gmail.com", role:"admin", branch_id:1 },
-      "manager@valano.rw":   { id:2, name:"Habimana Jean Pierre", email:"manager@valano.rw",   role:"manager",    branch_id:1 },
-      "accounts@valano.rw":  { id:3, name:"Uwimana Angélique",    email:"accounts@valano.rw",  role:"accountant", branch_id:1 },
-      "worker1@valano.rw":   { id:4, name:"Uwamahoro Marie",       email:"worker1@valano.rw",   role:"worker",     branch_id:1 },
+      "manager@inzira-insights.rw":   { id:2, name:"Habimana Jean Pierre", email:"manager@inzira-insights.rw",   role:"manager",    branch_id:1 },
+      "accounts@inzira-insights.rw":  { id:3, name:"Uwimana Angélique",    email:"accounts@inzira-insights.rw",  role:"accountant", branch_id:1 },
+      "worker1@inzira-insights.rw":   { id:4, name:"Uwamahoro Marie",       email:"worker1@inzira-insights.rw",   role:"worker",     branch_id:1 },
     };
     const PASSWORDS = {
       "rukundojosephtuyishime@gmail.com": "rukundo2007",
-      "manager@valano.rw":  "valano123",
-      "accounts@valano.rw": "valano123",
-      "worker1@valano.rw":  "valano123",
+      "manager@inzira-insights.rw":  "inzira2024",
+      "accounts@inzira-insights.rw": "inzira2024",
+      "worker1@inzira-insights.rw":  "inzira2024",
     };
     const email = body?.email?.trim().toLowerCase();
     const u = USERS[email];
@@ -660,7 +660,7 @@ function handle(method, url, body) {
       }
     }
     return {
-      settings: { shop_name: "VALANO SHOP", shop_address: "Kigali, Rwanda", shop_phone: "+250788123456", default_low_stock_threshold: 5, default_commission_rate: 5.0, invoice_footer_text: "Thank you for your business!" },
+      settings: { shop_name: "INZIRA INSIGHTS", shop_address: "Kigali, Rwanda", shop_phone: "+250788123456", default_low_stock_threshold: 5, default_commission_rate: 5.0, invoice_footer_text: "Thank you for your business!" },
       branches: DB.MOCK_BRANCHES,
       exchangeRates: []
     };

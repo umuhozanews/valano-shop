@@ -1,7 +1,7 @@
 {
-  "name": "valano-shop-frontend",
-  "version": "1.0.0",
-  "description": "VALANO SHOP - Business Management System Frontend",
+  "name": "inzira-insights-frontend",
+  "version": "2.0.0",
+  "description": "Inzira Insights - Rwanda SME Business Management Platform",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -27,5 +27,8 @@
     "postcss": "^8.4.39",
     "tailwindcss": "^3.4.4",
     "vite": "^5.3.1"
+  },
+  "allowScripts": {
+    "esbuild@0.21.5": true
   }
 }

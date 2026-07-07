@@ -80,7 +80,7 @@ export default function CustomersList() {
       <div className="flex gap-1 items-center">
         <Button variant="ghost" size="sm" onClick={() => navigate(`/app/customers/${v}`)}>{t("view")}</Button>
         {r.phone && (
-          <button onClick={() => window.open(`https://wa.me/${r.phone.replace(/\D/g,"")}?text=Hello+${encodeURIComponent(r.name)},+from+KNOTTY+SYSTEM`,"_blank")}
+          <button onClick={() => window.open(`https://wa.me/${r.phone.replace(/\D/g,"")}?text=Hello+${encodeURIComponent(r.name)},+from+INZIRA INSIGHTS+SYSTEM`,"_blank")}
             className="p-1 text-[#25D366] hover:opacity-80" title="WhatsApp">
             <MessageCircle size={14} />
           </button>

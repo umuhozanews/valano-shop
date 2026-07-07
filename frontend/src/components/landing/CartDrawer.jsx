@@ -9,7 +9,7 @@ export default function CartDrawer({ open, onClose }) {
     const lines = cart.map(i =>
       `• ${i.name} (${i.size}, ${i.colorName}) × ${i.quantity} = ${formatRWF(i.price * i.quantity)}`
     ).join("\n");
-    const msg = `Hello VALANO SHOP! I'd like to order:\n\n${lines}\n\nTotal: ${formatRWF(cartTotal)}\n\nPlease confirm availability.`;
+    const msg = `Hello INZIRA INSIGHTS! I'd like to order:\n\n${lines}\n\nTotal: ${formatRWF(cartTotal)}\n\nPlease confirm availability.`;
     window.open(`https://wa.me/250788000111?text=${encodeURIComponent(msg)}`, "_blank");
   }
 

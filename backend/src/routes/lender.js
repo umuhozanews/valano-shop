@@ -54,13 +54,14 @@ router.get("/clients", async (req, res, next) => {
       ? (req.query.lender_id || req.user.id)
       : req.user.id;
 
-    const { band, sector, page = 1, limit = 20 } = req.query;
+    const { band, sector, search, page = 1, limit = 20 } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     const conditions = ["lc.lender_user_id = $1"];
     const params = [lenderId];
-    if (band) { params.push(band); conditions.push(`cs.band = $${params.length}`); }
+    if (band)   { params.push(band);   conditions.push(`cs.band = $${params.length}`); }
     if (sector) { params.push(sector); conditions.push(`u.sector = $${params.length}`); }
+    if (search) { params.push(`%${search}%`); conditions.push(`(u.name ILIKE $${params.length} OR u.email ILIKE $${params.length})`); }
 
     const where = conditions.join(" AND ");
 
@@ -84,7 +85,7 @@ router.get("/clients", async (req, res, next) => {
       params
     );
 
-    res.json({ clients: rows, total: parseInt(cnt.count), page: parseInt(page), limit: parseInt(limit) });
+    res.json({ data: rows, total: parseInt(cnt.count), page: parseInt(page), limit: parseInt(limit) });
   } catch (err) { next(err); }
 });
 
@@ -115,11 +116,21 @@ router.get("/clients/:sme_id", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// POST /v2/lender/referral — create a referral code for an SME
+// POST /v2/lender/referral — create a referral code for an SME (accepts sme_user_id or sme_email)
 router.post("/referral", async (req, res, next) => {
   try {
-    const { sme_user_id, notes } = req.body;
-    if (!sme_user_id) return res.status(400).json({ error: "sme_user_id required" });
+    let { sme_user_id, sme_email, notes } = req.body;
+
+    // Allow lookup by email
+    if (!sme_user_id && sme_email) {
+      const { rows: [found] } = await pool.query(
+        "SELECT id FROM users WHERE email=$1 AND role IN ('sme_owner','admin','manager','cashier','accountant')",
+        [sme_email.toLowerCase().trim()]
+      );
+      if (!found) return res.status(404).json({ error: `No SME account found with email: ${sme_email}` });
+      sme_user_id = found.id;
+    }
+    if (!sme_user_id) return res.status(400).json({ error: "sme_user_id or sme_email required" });
 
     const code = "REF-" + crypto.randomBytes(4).toString("hex").toUpperCase();
 

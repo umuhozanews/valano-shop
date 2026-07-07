@@ -10,119 +10,135 @@ const Loading = () => (
   </div>
 );
 
-// Retry a failed dynamic import once before giving up. This smooths over the
-// transient chunk-fetch failures that happen right after a new deployment.
-const L = (imp) =>
-  lazy(() =>
-    imp().catch(async (err) => {
-      await new Promise((r) => setTimeout(r, 400));
-      return imp().catch(() => {
-        throw err;
-      });
-    })
-  );
+const L = (imp) => lazy(() =>
+  imp().catch(async (err) => {
+    await new Promise(r => setTimeout(r, 400));
+    return imp().catch(() => { throw err; });
+  })
+);
 
-const Login = L(() => import("./pages/auth/Login"));
-const Dashboard = L(() => import("./pages/dashboard/Dashboard"));
-const StockList = L(() => import("./pages/stock/StockList"));
-const StockDetail = L(() => import("./pages/stock/StockDetail"));
-const LabelPrint = L(() => import("./pages/stock/LabelPrint"));
-const SalesList = L(() => import("./pages/sales/SalesList"));
-const NewSale = L(() => import("./pages/sales/NewSale"));
-const SaleDetail = L(() => import("./pages/sales/SaleDetail"));
-const ProcurementList = L(() => import("./pages/procurement/ProcurementList"));
-const ProcurementDetail = L(() => import("./pages/procurement/ProcurementDetail"));
-const WorkersList = L(() => import("./pages/workers/WorkersList"));
-const WorkerProfile = L(() => import("./pages/workers/WorkerProfile"));
-const CustomersList = L(() => import("./pages/customers/CustomersList"));
-const CustomerProfile = L(() => import("./pages/customers/CustomerProfile"));
-const SuppliersList = L(() => import("./pages/suppliers/SuppliersList"));
-const InvoicesList = L(() => import("./pages/finance/InvoicesList"));
-const ExpensesList = L(() => import("./pages/finance/ExpensesList"));
-const ProfitLoss = L(() => import("./pages/finance/ProfitLoss"));
-const DebtManagement = L(() => import("./pages/finance/DebtManagement"));
-const SalesReport = L(() => import("./pages/reports/SalesReport"));
-const StockReport = L(() => import("./pages/reports/StockReport"));
-const WorkerPerformance = L(() => import("./pages/reports/WorkerPerformance"));
-const FinancialReport = L(() => import("./pages/reports/FinancialReport"));
-const ProcurementReport = L(() => import("./pages/reports/ProcurementReport"));
-const AuditLog = L(() => import("./pages/reports/AuditLog"));
+// ── Pages ─────────────────────────────────────────────────────────────────────
+const Login             = L(() => import("./pages/auth/Login"));
+const Dashboard         = L(() => import("./pages/dashboard/Dashboard"));
+
+// Inventory
+const StockList         = L(() => import("./pages/stock/StockList"));
+const StockDetail       = L(() => import("./pages/stock/StockDetail"));
+const LabelPrint        = L(() => import("./pages/stock/LabelPrint"));
+const PurchaseOrders    = L(() => import("./pages/purchase-orders/PurchaseOrders"));
+
+// Sales / POS
+const SalesList         = L(() => import("./pages/sales/SalesList"));
+const NewSale           = L(() => import("./pages/sales/NewSale"));
+const SaleDetail        = L(() => import("./pages/sales/SaleDetail"));
+
+// CRM
+const CustomersList     = L(() => import("./pages/customers/CustomersList"));
+const CustomerProfile   = L(() => import("./pages/customers/CustomerProfile"));
+const SuppliersList     = L(() => import("./pages/suppliers/SuppliersList"));
+const Receivables       = L(() => import("./pages/finance/Receivables"));
+
+// Finance
+const InvoicesList      = L(() => import("./pages/finance/InvoicesList"));
+const ExpensesList      = L(() => import("./pages/finance/ExpensesList"));
+const ProfitLoss        = L(() => import("./pages/finance/ProfitLoss"));
+
+// Reports
+const SalesReport       = L(() => import("./pages/reports/SalesReport"));
+const StockReport       = L(() => import("./pages/reports/StockReport"));
+const FinancialReport   = L(() => import("./pages/reports/FinancialReport"));
+const AuditLog          = L(() => import("./pages/reports/AuditLog"));
+const TaxReport         = L(() => import("./pages/reports/TaxReport"));
+
+// Intelligence
+const HealthScore       = L(() => import("./pages/intelligence/HealthScore"));
 const NotificationsPage = L(() => import("./pages/notifications/NotificationsPage"));
-const SettingsPage = L(() => import("./pages/settings/SettingsPage"));
 
-// New Business Specific Pages
-const ProductionPage = L(() => import("./pages/industry/Production"));
-const FinishedGoodsPage = L(() => import("./pages/industry/FinishedGoods"));
-const PropertiesPage = L(() => import("./pages/real-estate/Properties"));
-const TenantsPage = L(() => import("./pages/real-estate/Tenants"));
-const MaintenancePage = L(() => import("./pages/real-estate/Maintenance"));
+// Admin + Lender
+const AdminDashboard    = L(() => import("./pages/admin/AdminDashboard"));
+const LenderDashboard   = L(() => import("./pages/lender/LenderDashboard"));
+const LenderSmeDetail   = L(() => import("./pages/lender/LenderSmeDetail"));
+const AdvisoryPublic    = L(() => import("./pages/intelligence/AdvisoryPublic"));
 
-const Landing = L(() => import("./pages/Landing"));
-const ProductDetail = L(() => import("./pages/ProductDetail"));
+// Settings
+const SettingsPage      = L(() => import("./pages/settings/SettingsPage"));
 
-const AM = ["admin","manager"];
-const AMA = ["admin","manager","accountant"];
-const AO = ["admin"];
-const AA = ["admin","accountant"];
-const ALL = ["admin","manager","worker"];
-const ALLA = ["admin","manager","worker","accountant"];
+// ── Role groups ───────────────────────────────────────────────────────────────
+const ALL    = ["pulse_admin","sme_owner","admin","manager","cashier","accountant","viewer"];
+const OWNER  = ["pulse_admin","sme_owner","admin"];
+const STAFF  = ["pulse_admin","sme_owner","admin","manager","accountant"];
+const POS    = ["pulse_admin","sme_owner","admin","manager","cashier"];
+const FIN    = ["pulse_admin","sme_owner","admin","accountant"];
 
 const P = ({ children, roles }) => <ProtectedRoute roles={roles}>{children}</ProtectedRoute>;
 
 function AppRoot() {
   const { user } = useAuth();
   if (!user) return <Navigate to="/app/login" replace />;
-  return <Navigate to={user.role === "worker" ? "/app/sales" : "/app/dashboard"} replace />;
+  const cashierOnly = ["cashier", "viewer"].includes(user.role);
+  return <Navigate to={cashierOnly ? "/app/sales/new" : "/app/dashboard"} replace />;
 }
 
 export default function App() {
   return (
     <ErrorBoundary>
-    <Suspense fallback={<Loading />}>
-      <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/product/:id" element={<ProductDetail />} />
-        <Route path="/app/login" element={<Login />} />
-        <Route path="/app/dashboard" element={<P roles={AMA}><Dashboard /></P>} />
-        <Route path="/app/stock" element={<P roles={AMA}><StockList /></P>} />
-        <Route path="/app/stock/labels" element={<P roles={AMA}><LabelPrint /></P>} />
-        <Route path="/app/stock/:id" element={<P roles={AMA}><StockDetail /></P>} />
-        <Route path="/app/sales" element={<P roles={ALLA}><SalesList /></P>} />
-        <Route path="/app/sales/new" element={<P roles={ALLA}><NewSale /></P>} />
-        <Route path="/app/sales/:id" element={<P roles={ALLA}><SaleDetail /></P>} />
-        
-        {/* Industry Specific */}
-        <Route path="/app/production" element={<P roles={AMA}><ProductionPage /></P>} />
-        <Route path="/app/finished-goods" element={<P roles={AMA}><FinishedGoodsPage /></P>} />
-        
-        {/* Real Estate Specific */}
-        <Route path="/app/properties" element={<P roles={AMA}><PropertiesPage /></P>} />
-        <Route path="/app/tenants" element={<P roles={AMA}><TenantsPage /></P>} />
-        <Route path="/app/maintenance" element={<P roles={AMA}><MaintenancePage /></P>} />
+      <Suspense fallback={<Loading />}>
+        <Routes>
+          <Route path="/"           element={<Navigate to="/app/login" replace />} />
+          <Route path="/app/login"  element={<Login />} />
 
-        <Route path="/app/procurement" element={<P roles={AMA}><ProcurementList /></P>} />
-        <Route path="/app/procurement/:id" element={<P roles={AMA}><ProcurementDetail /></P>} />
-        <Route path="/app/workers" element={<P roles={AM}><WorkersList /></P>} />
-        <Route path="/app/workers/:id" element={<P roles={AM}><WorkerProfile /></P>} />
-        <Route path="/app/customers" element={<P roles={AMA}><CustomersList /></P>} />
-        <Route path="/app/customers/:id" element={<P roles={AMA}><CustomerProfile /></P>} />
-        <Route path="/app/suppliers" element={<P roles={AA}><SuppliersList /></P>} />
-        <Route path="/app/invoices" element={<P roles={AMA}><InvoicesList /></P>} />
-        <Route path="/app/expenses" element={<P roles={AMA}><ExpensesList /></P>} />
-        <Route path="/app/debts" element={<P roles={AMA}><DebtManagement /></P>} />
-        <Route path="/app/finance/pnl" element={<P roles={AA}><ProfitLoss /></P>} />
-        <Route path="/app/reports/sales" element={<P roles={AMA}><SalesReport /></P>} />
-        <Route path="/app/reports/stock" element={<P roles={AMA}><StockReport /></P>} />
-        <Route path="/app/reports/workers" element={<P roles={AMA}><WorkerPerformance /></P>} />
-        <Route path="/app/reports/financial" element={<P roles={AA}><FinancialReport /></P>} />
-        <Route path="/app/reports/procurement" element={<P roles={AA}><ProcurementReport /></P>} />
-        <Route path="/app/reports/audit" element={<P roles={AO}><AuditLog /></P>} />
-        <Route path="/app/notifications" element={<P roles={ALLA}><NotificationsPage /></P>} />
-        <Route path="/app/settings" element={<P roles={AO}><SettingsPage /></P>} />
-        <Route path="/app" element={<AppRoot />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Suspense>
+          {/* Dashboard */}
+          <Route path="/app/dashboard" element={<P roles={STAFF}><Dashboard /></P>} />
+
+          {/* Inventory */}
+          <Route path="/app/stock"            element={<P roles={STAFF}><StockList /></P>} />
+          <Route path="/app/stock/labels"     element={<P roles={STAFF}><LabelPrint /></P>} />
+          <Route path="/app/stock/:id"        element={<P roles={STAFF}><StockDetail /></P>} />
+          <Route path="/app/purchase-orders"  element={<P roles={STAFF}><PurchaseOrders /></P>} />
+          <Route path="/app/suppliers"        element={<P roles={FIN}><SuppliersList /></P>} />
+
+          {/* POS / Sales */}
+          <Route path="/app/sales"            element={<P roles={ALL}><SalesList /></P>} />
+          <Route path="/app/sales/new"        element={<P roles={POS}><NewSale /></P>} />
+          <Route path="/app/sales/:id"        element={<P roles={ALL}><SaleDetail /></P>} />
+
+          {/* CRM */}
+          <Route path="/app/customers"        element={<P roles={STAFF}><CustomersList /></P>} />
+          <Route path="/app/customers/:id"    element={<P roles={STAFF}><CustomerProfile /></P>} />
+          <Route path="/app/receivables"      element={<P roles={STAFF}><Receivables /></P>} />
+
+          {/* Finance */}
+          <Route path="/app/expenses"         element={<P roles={STAFF}><ExpensesList /></P>} />
+          <Route path="/app/invoices"         element={<P roles={STAFF}><InvoicesList /></P>} />
+          <Route path="/app/finance/pnl"      element={<P roles={FIN}><ProfitLoss /></P>} />
+
+          {/* Reports */}
+          <Route path="/app/reports/sales"    element={<P roles={STAFF}><SalesReport /></P>} />
+          <Route path="/app/reports/stock"    element={<P roles={STAFF}><StockReport /></P>} />
+          <Route path="/app/reports/tax"      element={<P roles={FIN}><TaxReport /></P>} />
+          <Route path="/app/reports/financial"element={<P roles={FIN}><FinancialReport /></P>} />
+          <Route path="/app/reports/audit"    element={<P roles={OWNER}><AuditLog /></P>} />
+
+          {/* Intelligence */}
+          <Route path="/app/health-score"     element={<P roles={OWNER}><HealthScore /></P>} />
+          <Route path="/app/notifications"    element={<P roles={ALL}><NotificationsPage /></P>} />
+
+          {/* Admin (pulse_admin only) */}
+          <Route path="/app/admin"            element={<P roles={["pulse_admin"]}><AdminDashboard /></P>} />
+
+          {/* Lender */}
+          <Route path="/app/lender"           element={<P roles={["lender","pulse_admin"]}><LenderDashboard /></P>} />
+          <Route path="/app/lender/sme/:id"   element={<P roles={["lender","pulse_admin"]}><LenderSmeDetail /></P>} />
+
+          {/* Settings */}
+          <Route path="/app/settings"         element={<P roles={OWNER}><SettingsPage /></P>} />
+
+          <Route path="/app" element={<AppRoot />} />
+          {/* Public advisory share link — no auth required */}
+          <Route path="/advisory/:token"      element={<AdvisoryPublic />} />
+          <Route path="*"    element={<Navigate to="/app/login" replace />} />
+        </Routes>
+      </Suspense>
     </ErrorBoundary>
   );
 }

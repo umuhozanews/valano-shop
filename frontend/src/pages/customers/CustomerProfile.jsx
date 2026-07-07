@@ -42,7 +42,7 @@ export default function CustomerProfile() {
         <Button variant="ghost" size="sm" icon={ArrowLeft} onClick={() => navigate("/app/customers")}>Back</Button>
         {customer.phone && (
           <Button variant="secondary" size="sm" icon={MessageCircle}
-            onClick={() => window.open(`https://wa.me/${customer.phone.replace(/\D/g,"")}?text=Hello+${encodeURIComponent(customer.name)},+from+VALANO+SHOP`,"_blank")}>
+            onClick={() => window.open(`https://wa.me/${customer.phone.replace(/\D/g,"")}?text=Hello+${encodeURIComponent(customer.name)},+from+INZIRA INSIGHTS+SHOP`,"_blank")}>
             WhatsApp
           </Button>
         )}

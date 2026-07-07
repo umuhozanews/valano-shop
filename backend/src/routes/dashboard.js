@@ -44,7 +44,7 @@ router.get("/stats", async (req, res, next) => {
 
     // Latest health score
     const { rows: [healthScore] } = await pool.query(
-      "SELECT score, band FROM health_score_log WHERE user_id=$1 ORDER BY calculated_at DESC LIMIT 1",
+      "SELECT score, band FROM health_score_log WHERE user_id=$1 ORDER BY created_at DESC LIMIT 1",
       [req.user.id]
     );
 
@@ -137,6 +137,25 @@ router.get("/low-stock-alerts", async (req, res, next) => {
        ORDER BY quantity ASC LIMIT 20`
     );
     res.json(rows);
+  } catch (err) { next(err); }
+});
+
+router.get("/worker-leaderboard", async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT u.id, u.name, u.role,
+        COUNT(s.id) as sales_count,
+        COALESCE(SUM(s.total_amount),0) as revenue
+       FROM users u
+       LEFT JOIN sales s ON s.user_id=u.id
+         AND DATE_TRUNC('month',s.created_at)=DATE_TRUNC('month',NOW())
+         AND s.is_voided=false
+       WHERE u.role IN ('sme_owner','manager','cashier','admin') AND u.is_active=true
+       GROUP BY u.id, u.name, u.role
+       ORDER BY revenue DESC LIMIT 10`
+    );
+    // Add a monthly_target placeholder so the frontend progress bar renders
+    res.json(rows.map(r => ({ ...r, monthly_target: 0 })));
   } catch (err) { next(err); }
 });
 

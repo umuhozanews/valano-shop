@@ -54,9 +54,9 @@ const TRANSLATIONS = {
     overdue: "Overdue",
     
     // Businesses
-    industry: "KNOTTY INDUSTRY",
-    shop: "KNOTTY FASHION",
-    real_estate_biz: "KNOTTY ESTATES",
+    industry: "INZIRA INSIGHTS",
+    shop: "INZIRA INSIGHTS",
+    real_estate_biz: "INZIRA INSIGHTS",
     switch_business: "Switch Business",
     
     // Auth
@@ -217,9 +217,9 @@ const TRANSLATIONS = {
     overdue: "Arengeje igihe",
     
     // Businesses
-    industry: "KNOTTY INDUSTRY",
-    shop: "KNOTTY FASHION",
-    real_estate_biz: "KNOTTY ESTATES",
+    industry: "INZIRA INSIGHTS",
+    shop: "INZIRA INSIGHTS",
+    real_estate_biz: "INZIRA INSIGHTS",
     switch_business: "Hindura Ubucuruzi",
     
     // Auth
@@ -332,7 +332,7 @@ const TRANSLATIONS = {
 };
 
 export function LanguageProvider({ children }) {
-  const [lang, setLang] = useState(localStorage.getItem("valano_lang") || "en");
+  const [lang, setLang] = useState(localStorage.getItem("inzira_lang") || "en");
 
   const t = useCallback((key) => {
     return TRANSLATIONS[lang]?.[key] || TRANSLATIONS["en"][key] || key;
@@ -340,7 +340,7 @@ export function LanguageProvider({ children }) {
 
   const switchLanguage = (newLang) => {
     setLang(newLang);
-    localStorage.setItem("valano_lang", newLang);
+    localStorage.setItem("inzira_lang", newLang);
   };
 
   return (

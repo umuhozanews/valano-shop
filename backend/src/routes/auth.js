@@ -232,19 +232,30 @@ router.post("/otp/verify", async (req, res, next) => {
 // ─── Consent management ───────────────────────────────────────────────────────
 router.put("/consent", verifyToken, async (req, res, next) => {
   try {
-    const { status } = req.body;
-    if (!['consented','declined','withdrawn'].includes(status))
-      return res.status(400).json({ error: "Status must be consented, declined, or withdrawn" });
+    const { status, consent_status, lender_sharing } = req.body;
+    const finalStatus = consent_status || status;
+    if (!['consented','granted','declined','withdrawn'].includes(finalStatus))
+      return res.status(400).json({ error: "Status must be consented, granted, declined, or withdrawn" });
+
+    // Normalise: "granted" → "consented"
+    const normalised = finalStatus === "granted" ? "consented" : finalStatus;
+
+    const sets = ["consent_status=$1", "consent_date=NOW()"];
+    const params = [normalised, req.user.id];
+    if (lender_sharing !== undefined) {
+      sets.push(`lender_sharing=$${params.length - 1 + 1}`);
+      params.splice(params.length - 1, 0, lender_sharing);
+    }
 
     const { rows: [user] } = await pool.query(
-      `UPDATE users SET consent_status=$1, consent_date=NOW() WHERE id=$2 RETURNING *`,
-      [status, req.user.id]
+      `UPDATE users SET ${sets.join(", ")} WHERE id=$${params.length} RETURNING *`,
+      params
     );
 
-    await logAudit(req.user.id, "CONSENT_UPDATED", "users", req.user.id, null, { status }, req.ip);
+    await logAudit(req.user.id, "CONSENT_UPDATED", "users", req.user.id, null, { status: normalised, lender_sharing }, req.ip);
 
     const { password_hash, otp_code, otp_expires_at, ...safe } = user;
-    res.json({ message: `Consent ${status}`, user: safe });
+    res.json({ message: `Consent ${normalised}`, user: safe });
   } catch (err) { next(err); }
 });
 

@@ -4,12 +4,12 @@ const CartContext = createContext(null);
 
 export function CartProvider({ children }) {
   const [cart, setCart] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("valano_cart") || "[]"); }
+    try { return JSON.parse(localStorage.getItem("inzira_cart") || "[]"); }
     catch { return []; }
   });
 
   useEffect(() => {
-    localStorage.setItem("valano_cart", JSON.stringify(cart));
+    localStorage.setItem("inzira_cart", JSON.stringify(cart));
   }, [cart]);
 
   function addToCart({ id, name, img, price, size, colorName, quantity = 1 }) {

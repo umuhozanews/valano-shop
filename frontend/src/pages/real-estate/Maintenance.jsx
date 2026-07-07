@@ -13,7 +13,7 @@ import { useLanguage } from "../../context/LanguageContext";
 const PRIORITY_MAP = { high: "danger", medium: "warning", low: "neutral" };
 
 const INITIAL_TASKS = [
-  { id: 1, title: "Fix leaking pipe", property: "Knotty Heights A1", unit: "Unit 101", priority: "high", status: "pending", date: "2026-07-01" },
+  { id: 1, title: "Fix leaking pipe", property: "Inzira Properties A1", unit: "Unit 101", priority: "high", status: "pending", date: "2026-07-01" },
   { id: 2, title: "Paint exterior walls", property: "Commercial Plaza", unit: "General", priority: "medium", status: "in_progress", date: "2026-06-25" },
   { id: 3, title: "Electrical inspection", property: "Warehouse X", unit: "Main Area", priority: "low", status: "completed", date: "2026-06-20" },
 ];

@@ -29,6 +29,15 @@ app.use(logger);
 // Serve uploaded files
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
+app.get("/", (req, res) => {
+  res.json({
+    app: "Inzira Insights API",
+    version: "2.0.0",
+    status: "running",
+    docs: "/api/health",
+    time: new Date().toISOString(),
+  });
+});
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", time: new Date().toISOString(), version: "2.0.0", app: "Inzira Insights" });
 });

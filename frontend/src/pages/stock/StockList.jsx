@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Tag, Search, Edit, Clock, Trash2, Box } from "lucide-react";
+import { Plus, Search, Edit, Clock, Trash2 } from "lucide-react";
 import PageWrapper from "../../components/layout/PageWrapper";
 import Table from "../../components/ui/Table";
 import Badge from "../../components/ui/Badge";
@@ -12,195 +12,203 @@ import { useNavigate } from "react-router-dom";
 import api from "../../utils/api";
 import { formatRWF } from "../../utils/formatters";
 import toast from "react-hot-toast";
-import { ITEM_CATEGORIES, SIZES } from "../../utils/constants";
+import { ITEM_CATEGORIES, STOCK_UNITS } from "../../utils/constants";
 import { useLanguage } from "../../context/LanguageContext";
-import { useBusiness } from "../../context/BusinessContext";
 import { useAuth } from "../../context/AuthContext";
 
-const STATUS_MAP = { in_stock: "success", low_stock: "warning", out_of_stock: "danger" };
-
-const EMPTY_FORM = { name:"", category:"", size:"", color:"", quantity:0, cost_price_rwf:"", sell_price_rwf:"", low_stock_threshold:5, branch_id:"" };
+const STATUS_MAP   = { in_stock: "success", low_stock: "warning", out_of_stock: "danger" };
+const EMPTY_FORM   = { name:"", name_rw:"", category:"", unit:"pcs", quantity:0, cost_price_rwf:"", sell_price_rwf:"", low_stock_threshold:5 };
 
 export default function StockList() {
   const { t } = useLanguage();
-  const { activeBusiness } = useBusiness();
   const { user } = useAuth();
-  const navigate = useNavigate();
-  
-  const [items, setItems] = useState([]);
-  const [total, setTotal] = useState(0);
+  const navigate  = useNavigate();
+
+  const [items,   setItems]   = useState([]);
+  const [total,   setTotal]   = useState(0);
   const [summary, setSummary] = useState({});
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
+  const [page,    setPage]    = useState(1);
   const [filters, setFilters] = useState({ search:"", category:"", status:"" });
   const [showModal, setShowModal] = useState(false);
-  const [editItem, setEditItem] = useState(null);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [saving, setSaving] = useState(false);
-  const [branches, setBranches] = useState([]);
+  const [editItem,  setEditItem]  = useState(null);
+  const [form,    setForm]    = useState(EMPTY_FORM);
+  const [saving,  setSaving]  = useState(false);
 
-  useEffect(() => {
-    api.get("/settings").then(({ data }) => {
-      setBranches(data.branches || []);
-    }).catch(() => {});
-  }, []);
-
-  const isIndustry = activeBusiness.type === "industry";
-
-  const STATUS_LABEL = { 
-    in_stock: t("in_stock"), 
-    low_stock: t("low_stock"), 
-    out_of_stock: t("out_of_stock") 
-  };
+  const canEdit = ["pulse_admin","sme_owner","admin","manager"].includes(user?.role);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const params = { page, limit: 20, ...Object.fromEntries(Object.entries(filters).filter(([,v]) => v)) };
       const { data } = await api.get("/stock", { params });
-      setItems(data.data); setTotal(data.total);
+      setItems(data.data || []); setTotal(data.total || 0);
 
-      const [all] = await Promise.all([api.get("/stock", { params: { limit: 1000, ...Object.fromEntries(Object.entries(filters).filter(([k,v]) => v && k !== "status")) } })]);
-      const it = all.data.data;
+      const { data: all } = await api.get("/stock", { params: { limit: 1000 } });
+      const it = all.data || [];
       setSummary({
-        total: all.data.total,
-        value: it.reduce((s,x) => s + x.quantity * x.cost_price_rwf, 0),
-        low: it.filter(x => x.status === "low_stock").length,
-        out: it.filter(x => x.status === "out_of_stock").length,
+        total: all.total || it.length,
+        value: it.reduce((s,x) => s + (x.quantity * (x.cost_price_rwf || 0)), 0),
+        low:   it.filter(x => x.status === "low_stock").length,
+        out:   it.filter(x => x.status === "out_of_stock").length,
       });
-    } catch (e) { toast.error(t("error")); }
-    finally { setLoading(false); }
-  }, [page, filters, t]);
+    } catch { toast.error("Failed to load stock"); }
+    finally   { setLoading(false); }
+  }, [page, filters]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
   async function handleSave() {
+    if (!form.name) return toast.error("Product name is required");
+    if (!form.sell_price_rwf) return toast.error("Selling price is required");
     setSaving(true);
     try {
-      const payload = { ...form };
-      if (user?.role !== "admin") {
-        payload.branch_id = user?.branch_id;
-      }
-      if (!payload.branch_id) {
-        toast.error("Branch assignment is required.");
-        setSaving(false);
-        return;
-      }
+      const payload = {
+        name:                form.name,
+        name_rw:             form.name_rw || null,
+        category:            form.category || null,
+        unit:                form.unit || "pcs",
+        quantity:            parseInt(form.quantity) || 0,
+        cost_price_rwf:      parseFloat(form.cost_price_rwf) || 0,
+        sell_price_rwf:      parseFloat(form.sell_price_rwf) || 0,
+        low_stock_threshold: parseInt(form.low_stock_threshold) || 5,
+      };
       if (editItem) await api.put(`/stock/${editItem.id}`, payload);
-      else await api.post("/stock", payload);
-      toast.success(t("success"));
+      else          await api.post("/stock", payload);
+      toast.success(editItem ? "Product updated" : "Product added");
       setShowModal(false); fetchData();
-    } catch(e){ toast.error(e.response?.data?.error || t("error")); }
-    finally { setSaving(false); }
+    } catch(e) { toast.error(e.response?.data?.error || "Failed to save"); }
+    finally   { setSaving(false); }
   }
 
   async function handleDelete(id) {
-    if (!confirm(t("confirm_delete"))) return;
-    try { await api.delete(`/stock/${id}`); toast.success(t("success")); fetchData(); }
-    catch { toast.error(t("error")); }
+    if (!confirm("Delete this product?")) return;
+    try { await api.delete(`/stock/${id}`); toast.success("Product deleted"); fetchData(); }
+    catch { toast.error("Failed to delete"); }
   }
 
   function openEdit(item) {
     setEditItem(item);
-    setForm({ name:item.name, category:item.category, size:item.size || "", color:item.color || "",
-              quantity:item.quantity, cost_price_rwf:item.cost_price_rwf, sell_price_rwf:item.sell_price_rwf,
-              low_stock_threshold:item.low_stock_threshold, branch_id:item.branch_id });
+    setForm({
+      name:                item.name,
+      name_rw:             item.name_rw || "",
+      category:            item.category || "",
+      unit:                item.unit || "pcs",
+      quantity:            item.quantity,
+      cost_price_rwf:      item.cost_price_rwf,
+      sell_price_rwf:      item.sell_price_rwf,
+      low_stock_threshold: item.low_stock_threshold,
+    });
     setShowModal(true);
   }
 
   const columns = [
-    { key:"name", label: isIndustry ? "Material Name" : t("item_name"), render:(v,r) => (
+    { key:"name", label:"Product", render:(v,r) => (
       <div>
         <p className="font-medium text-text-primary">{v}</p>
-        <p className="text-[11px] text-text-secondary">
-          {r.category}{r.size ? ` • ${r.size}` : ""}{r.color ? ` • ${r.color}` : ""}
-        </p>
+        {r.name_rw && <p className="text-[11px] text-text-secondary">{r.name_rw}</p>}
+        <p className="text-[11px] text-text-secondary">{r.category}{r.unit ? ` · ${r.unit}` : ""}</p>
       </div>
     )},
-    { key:"barcode", label: t("barcode"), render:v => <span className="font-mono text-[11px] text-text-secondary">{v}</span> },
-    { key:"quantity", label: t("quantity"), render:(v,r) => (
-      <span className={`font-semibold ${r.status==="out_of_stock"?"text-danger":r.status==="low_stock"?"text-warning":"text-text-primary"}`}>{v}</span>
+    { key:"barcode",       label:"Barcode",  render:v => <span className="font-mono text-[11px] text-text-secondary">{v || "—"}</span> },
+    { key:"quantity",      label:"Qty",      render:(v,r) => (
+      <span className={`font-semibold ${r.status==="out_of_stock"?"text-danger":r.status==="low_stock"?"text-warning":"text-text-primary"}`}>{v} {r.unit}</span>
     )},
-    { key:"cost_price_rwf", label: t("cost_price"), render:v => formatRWF(v) },
-    !isIndustry ? { key:"sell_price_rwf", label: t("selling_price"), render:v => formatRWF(v) } : null,
-    { key:"status", label: t("status"), render:v => <Badge status={STATUS_MAP[v]||"neutral"} label={STATUS_LABEL[v]||v} /> },
+    { key:"cost_price_rwf",  label:"Cost",   render:v => formatRWF(v) },
+    { key:"sell_price_rwf",  label:"Sell",   render:v => formatRWF(v) },
+    { key:"status",       label:"Status",    render:v => <Badge status={STATUS_MAP[v]||"neutral"} label={v?.replace(/_/g," ")||"—"} /> },
     { key:"id", label:"", render:(v,r) => (
       <div className="flex gap-1">
-        <button onClick={() => navigate(`/app/stock/${v}`)} className="p-1 text-text-secondary hover:text-primary rounded" title={t("view")}><Clock size={14}/></button>
-        <button onClick={() => openEdit(r)} className="p-1 text-text-secondary hover:text-primary rounded" title={t("edit")}><Edit size={14}/></button>
-        <button onClick={() => handleDelete(v)} className="p-1 text-text-secondary hover:text-danger rounded" title={t("delete")}><Trash2 size={14}/></button>
+        <button onClick={() => navigate(`/app/stock/${v}`)} className="p-1 text-text-secondary hover:text-primary rounded"><Clock size={14}/></button>
+        {canEdit && <>
+          <button onClick={() => openEdit(r)} className="p-1 text-text-secondary hover:text-primary rounded"><Edit size={14}/></button>
+          <button onClick={() => handleDelete(v)} className="p-1 text-text-secondary hover:text-danger rounded"><Trash2 size={14}/></button>
+        </>}
       </div>
     )},
-  ].filter(Boolean);
+  ];
 
   return (
-    <PageWrapper title={isIndustry ? t("raw_materials") : t("stock")} subtitle={isIndustry ? "Supplies for production" : t("stock")}
-      breadcrumbs={[{label: isIndustry ? t("raw_materials") : t("stock"), path: "/app/stock"}]}>
-
-      {/* Summary */}
+    <PageWrapper title="Stock" subtitle="Manage your product inventory"
+      breadcrumbs={[{ label:"Stock", path:"/app/stock" }]}
+      action={canEdit && (
+        <button onClick={() => { setEditItem(null); setForm(EMPTY_FORM); setShowModal(true); }}
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-[6px] text-[13px] font-medium hover:bg-primary/90">
+          <Plus size={15} /> Add Product
+        </button>
+      )}
+    >
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
-        <StatCard title={t("total")} value={summary.total||0} />
-        <StatCard title={t("stock_value")} value={formatRWF(summary.value||0)} />
-        <StatCard title={t("low_stock")} value={summary.low||0} />
-        <StatCard title={t("out_of_stock")} value={summary.out||0} />
+        <StatCard title="Total Items"    value={summary.total || 0} />
+        <StatCard title="Stock Value"    value={formatRWF(summary.value || 0)} />
+        <StatCard title="Low Stock"      value={summary.low || 0} color="warning" />
+        <StatCard title="Out of Stock"   value={summary.out || 0} color="danger" />
       </div>
 
       <Card>
-        {/* Actions */}
         <div className="flex flex-wrap gap-3 mb-4">
           <div className="relative flex-1 min-w-[180px]">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
-            <input value={filters.search} onChange={e=>setFilters(f=>({...f,search:e.target.value}))} placeholder={`${t("search")}…`}
-              className="w-full h-9 pl-9 pr-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary" />
+            <input value={filters.search} onChange={e=>setFilters(f=>({...f,search:e.target.value}))} placeholder="Search products…"
+              className="w-full h-9 pl-9 pr-3 border border-border rounded-[6px] text-[13px] focus:outline-none focus:ring-1 focus:ring-primary" />
           </div>
           <select value={filters.category} onChange={e=>setFilters(f=>({...f,category:e.target.value}))}
-            className="h-9 px-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface">
-            <option value="">{t("category")} ({t("all")})</option>
-            {isIndustry ? ["Fabric","Buttons","Thread","Zippers","Labels","Packaging"].map(c => <option key={c} value={c}>{c}</option>) : ITEM_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            className="h-9 px-3 border border-border rounded-[6px] text-[13px] bg-surface">
+            <option value="">All Categories</option>
+            {ITEM_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
-          <div className="ml-auto flex gap-2">
-            <Button variant="primary" size="sm" icon={Plus} onClick={() => { setEditItem(null); setForm(EMPTY_FORM); setShowModal(true); }}>{t("add")}</Button>
-          </div>
+          <select value={filters.status} onChange={e=>setFilters(f=>({...f,status:e.target.value}))}
+            className="h-9 px-3 border border-border rounded-[6px] text-[13px] bg-surface">
+            <option value="">All Status</option>
+            <option value="in_stock">In Stock</option>
+            <option value="low_stock">Low Stock</option>
+            <option value="out_of_stock">Out of Stock</option>
+          </select>
         </div>
 
-        <Table columns={columns} data={items} loading={loading} emptyMessage={t("loading")} />
+        <Table columns={columns} data={items} loading={loading} emptyMessage="No products yet" />
+
+        {total > 20 && (
+          <div className="flex justify-center gap-2 mt-4">
+            <button disabled={page===1} onClick={() => setPage(p=>p-1)}
+              className="px-3 py-1.5 border border-border rounded text-[12px] disabled:opacity-40">Prev</button>
+            <span className="px-3 py-1.5 text-[12px] text-text-secondary">Page {page} of {Math.ceil(total/20)}</span>
+            <button disabled={page>=Math.ceil(total/20)} onClick={() => setPage(p=>p+1)}
+              className="px-3 py-1.5 border border-border rounded text-[12px] disabled:opacity-40">Next</button>
+          </div>
+        )}
       </Card>
 
-      {/* Add/Edit Modal */}
-      <Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? t("edit") : t("add")}
-        footer={<><Button variant="secondary" onClick={() => setShowModal(false)}>{t("cancel")}</Button><Button loading={saving} onClick={handleSave}>{t("save")}</Button></>}>
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? "Edit Product" : "Add Product"}
+        footer={<><Button variant="secondary" onClick={() => setShowModal(false)}>Cancel</Button><Button loading={saving} onClick={handleSave}>Save</Button></>}>
         <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2"><Input label={isIndustry ? "Material Name" : t("item_name")} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} /></div>
-          
-          {user?.role === "admin" && (
-            <div className="col-span-2">
-              <label className="block text-[13px] font-medium text-text-primary mb-1">Assign to Branch</label>
-              <select value={form.branch_id || ""} onChange={e=>setForm(f=>({...f,branch_id:e.target.value}))} className="w-full h-9 px-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface">
-                <option value="">Select Branch…</option>
-                {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
-            </div>
-          )}
-
+          <div className="col-span-2">
+            <Input label="Product Name (English)" value={form.name}
+              onChange={e=>setForm(f=>({...f,name:e.target.value}))} required />
+          </div>
+          <div className="col-span-2">
+            <Input label="Izina mu Kinyarwanda (optional)" value={form.name_rw}
+              onChange={e=>setForm(f=>({...f,name_rw:e.target.value}))} placeholder="e.g. Umuceri" />
+          </div>
           <div>
-            <label className="block text-[13px] font-medium text-text-primary mb-1">{t("category")}</label>
-            <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} className="w-full h-9 px-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface">
-              <option value="">{t("category")}…</option>
-              {isIndustry ? ["Fabric","Buttons","Thread","Zippers","Labels","Packaging"].map(c => <option key={c} value={c}>{c}</option>) : ITEM_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            <label className="block text-[13px] font-medium text-text-primary mb-1">Category</label>
+            <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))}
+              className="w-full h-9 px-3 border border-border rounded-[6px] text-[13px] bg-surface">
+              <option value="">Select…</option>
+              {ITEM_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-[13px] font-medium text-text-primary mb-1">{t("size") || "Size"}</label>
-            <select value={form.size} onChange={e=>setForm(f=>({...f,size:e.target.value}))} className="w-full h-9 px-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface">
-              <option value="">{t("size") || "Size"}…</option>
-              {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+            <label className="block text-[13px] font-medium text-text-primary mb-1">Unit of Measure</label>
+            <select value={form.unit} onChange={e=>setForm(f=>({...f,unit:e.target.value}))}
+              className="w-full h-9 px-3 border border-border rounded-[6px] text-[13px] bg-surface">
+              {STOCK_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
             </select>
           </div>
-          <Input label={t("color") || "Color"} value={form.color} onChange={e=>setForm(f=>({...f,color:e.target.value}))} />
-          <Input label={t("quantity")} type="number" value={form.quantity} onChange={e=>setForm(f=>({...f,quantity:e.target.value}))} />
-          <Input label={t("min_stock")} type="number" value={form.low_stock_threshold} onChange={e=>setForm(f=>({...f,low_stock_threshold:e.target.value}))} />
-          <Input label={t("cost_price")} type="number" value={form.cost_price_rwf} onChange={e=>setForm(f=>({...f,cost_price_rwf:e.target.value}))} />
-          {!isIndustry && <Input label={t("selling_price")} type="number" value={form.sell_price_rwf} onChange={e=>setForm(f=>({...f,sell_price_rwf:e.target.value}))} />}
+          <Input label="Quantity"           type="number" value={form.quantity}            onChange={e=>setForm(f=>({...f,quantity:e.target.value}))} />
+          <Input label="Low Stock Alert at" type="number" value={form.low_stock_threshold} onChange={e=>setForm(f=>({...f,low_stock_threshold:e.target.value}))} />
+          <Input label="Cost Price (RWF)"   type="number" value={form.cost_price_rwf}      onChange={e=>setForm(f=>({...f,cost_price_rwf:e.target.value}))} />
+          <Input label="Selling Price (RWF)" type="number" value={form.sell_price_rwf}     onChange={e=>setForm(f=>({...f,sell_price_rwf:e.target.value}))} required />
         </div>
       </Modal>
     </PageWrapper>

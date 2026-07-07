@@ -1,146 +1,114 @@
 export const ROLES = {
-  OWNER: "admin",
-  MANAGER: "manager",
-  ACCOUNTANT: "accountant",
-  WORKER: "worker",
-  VIEWER: "viewer",
+  PULSE_ADMIN:      "pulse_admin",
+  SME_OWNER:        "sme_owner",
+  ADMIN:            "admin",
+  MANAGER:          "manager",
+  ACCOUNTANT:       "accountant",
+  CASHIER:          "cashier",
+  ADVISOR:          "databridge_advisor",
+  LENDER:           "lender",
+  VIEWER:           "viewer",
 };
 
-export const PAYMENT_METHODS = ["cash", "momo", "bank_transfer", "credit"];
-
-export const ITEM_CATEGORIES = [
-  "T-Shirts",
-  "Shirts",
-  "Trousers",
-  "Jeans",
-  "Dresses",
-  "Jackets",
-  "Suits",
-  "Shoes",
-  "Accessories",
-  "Other",
+export const PAYMENT_METHODS = [
+  "cash", "mtn_momo", "airtel", "card", "bank_transfer", "credit", "split"
 ];
 
 export const EXPENSE_CATEGORIES = [
-  "Rent",
-  "Utilities",
-  "Salaries",
-  "Transport",
-  "Customs",
-  "Marketing",
-  "Supplies",
-  "Other",
+  "Rent", "Utilities", "Salaries", "Transport", "Marketing",
+  "Supplies", "Maintenance", "Loan Repayment", "Other",
 ];
 
-export const SIZES = ["XS","S","M","L","XL","XXL","One Size","28","30","32","34","36","37","38","39","40","41","42","43","44","45"];
+// Keep for backward compat with StockList
+export const ITEM_CATEGORIES = [
+  "Groceries", "Beverages", "Hygiene", "Electronics", "Clothing",
+  "Hardware", "Stationery", "Medicine", "Agriculture", "Other",
+];
+export const SIZES = ["XS","S","M","L","XL","XXL","One Size"];
 
-export const CURRENCIES = ["RWF", "CNY", "USD", "EUR"];
+export const STOCK_UNITS = [
+  "pcs", "kg", "g", "litre", "ml", "packet", "box", "sack", "bottle", "pair", "roll", "sheet",
+];
 
-export const ORDER_STATUSES = ["draft", "placed", "shipped", "customs", "arrived", "cancelled"];
+export const CURRENCIES = ["RWF", "USD", "EUR", "KES", "UGX"];
 
-export const CUSTOMER_TYPES = ["retail", "wholesale", "vip"];
+export const SECTORS = [
+  "Retail Shop", "Wholesale", "Restaurant / Food", "Salon / Beauty",
+  "Pharmacy", "Hardware", "Agribusiness", "Transport", "Construction",
+  "Education", "Health", "Technology", "Other",
+];
 
+export const DISTRICTS = [
+  "Gasabo", "Kicukiro", "Nyarugenge",
+  "Bugesera", "Gatsibo", "Kayonza", "Kirehe", "Ngoma", "Nyagatare", "Rwamagana",
+  "Burera", "Gakenke", "Gicumbi", "Musanze", "Rulindo",
+  "Gisagara", "Huye", "Kamonyi", "Muhanga", "Nyamagabe", "Nyanza", "Nyaruguru", "Ruhango",
+  "Karongi", "Ngororero", "Nyabihu", "Nyamasheke", "Rubavu", "Rutsiro", "Rusizi",
+];
+
+export const CUSTOMER_TYPES    = ["retailer", "wholesaler", "vip"];
 export const CUSTOMER_SEGMENTS = ["new", "regular", "loyal", "inactive"];
 
-export const BUSINESS_TYPES = {
-  INDUSTRY: "industry",
-  SHOP: "shop",
-  REAL_ESTATE: "real_estate",
-};
-
-export const BUSINESSES = [
-  { id: "b1", type: BUSINESS_TYPES.INDUSTRY,    name: "KNOTTY PRODUCTION", color: "#F59E0B" },
-  { id: "b2", type: BUSINESS_TYPES.SHOP,        name: "KNOTTY FASHION",    color: "#1e3a8a" },
-  { id: "b3", type: BUSINESS_TYPES.REAL_ESTATE, name: "KNOTTY ESTATES",    color: "#10B981" },
+// ─── Navigation — Inzira Insights structure from PRD ─────────────────────────
+export const NAV_ITEMS = [
+  {
+    section: "MAIN",
+    items: [
+      { label: "Dashboard",     icon: "LayoutDashboard", path: "/app/dashboard"  },
+      { label: "Point of Sale", icon: "ShoppingCart",    path: "/app/sales/new", roles: ["pulse_admin","sme_owner","admin","manager","cashier"] },
+      { label: "Sales History", icon: "Receipt",         path: "/app/sales",     roles: ["pulse_admin","sme_owner","admin","manager","accountant","cashier"] },
+    ],
+  },
+  {
+    section: "INVENTORY",
+    items: [
+      { label: "Stock",           icon: "Package",       path: "/app/stock",               roles: ["pulse_admin","sme_owner","admin","manager","accountant"] },
+      { label: "Purchase Orders", icon: "Truck",         path: "/app/purchase-orders",      roles: ["pulse_admin","sme_owner","admin","manager","accountant"] },
+      { label: "Suppliers",       icon: "Globe",         path: "/app/suppliers",            roles: ["pulse_admin","sme_owner","admin","accountant"] },
+    ],
+  },
+  {
+    section: "CRM",
+    items: [
+      { label: "Customers",    icon: "UserCheck",  path: "/app/customers",          roles: ["pulse_admin","sme_owner","admin","manager","accountant"] },
+      { label: "Receivables",  icon: "Scale",      path: "/app/receivables",        roles: ["pulse_admin","sme_owner","admin","manager","accountant"] },
+    ],
+  },
+  {
+    section: "FINANCE",
+    items: [
+      { label: "Expenses",     icon: "CreditCard",  path: "/app/expenses",          roles: ["pulse_admin","sme_owner","admin","manager","accountant"] },
+      { label: "Invoices",     icon: "FileText",    path: "/app/invoices",          roles: ["pulse_admin","sme_owner","admin","manager","accountant"] },
+      { label: "Profit & Loss",icon: "TrendingUp",  path: "/app/finance/pnl",       roles: ["pulse_admin","sme_owner","admin","accountant"] },
+    ],
+  },
+  {
+    section: "REPORTS",
+    items: [
+      { label: "Sales Report",    icon: "BarChart2",     path: "/app/reports/sales",    roles: ["pulse_admin","sme_owner","admin","manager","accountant"] },
+      { label: "Stock Report",    icon: "ClipboardList", path: "/app/reports/stock",    roles: ["pulse_admin","sme_owner","admin","manager","accountant"] },
+      { label: "Tax Reports",     icon: "Shield",        path: "/app/reports/tax",      roles: ["pulse_admin","sme_owner","admin","accountant"] },
+    ],
+  },
+  {
+    section: "INTELLIGENCE",
+    items: [
+      { label: "Health Score",    icon: "Activity",      path: "/app/health-score",     roles: ["pulse_admin","sme_owner","admin"] },
+      { label: "Notifications",   icon: "Bell",          path: "/app/notifications" },
+    ],
+  },
+  {
+    section: "ADMIN",
+    items: [
+      { label: "Audit Log",       icon: "Shield",        path: "/app/reports/audit",    roles: ["pulse_admin","admin"] },
+      { label: "Settings",        icon: "Settings",      path: "/app/settings",         roles: ["pulse_admin","sme_owner","admin"] },
+      { label: "Pulse Admin",     icon: "Activity",      path: "/app/admin",            roles: ["pulse_admin"] },
+    ],
+  },
+  {
+    section: "LENDER",
+    items: [
+      { label: "Portfolio",       icon: "TrendingUp",    path: "/app/lender",           roles: ["lender","pulse_admin"] },
+    ],
+  },
 ];
-
-export const NAV_ITEMS = (activeBusiness) => {
-  const type = activeBusiness?.type || BUSINESS_TYPES.SHOP;
-  
-  const common = [
-    {
-      section: "MANAGEMENT",
-      items: [
-        { label: "Workers",   icon: "Users",     path: "/app/workers",   roles: ["admin","manager"] },
-        { label: "Expenses",  icon: "Receipt",   path: "/app/expenses",    roles: ["admin","manager","accountant"] },
-        { label: "Debt Management", icon: "Scale", path: "/app/debts", roles: ["admin","manager","accountant"] },
-        { label: "Settings",  icon: "Settings",  path: "/app/settings",      roles: ["admin"] },
-      ],
-    },
-  ];
-
-  const businessSpecific = {
-    [BUSINESS_TYPES.INDUSTRY]: [
-      {
-        section: "PRODUCTION",
-        items: [
-          { label: "Dashboard",       icon: "LayoutDashboard", path: "/app/dashboard" },
-          { label: "Production Runs",  icon: "Factory",         path: "/app/production" },
-          { label: "Raw Materials",    icon: "Box",            path: "/app/stock" },
-          { label: "Finished Goods",   icon: "Package",         path: "/app/finished-goods" },
-        ],
-      },
-      {
-        section: "SUPPLY CHAIN",
-        items: [
-          { label: "Wholesale Orders", icon: "ShoppingCart",    path: "/app/sales" },
-          { label: "Suppliers",        icon: "Truck",           path: "/app/suppliers" },
-          { label: "Procurement",      icon: "ClipboardList",   path: "/app/procurement" },
-        ],
-      },
-    ],
-    [BUSINESS_TYPES.SHOP]: [
-      {
-        section: "MAIN MENU",
-        items: [
-          { label: "Dashboard",   icon: "LayoutDashboard", path: "/app/dashboard",     roles: ["admin","manager","accountant"] },
-          { label: "Stock",       icon: "Package",         path: "/app/stock",         roles: ["admin","manager","accountant"] },
-          { label: "Sales",       icon: "ShoppingCart",    path: "/app/sales",         roles: ["admin","manager","worker","accountant"] },
-          { label: "Procurement", icon: "Truck",           path: "/app/procurement",   roles: ["admin","manager","accountant"] },
-        ],
-      },
-      {
-        section: "CRM",
-        items: [
-          { label: "Customers", icon: "UserCheck", path: "/app/customers", roles: ["admin","manager","accountant"] },
-          { label: "Suppliers", icon: "Globe",     path: "/app/suppliers", roles: ["admin","accountant"] },
-        ],
-      },
-      {
-        section: "FINANCE",
-        items: [
-          { label: "Invoices",     icon: "FileText",  path: "/app/invoices",    roles: ["admin","manager","accountant"] },
-          { label: "Profit & Loss",icon: "TrendingUp",path: "/app/finance/pnl", roles: ["admin","accountant"] },
-        ],
-      },
-      {
-        section: "REPORTS",
-        items: [
-          { label: "Sales Report",       icon: "BarChart2",    path: "/app/reports/sales",   roles: ["admin","manager","accountant"] },
-          { label: "Stock Report",       icon: "ClipboardList",path: "/app/reports/stock",   roles: ["admin","manager","accountant"] },
-          { label: "Worker Performance", icon: "Award",        path: "/app/reports/workers", roles: ["admin","manager","accountant"] },
-        ],
-      },
-    ],
-    [BUSINESS_TYPES.REAL_ESTATE]: [
-      {
-        section: "REAL ESTATE",
-        items: [
-          { label: "Dashboard",   icon: "LayoutDashboard", path: "/app/dashboard" },
-          { label: "Properties",  icon: "Home",            path: "/app/properties" },
-          { label: "Tenants",     icon: "Users",           path: "/app/tenants" },
-          { label: "Rent Payments", icon: "Key",           path: "/app/sales" },
-        ],
-      },
-      {
-        section: "OPERATIONS",
-        items: [
-          { label: "Maintenance",  icon: "Wrench",          path: "/app/maintenance" },
-          { label: "Profit & Loss",icon: "TrendingUp",      path: "/app/finance/pnl", roles: ["admin"] },
-        ],
-      },
-    ],
-  };
-
-  return [...(businessSpecific[type] || []), ...common];
-};

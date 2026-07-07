@@ -14,8 +14,8 @@ export default class ErrorBoundary extends Component {
     // build after a new deploy. Reload once to pull the fresh assets.
     const msg = error?.message || "";
     const isChunkError = /dynamically imported module|Importing a module script failed|Failed to fetch dynamically imported module|ChunkLoadError|Loading chunk/i.test(msg);
-    if (isChunkError && !sessionStorage.getItem("valano_reloaded_for_chunk")) {
-      sessionStorage.setItem("valano_reloaded_for_chunk", "1");
+    if (isChunkError && !sessionStorage.getItem("inzira_reloaded_for_chunk")) {
+      sessionStorage.setItem("inzira_reloaded_for_chunk", "1");
       window.location.reload();
     }
   }

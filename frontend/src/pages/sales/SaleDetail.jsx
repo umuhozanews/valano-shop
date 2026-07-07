@@ -192,7 +192,7 @@ export default function SaleDetail() {
               <div className="absolute left-4 w-8 top-8 flex flex-col items-center select-none z-10">
                 <div className="writing-vertical text-[#7C3AED] font-black text-[14px] tracking-[0.25em] uppercase"
                      style={{ transform: "rotate(180deg)", writingMode: "vertical-rl" }}>
-                  {shopSettings?.shop_name || sale.branch_name || "KNOTTY"}
+                  {shopSettings?.shop_name || sale.branch_name || "INZIRA INSIGHTS"}
                 </div>
                 <div className="w-1.5 h-1.5 rounded-full bg-[#7C3AED] mt-2" />
               </div>
@@ -200,7 +200,7 @@ export default function SaleDetail() {
               {/* Top Row: Sender Info & Invoice Title */}
               <div className="flex justify-between items-start mb-6">
                 <div className="text-[11px] text-text-secondary leading-relaxed font-sans">
-                  <p className="font-bold text-text-primary text-[12px] mb-0.5">{shopSettings?.shop_name || sale.branch_name || "KNOTTY FASHION"}</p>
+                  <p className="font-bold text-text-primary text-[12px] mb-0.5">{shopSettings?.shop_name || sale.branch_name || "INZIRA INSIGHTS"}</p>
                   <p>{shopSettings?.shop_address || sale.branch_location || "Kigali, Rwanda"}</p>
                   {(shopSettings?.shop_phone || sale.branch_phone) && (
                     <p>Tel: {shopSettings?.shop_phone || sale.branch_phone}</p>
@@ -232,7 +232,7 @@ export default function SaleDetail() {
                   </p>
                   <div className="text-[11px] text-text-secondary space-y-0.5 font-sans">
                     {sale.customer_phone && <p>Tel: {sale.customer_phone}</p>}
-                    <p>E-mail: {sale.customer_email || "customer@valano.rw"}</p>
+                    <p>E-mail: {sale.customer_email || "customer@inzira-insights.rw"}</p>
                     <p>Address: Kigali, Rwanda</p>
                   </div>
                 </div>
@@ -346,7 +346,7 @@ export default function SaleDetail() {
 
                   <div className="flex flex-col justify-between items-end">
                     <div className="text-right">
-                      <p className="text-[10px] font-bold text-text-primary uppercase tracking-wider">Invoiced by {shopSettings?.shop_name || sale.branch_name || "KNOTTY FASHION"}</p>
+                      <p className="text-[10px] font-bold text-text-primary uppercase tracking-wider">Invoiced by {shopSettings?.shop_name || sale.branch_name || "INZIRA INSIGHTS"}</p>
                     </div>
                     <div className="w-full max-w-[120px] border-b border-border mt-6" />
                   </div>
@@ -357,7 +357,7 @@ export default function SaleDetail() {
                   <p className="font-medium">
                     This is a computer-generated document. Technical data is verified automatically.
                   </p>
-                  <p className="mt-0.5">{shopSettings?.invoice_footer_text || `© 2026 ${shopSettings?.shop_name || "KNOTTY FASHION"}. All rights reserved.`}</p>
+                  <p className="mt-0.5">{shopSettings?.invoice_footer_text || `© 2026 ${shopSettings?.shop_name || "INZIRA INSIGHTS"}. All rights reserved.`}</p>
                 </div>
               </div>
             </div>

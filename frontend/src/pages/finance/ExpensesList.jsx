@@ -11,6 +11,7 @@ import api from "../../utils/api";
 import { formatRWF, formatDate } from "../../utils/formatters";
 import toast from "react-hot-toast";
 import { useLanguage } from "../../context/LanguageContext";
+import { EXPENSE_CATEGORIES } from "../../utils/constants";
 
 export default function ExpensesList() {
   const { t } = useLanguage();
@@ -88,7 +89,7 @@ export default function ExpensesList() {
           <input type="date" value={filters.end_date} onChange={e=>setFilters(f=>({...f,end_date:e.target.value}))} className="h-9 px-3 border border-border rounded-card text-[13px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary" />
           <select value={filters.category} onChange={e=>setFilters(f=>({...f,category:e.target.value}))} className="h-9 px-3 border border-border rounded-card text-[13px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary">
             <option value="">{t("category")} ({t("all")})</option>
-            {["Rent","Utilities","Salaries","Transport","Marketing","Stock","Other"].map(c=><option key={c}>{c}</option>)}
+            {EXPENSE_CATEGORIES.map(c=><option key={c}>{c}</option>)}
           </select>
         </div>
 
@@ -101,7 +102,7 @@ export default function ExpensesList() {
           <div>
             <label className="block text-[13px] font-medium text-text-primary mb-1">{t("category")}</label>
             <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} className="w-full h-9 px-3 border border-border rounded-card text-[13px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary">
-              {["Rent","Utilities","Salaries","Transport","Marketing","Stock","Other"].map(c=><option key={c}>{c}</option>)}
+              {EXPENSE_CATEGORIES.map(c=><option key={c}>{c}</option>)}
             </select>
           </div>
           <Input label={t("amount")} type="number" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} />

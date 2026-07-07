@@ -11,8 +11,8 @@ import toast from "react-hot-toast";
 import { useLanguage } from "../../context/LanguageContext";
 
 const INITIAL_TENANTS = [
-  { id: 1, name: "Iradukunda Eric", property: "Knotty Heights A1", unit: "Unit 101", phone: "0788111222", email: "eric@gmail.com", status: "active", paid: true },
-  { id: 2, name: "Mutesi Solange", property: "Knotty Heights A1", unit: "Unit 102", phone: "0788333444", email: "solange@gmail.com", status: "active", paid: false },
+  { id: 1, name: "Iradukunda Eric", property: "Inzira Properties A1", unit: "Unit 101", phone: "0788111222", email: "eric@gmail.com", status: "active", paid: true },
+  { id: 2, name: "Mutesi Solange", property: "Inzira Properties A1", unit: "Unit 102", phone: "0788333444", email: "solange@gmail.com", status: "active", paid: false },
   { id: 3, name: "Gasana Jean", property: "Commercial Plaza", unit: "Suite 4", phone: "0788555666", email: "jean@gmail.com", status: "active", paid: true },
 ];
 

@@ -313,6 +313,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS district VARCHAR(50);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'RWF';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_code VARCHAR(10);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_expires_at TIMESTAMP;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS lender_sharing BOOLEAN DEFAULT false;
 
 -- Suppliers: add Inzira fields (remove Chinese-specific via UI, keep columns for compat)
 ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS phone VARCHAR(20);
