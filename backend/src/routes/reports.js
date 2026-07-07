@@ -288,4 +288,92 @@ router.get("/monthly", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ─── VAT Tax Report (Rwanda 18%) ──────────────────────────────────────────────
+router.get("/tax/vat", async (req, res, next) => {
+  try {
+    const { start_date, end_date, export: exp } = req.query;
+    const conds = ["s.is_voided=false"]; const params = [];
+    addDateFilter(params, conds, { start_date, end_date, col: "s.created_at" });
+
+    const VAT_RATE = 0.18;
+    const { rows } = await pool.query(
+      `SELECT
+        DATE_TRUNC('month', s.created_at) as month,
+        COUNT(*) as transactions,
+        COALESCE(SUM(s.total_amount),0) as gross_sales,
+        ROUND(COALESCE(SUM(s.total_amount),0) / (1+$${params.length+1})) as net_sales,
+        ROUND(COALESCE(SUM(s.total_amount),0) - COALESCE(SUM(s.total_amount),0) / (1+$${params.length+1})) as vat_collected
+       FROM sales s WHERE ${conds.join(" AND ")}
+       GROUP BY DATE_TRUNC('month', s.created_at)
+       ORDER BY month`,
+      [...params, VAT_RATE]
+    );
+
+    const totals = rows.reduce((a, r) => ({
+      transactions: a.transactions + parseInt(r.transactions),
+      gross_sales: a.gross_sales + parseInt(r.gross_sales),
+      net_sales: a.net_sales + parseInt(r.net_sales),
+      vat_collected: a.vat_collected + parseInt(r.vat_collected),
+    }), { transactions: 0, gross_sales: 0, net_sales: 0, vat_collected: 0 });
+
+    if (exp === "excel") {
+      return exportToExcel(res, [{
+        name: "VAT Report",
+        headers: ["Month", "Transactions", "Gross Sales (RWF)", "Net Sales (RWF)", "VAT Collected (RWF)"],
+        rows: rows.map(r => [r.month?.toISOString().slice(0,7), r.transactions, r.gross_sales, r.net_sales, r.vat_collected]),
+        totals: ["TOTAL", totals.transactions, totals.gross_sales, totals.net_sales, totals.vat_collected],
+      }]);
+    }
+
+    res.json({
+      vat_rate: VAT_RATE,
+      period: { start_date, end_date },
+      byMonth: rows,
+      totals,
+    });
+  } catch (err) { next(err); }
+});
+
+// ─── RSSB Contribution Report ─────────────────────────────────────────────────
+// Rwanda Social Security: employee 3% + employer 5% of gross salary
+router.get("/tax/rssb", async (req, res, next) => {
+  try {
+    const { start_date, end_date, export: exp } = req.query;
+    const conds = ["1=1"]; const params = [];
+    addDateFilter(params, conds, { start_date, end_date, col: "e.expense_date" });
+    conds.push(`e.category='Salaries'`);
+
+    const { rows } = await pool.query(
+      `SELECT
+        DATE_TRUNC('month', e.expense_date::timestamp) as month,
+        SUM(e.amount) as gross_salaries,
+        ROUND(SUM(e.amount) * 0.03) as employee_contribution,
+        ROUND(SUM(e.amount) * 0.05) as employer_contribution,
+        ROUND(SUM(e.amount) * 0.08) as total_rssb
+       FROM expenses e WHERE ${conds.join(" AND ")}
+       GROUP BY DATE_TRUNC('month', e.expense_date::timestamp)
+       ORDER BY month`,
+      params
+    );
+
+    const totals = rows.reduce((a, r) => ({
+      gross_salaries: a.gross_salaries + parseInt(r.gross_salaries || 0),
+      employee_contribution: a.employee_contribution + parseInt(r.employee_contribution || 0),
+      employer_contribution: a.employer_contribution + parseInt(r.employer_contribution || 0),
+      total_rssb: a.total_rssb + parseInt(r.total_rssb || 0),
+    }), { gross_salaries: 0, employee_contribution: 0, employer_contribution: 0, total_rssb: 0 });
+
+    if (exp === "excel") {
+      return exportToExcel(res, [{
+        name: "RSSB Report",
+        headers: ["Month", "Gross Salaries (RWF)", "Employee 3% (RWF)", "Employer 5% (RWF)", "Total RSSB (RWF)"],
+        rows: rows.map(r => [r.month?.toISOString().slice(0,7), r.gross_salaries, r.employee_contribution, r.employer_contribution, r.total_rssb]),
+        totals: ["TOTAL", totals.gross_salaries, totals.employee_contribution, totals.employer_contribution, totals.total_rssb],
+      }]);
+    }
+
+    res.json({ period: { start_date, end_date }, byMonth: rows, totals });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

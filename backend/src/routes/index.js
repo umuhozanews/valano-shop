@@ -16,5 +16,6 @@ router.use("/audit",              require("./audit"));
 router.use("/settings",           require("./settings"));
 router.use("/purchase-orders",    require("./purchase-orders"));
 router.use("/accounts-receivable",require("./accounts-receivable"));
+router.use("/payments",           require("./payments"));
 
 module.exports = router;

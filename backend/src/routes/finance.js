@@ -8,17 +8,11 @@ const { exportToExcel } = require("../utils/excel");
 
 router.use(verifyToken);
 
-router.get("/pnl", requireRole("admin", "manager", "accountant"), async (req, res, next) => {
+router.get("/pnl", requireRole("admin", "sme_owner", "manager", "accountant", "pulse_admin"), async (req, res, next) => {
   try {
-    const { year = new Date().getFullYear(), branch_id } = req.query;
-    
-    const bfSales = (req.user.role === "admin" || req.user.role === "accountant")
-      ? (branch_id ? `AND s.branch_id=${parseInt(branch_id)}` : "")
-      : `AND s.branch_id=${req.user.branch_id}`;
-
-    const bfExpenses = (req.user.role === "admin" || req.user.role === "accountant")
-      ? (branch_id ? `AND branch_id=${parseInt(branch_id)}` : "")
-      : `AND branch_id=${req.user.branch_id}`;
+    const { year = new Date().getFullYear() } = req.query;
+    const bfSales = "";
+    const bfExpenses = "";
 
     const query = `
       WITH month_series AS (
@@ -108,21 +102,16 @@ router.get("/pnl", requireRole("admin", "manager", "accountant"), async (req, re
   } catch (err) { next(err); }
 });
 
-router.get("/pnl/daily", requireRole("admin", "manager", "accountant"), async (req, res, next) => {
+router.get("/pnl/daily", requireRole("admin", "sme_owner", "manager", "accountant", "pulse_admin"), async (req, res, next) => {
   try {
-    const { year = new Date().getFullYear(), month = new Date().getMonth() + 1, branch_id } = req.query;
-    
+    const { year = new Date().getFullYear(), month = new Date().getMonth() + 1 } = req.query;
+
     const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
     const lastDay = new Date(year, month, 0).getDate();
     const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
-    const bfSales = (req.user.role === "admin" || req.user.role === "accountant")
-      ? (branch_id ? `AND s.branch_id=${parseInt(branch_id)}` : "")
-      : `AND s.branch_id=${req.user.branch_id}`;
-
-    const bfExpenses = (req.user.role === "admin" || req.user.role === "accountant")
-      ? (branch_id ? `AND branch_id=${parseInt(branch_id)}` : "")
-      : `AND branch_id=${req.user.branch_id}`;
+    const bfSales = "";
+    const bfExpenses = "";
 
     const query = `
       WITH date_series AS (
@@ -220,7 +209,7 @@ router.get("/exchange-rates", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put("/exchange-rates", requireRole("admin"), async (req, res, next) => {
+router.put("/exchange-rates", requireRole("admin", "sme_owner", "pulse_admin"), async (req, res, next) => {
   try {
     const { rates } = req.body; // [{ from_currency, to_currency, rate }]
     for (const r of rates) {

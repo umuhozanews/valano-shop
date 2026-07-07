@@ -1,7 +1,6 @@
 const nodemailer = require("nodemailer");
 require("dotenv").config();
 
-// Create transporter from env config
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || "smtp.ethereal.email",
   port: parseInt(process.env.SMTP_PORT || "587", 10),
@@ -13,12 +12,12 @@ const transporter = nodemailer.createTransport({
 });
 
 async function sendLoginAlert(toEmail, userName, ipAddress) {
-  const subject = "⚠️ Security Alert: New Login Attempt Detected";
+  const subject = "Security Alert: New Login Detected — Inzira Insights";
   const dateStr = new Date().toLocaleString("en-RW", { timeZone: "Africa/Kigali" });
-  
+
   const text = `Hello ${userName},
 
-A new login to your KNOTTY SYSTEM account was detected.
+A new login to your Inzira Insights account was detected.
 
 Details:
 - User: ${userName}
@@ -26,68 +25,46 @@ Details:
 - Time: ${dateStr} (Kigali Time)
 - IP Address: ${ipAddress}
 
-If this was you, you can safely ignore this email. If this wasn't you, please change your password immediately.
+If this was you, you can safely ignore this email. If it wasn't you, change your password immediately.
 
-Best regards,
-KNOTTY SYSTEM Security`;
+Inzira Insights Security Team
+Pulse Data Analytics Ltd`;
 
   const html = `
-    <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; border: 1px solid #ddd; border-radius: 8px;">
-      <h2 style="color: #d97706; margin-bottom: 20px;">⚠️ Security Alert: New Login</h2>
+    <div style="font-family:Arial,sans-serif;padding:24px;color:#333;max-width:600px;border:1px solid #ddd;border-radius:8px;">
+      <h2 style="color:#10B981;margin-bottom:16px;">Inzira Insights — Security Alert</h2>
       <p>Hello <strong>${userName}</strong>,</p>
-      <p>A new login to your <strong>KNOTTY SYSTEM</strong> account was detected.</p>
-      <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
-      <table style="width: 100%; font-size: 14px;">
-        <tr>
-          <td style="width: 120px; font-weight: bold; padding: 5px 0;">User:</td>
-          <td>${userName}</td>
-        </tr>
-        <tr>
-          <td style="font-weight: bold; padding: 5px 0;">Email:</td>
-          <td>${toEmail}</td>
-        </tr>
-        <tr>
-          <td style="font-weight: bold; padding: 5px 0;">Time:</td>
-          <td>${dateStr} (Kigali Time)</td>
-        </tr>
-        <tr>
-          <td style="font-weight: bold; padding: 5px 0;">IP Address:</td>
-          <td><code>${ipAddress}</code></td>
-        </tr>
+      <p>A new login to your <strong>Inzira Insights</strong> account was detected.</p>
+      <hr style="border:0;border-top:1px solid #eee;margin:16px 0;"/>
+      <table style="width:100%;font-size:14px;">
+        <tr><td style="width:120px;font-weight:bold;padding:4px 0;">User:</td><td>${userName}</td></tr>
+        <tr><td style="font-weight:bold;padding:4px 0;">Email:</td><td>${toEmail}</td></tr>
+        <tr><td style="font-weight:bold;padding:4px 0;">Time:</td><td>${dateStr} (Kigali)</td></tr>
+        <tr><td style="font-weight:bold;padding:4px 0;">IP:</td><td><code>${ipAddress}</code></td></tr>
       </table>
-      <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
-      <p style="font-size: 13px; color: #666;">
-        If this was you, you can safely ignore this email. If this was not you, please change your password immediately or contact your administrator.
-      </p>
-      <br />
-      <p style="font-size: 13px; font-weight: bold; color: #006C49; margin-bottom: 0;">KNOTTY SYSTEM Security Team</p>
-    </div>
-  `;
+      <hr style="border:0;border-top:1px solid #eee;margin:16px 0;"/>
+      <p style="font-size:13px;color:#666;">If this was not you, change your password immediately or contact your administrator.</p>
+      <p style="font-size:13px;font-weight:bold;color:#10B981;">Inzira Insights Security — Pulse Data Analytics Ltd</p>
+    </div>`;
 
-  // If credentials are not provided, print to console as fallback (so it doesn't crash)
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-    console.log(`[MAIL MOCK] Sending login alert to ${toEmail}`);
-    console.log(`Subject: ${subject}`);
-    console.log(text);
-    return { mock: true, message: "Logged to console (SMTP credentials missing)" };
+    console.log(`[MAIL MOCK] Login alert → ${toEmail}`);
+    return { mock: true };
   }
 
   try {
     const info = await transporter.sendMail({
-      from: process.env.SMTP_FROM || `"KNOTTY SYSTEM Security" <no-reply@valano.rw>`,
+      from: process.env.SMTP_FROM || `"Inzira Insights" <no-reply@inzira-insights.rw>`,
       to: toEmail,
       subject,
       text,
       html,
     });
-    console.log(`[MAIL] Login alert sent to ${toEmail}. Message ID: ${info.messageId}`);
     return info;
-  } catch (error) {
-    console.error(`[MAIL ERROR] Failed to send login alert email to ${toEmail}:`, error.message);
-    throw error;
+  } catch (err) {
+    console.error(`[MAIL ERROR] ${err.message}`);
+    throw err;
   }
 }
 
-module.exports = {
-  sendLoginAlert,
-};
+module.exports = { sendLoginAlert };

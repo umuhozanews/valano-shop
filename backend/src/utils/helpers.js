@@ -13,7 +13,7 @@ function generateInvoiceNumber() {
   const yy = String(d.getFullYear()).slice(2);
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const rand = crypto.randomInt(1000, 9999);
-  return `VLN-${yy}${mm}-${rand}`;
+  return `INZ-${yy}${mm}-${rand}`;
 }
 
 async function logAudit(userId, action, tableName, recordId, oldValue, newValue, ip) {
@@ -50,7 +50,7 @@ async function createNotification(userId, type, title, message) {
 async function notifyAdminsAndManagers(type, title, message) {
   try {
     const { rows } = await pool.query(
-      `SELECT id FROM users WHERE role IN ('admin','manager') AND is_active = true`
+      `SELECT id FROM users WHERE role IN ('admin','manager','sme_owner','pulse_admin') AND is_active = true`
     );
     for (const u of rows) {
       await createNotification(u.id, type, title, message);
