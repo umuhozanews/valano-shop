@@ -7,10 +7,6 @@ const BACKUP_DIR = path.join(__dirname, "../../../backups");
 let isBackupRunning = false;
 let lastBackupTime = 0;
 
-// Ensure backup directory exists
-if (!fs.existsSync(BACKUP_DIR)) {
-  fs.mkdirSync(BACKUP_DIR, { recursive: true });
-}
 
 // Find pg_dump path on Windows
 const PG_DUMP_PATHS = [
@@ -31,8 +27,12 @@ function getPgDumpPath() {
 
 async function runDatabaseBackup() {
   if (process.env.NODE_ENV === "production") {
-    // Vercel / serverless environments don't support local pg_dump or local filesystems
     return { skipped: true, reason: "Skipped in production environment" };
+  }
+
+  // Ensure backup directory exists (only needed in local/dev)
+  if (!fs.existsSync(BACKUP_DIR)) {
+    fs.mkdirSync(BACKUP_DIR, { recursive: true });
   }
 
   // Throttle backups to max once every 30 seconds

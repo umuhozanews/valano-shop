@@ -1,8 +1,5 @@
-// Vercel serverless entry point for the KNOTTY SYSTEM backend.
-// It ensures the database schema/seed exist (once per warm instance) and then
-// hands the request to the Express app.
-const app = require("../server");
 const { ensureDbReady } = require("../src/config/initDb");
+const app = require("../server");
 
 module.exports = async (req, res) => {
   try {
