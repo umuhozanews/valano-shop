@@ -30,10 +30,10 @@ app.use(logger);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", time: new Date().toISOString(), version: "1.0.0" });
+  res.json({ status: "ok", time: new Date().toISOString(), version: "2.0.0", app: "Inzira Insights" });
 });
 app.get("/health", (req, res) => {
-  res.json({ status: "ok", time: new Date().toISOString(), version: "1.0.0" });
+  res.json({ status: "ok", time: new Date().toISOString(), version: "2.0.0", app: "Inzira Insights" });
 });
 
 app.use("/api", routes);
@@ -50,7 +50,7 @@ if (require.main === module) {
   const { ensureDbReady } = require("./src/config/initDb");
 
   app.listen(PORT, async () => {
-    console.log(`KNOTTY SYSTEM backend → http://localhost:${PORT} [${process.env.NODE_ENV || "development"}]`);
+    console.log(`INZIRA INSIGHTS backend → http://localhost:${PORT} [${process.env.NODE_ENV || "development"}]`);
     try {
       await ensureDbReady();
     } catch (e) {

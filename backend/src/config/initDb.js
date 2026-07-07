@@ -1,95 +1,57 @@
 const pool = require("./db");
 
-// Full schema + seed are embedded here (instead of read from .sql files) so the
-// database can bootstrap itself automatically on first run in any environment —
-// including serverless, where bundling/reading external files is unreliable.
-// Every statement is idempotent (IF NOT EXISTS / ON CONFLICT DO NOTHING), so
-// running this repeatedly is safe.
+// Full schema is embedded here so the database bootstraps automatically on
+// first run in any environment (including serverless). Every statement is
+// idempotent (IF NOT EXISTS / ON CONFLICT DO NOTHING), so repeated runs are safe.
 
 const SCHEMA_SQL = `
 BEGIN;
 
-CREATE TABLE IF NOT EXISTS branches (
-  id         SERIAL PRIMARY KEY,
-  name       VARCHAR(100) NOT NULL,
-  location   TEXT,
-  phone      VARCHAR(20),
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
+-- Core business entity (replaces separate users + branches model)
 CREATE TABLE IF NOT EXISTS users (
   id               SERIAL PRIMARY KEY,
   name             VARCHAR(100) NOT NULL,
   email            VARCHAR(100) UNIQUE NOT NULL,
   password_hash    TEXT NOT NULL,
-  role             VARCHAR(20) NOT NULL CHECK (role IN ('admin','manager','worker','accountant')),
-  branch_id        INTEGER REFERENCES branches(id) ON DELETE SET NULL,
+  role             VARCHAR(30) NOT NULL DEFAULT 'sme_owner',
   phone            VARCHAR(20),
   avatar_url       TEXT,
-  monthly_target   BIGINT DEFAULT 0,
-  commission_rate  DECIMAL(5,2) DEFAULT 0,
   is_active        BOOLEAN DEFAULT true,
+  -- Inzira Insights fields
+  consent_status   VARCHAR(20) DEFAULT 'pending',
+  consent_date     TIMESTAMP,
+  lender_id        INTEGER,
+  referral_code    VARCHAR(20),
+  language         VARCHAR(5) DEFAULT 'en',
+  sector           VARCHAR(50),
+  district         VARCHAR(50),
+  currency         VARCHAR(10) DEFAULT 'RWF',
+  otp_code         VARCHAR(10),
+  otp_expires_at   TIMESTAMP,
   created_at       TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS attendance (
-  id        SERIAL PRIMARY KEY,
-  user_id   INTEGER REFERENCES users(id) ON DELETE CASCADE,
-  check_in  TIMESTAMP,
-  check_out TIMESTAMP,
-  date      DATE NOT NULL,
-  UNIQUE (user_id, date)
-);
-
 CREATE TABLE IF NOT EXISTS suppliers (
-  id         SERIAL PRIMARY KEY,
-  name       VARCHAR(100) NOT NULL,
-  wechat     VARCHAR(100),
-  whatsapp   VARCHAR(20),
-  city       VARCHAR(100),
-  country    VARCHAR(100) DEFAULT 'China',
-  specialty  TEXT,
-  notes      TEXT,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS procurement_orders (
-  id             SERIAL PRIMARY KEY,
-  supplier_id    INTEGER REFERENCES suppliers(id) ON DELETE SET NULL,
-  order_date     DATE NOT NULL,
-  arrival_date   DATE,
-  status         VARCHAR(30) DEFAULT 'ordered'
-                   CHECK (status IN ('ordered','in_transit','at_customs','arrived','stocked')),
-  currency       VARCHAR(10) DEFAULT 'CNY',
-  exchange_rate  DECIMAL(10,4),
-  shipping_cost  DECIMAL(15,2) DEFAULT 0,
-  customs_cost   DECIMAL(15,2) DEFAULT 0,
-  notes          TEXT,
-  created_by     INTEGER REFERENCES users(id) ON DELETE SET NULL,
-  created_at     TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS procurement_items (
-  id         SERIAL PRIMARY KEY,
-  order_id   INTEGER REFERENCES procurement_orders(id) ON DELETE CASCADE,
-  item_name  VARCHAR(100) NOT NULL,
-  category   VARCHAR(50),
-  size       VARCHAR(20),
-  color      VARCHAR(50),
-  quantity   INTEGER NOT NULL,
-  unit_cost  DECIMAL(15,2) NOT NULL,
-  currency   VARCHAR(10)
+  id                  SERIAL PRIMARY KEY,
+  name                VARCHAR(100) NOT NULL,
+  phone               VARCHAR(20),
+  email               VARCHAR(100),
+  address             TEXT,
+  notes               TEXT,
+  products_supplied   TEXT,
+  payment_terms       TEXT,
+  outstanding_balance BIGINT DEFAULT 0,
+  created_at          TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS stock_items (
   id                   SERIAL PRIMARY KEY,
   name                 VARCHAR(100) NOT NULL,
+  name_rw              VARCHAR(100),
   category             VARCHAR(50),
-  size                 VARCHAR(20),
-  color                VARCHAR(50),
+  unit                 VARCHAR(20) DEFAULT 'pcs',
   barcode              VARCHAR(100) UNIQUE,
   image_url            TEXT,
-  branch_id            INTEGER REFERENCES branches(id) ON DELETE SET NULL,
   quantity             INTEGER DEFAULT 0,
   cost_price_rwf       BIGINT DEFAULT 0,
   sell_price_rwf       BIGINT DEFAULT 0,
@@ -98,41 +60,34 @@ CREATE TABLE IF NOT EXISTS stock_items (
   created_at           TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS stock_transfers (
-  id               SERIAL PRIMARY KEY,
-  item_id          INTEGER REFERENCES stock_items(id) ON DELETE RESTRICT,
-  from_branch      INTEGER REFERENCES branches(id) ON DELETE SET NULL,
-  to_branch        INTEGER REFERENCES branches(id) ON DELETE SET NULL,
-  quantity         INTEGER NOT NULL,
-  transferred_by   INTEGER REFERENCES users(id) ON DELETE SET NULL,
-  transferred_at   TIMESTAMP DEFAULT NOW(),
-  notes            TEXT
-);
-
 CREATE TABLE IF NOT EXISTS customers (
-  id         SERIAL PRIMARY KEY,
-  name       VARCHAR(100) NOT NULL,
-  phone      VARCHAR(20),
-  location   TEXT,
-  type       VARCHAR(20) DEFAULT 'retailer'
-               CHECK (type IN ('wholesaler','retailer')),
-  segment    VARCHAR(20) DEFAULT 'new'
-               CHECK (segment IN ('vip','regular','new')),
-  notes      TEXT,
-  created_at TIMESTAMP DEFAULT NOW()
+  id           SERIAL PRIMARY KEY,
+  name         VARCHAR(100) NOT NULL,
+  phone        VARCHAR(20),
+  location     TEXT,
+  type         VARCHAR(20) DEFAULT 'retailer'
+                 CHECK (type IN ('wholesaler','retailer')),
+  segment      VARCHAR(20) DEFAULT 'new'
+                 CHECK (segment IN ('vip','regular','new','inactive')),
+  credit_limit BIGINT DEFAULT 0,
+  notes        TEXT,
+  created_at   TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS sales (
-  id             SERIAL PRIMARY KEY,
-  worker_id      INTEGER REFERENCES users(id) ON DELETE SET NULL,
-  branch_id      INTEGER REFERENCES branches(id) ON DELETE SET NULL,
-  customer_id    INTEGER REFERENCES customers(id) ON DELETE SET NULL,
-  payment_method VARCHAR(20) CHECK (payment_method IN ('cash','mtn_momo','airtel')),
-  total_amount   BIGINT NOT NULL,
-  is_voided      BOOLEAN DEFAULT false,
-  void_reason    TEXT,
-  voided_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,
-  created_at     TIMESTAMP DEFAULT NOW()
+  id                SERIAL PRIMARY KEY,
+  user_id           INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  customer_id       INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+  payment_method    VARCHAR(20) CHECK (payment_method IN ('cash','mtn_momo','airtel','card','bank_transfer','credit','split')),
+  total_amount      BIGINT NOT NULL,
+  is_voided         BOOLEAN DEFAULT false,
+  void_reason       TEXT,
+  voided_by         INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  is_offline        BOOLEAN DEFAULT false,
+  synced_at         TIMESTAMP,
+  payment_reference VARCHAR(100),
+  payment_status    VARCHAR(20) DEFAULT 'completed',
+  created_at        TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS sale_items (
@@ -160,10 +115,58 @@ CREATE TABLE IF NOT EXISTS expenses (
   category     VARCHAR(50) NOT NULL,
   amount       BIGINT NOT NULL,
   description  TEXT,
-  branch_id    INTEGER REFERENCES branches(id) ON DELETE SET NULL,
+  receipt_url  TEXT,
+  supplier_id  INTEGER REFERENCES suppliers(id) ON DELETE SET NULL,
   recorded_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
   expense_date DATE NOT NULL,
   created_at   TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS purchase_orders (
+  id           SERIAL PRIMARY KEY,
+  supplier_id  INTEGER REFERENCES suppliers(id) ON DELETE SET NULL,
+  order_date   DATE NOT NULL,
+  arrival_date DATE,
+  status       VARCHAR(20) DEFAULT 'ordered'
+                 CHECK (status IN ('ordered','in_transit','arrived','stocked')),
+  notes        TEXT,
+  created_by   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at   TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS purchase_order_items (
+  id            SERIAL PRIMARY KEY,
+  order_id      INTEGER REFERENCES purchase_orders(id) ON DELETE CASCADE,
+  stock_item_id INTEGER REFERENCES stock_items(id) ON DELETE SET NULL,
+  item_name     VARCHAR(100) NOT NULL,
+  quantity      INTEGER NOT NULL,
+  unit_cost_rwf BIGINT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS accounts_receivable (
+  id          SERIAL PRIMARY KEY,
+  customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
+  sale_id     INTEGER REFERENCES sales(id) ON DELETE SET NULL,
+  amount      BIGINT NOT NULL,
+  amount_paid BIGINT DEFAULT 0,
+  due_date    DATE,
+  status      VARCHAR(20) DEFAULT 'pending'
+                CHECK (status IN ('pending','partial','paid','overdue')),
+  notes       TEXT,
+  created_at  TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS accounts_payable (
+  id          SERIAL PRIMARY KEY,
+  supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL,
+  order_id    INTEGER REFERENCES purchase_orders(id) ON DELETE SET NULL,
+  amount      BIGINT NOT NULL,
+  amount_paid BIGINT DEFAULT 0,
+  due_date    DATE,
+  status      VARCHAR(20) DEFAULT 'pending'
+                CHECK (status IN ('pending','partial','paid','overdue')),
+  notes       TEXT,
+  created_at  TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS exchange_rates (
@@ -177,13 +180,15 @@ CREATE TABLE IF NOT EXISTS exchange_rates (
 );
 
 CREATE TABLE IF NOT EXISTS notifications (
-  id         SERIAL PRIMARY KEY,
-  user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
-  type       VARCHAR(50) NOT NULL,
-  title      VARCHAR(200) NOT NULL,
-  message    TEXT,
-  is_read    BOOLEAN DEFAULT false,
-  created_at TIMESTAMP DEFAULT NOW()
+  id           SERIAL PRIMARY KEY,
+  user_id      INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  type         VARCHAR(50) NOT NULL,
+  title        VARCHAR(200) NOT NULL,
+  message      TEXT,
+  is_read      BOOLEAN DEFAULT false,
+  sent_via_sms BOOLEAN DEFAULT false,
+  sms_sent_at  TIMESTAMP,
+  created_at   TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS audit_log (
@@ -200,119 +205,206 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 CREATE TABLE IF NOT EXISTS settings (
   id                          SERIAL PRIMARY KEY,
-  shop_name                   VARCHAR(100) DEFAULT 'VALANO SHOP',
+  shop_name                   VARCHAR(100) DEFAULT 'My Business',
   shop_address                TEXT,
   shop_phone                  VARCHAR(20),
   logo_url                    TEXT,
   default_low_stock_threshold INTEGER DEFAULT 5,
-  default_commission_rate     DECIMAL(5,2) DEFAULT 5.0,
-  invoice_footer_text         TEXT DEFAULT 'Thank you for your business!'
+  invoice_footer_text         TEXT DEFAULT 'Thank you for your business!',
+  language                    VARCHAR(5) DEFAULT 'en',
+  sector_default              VARCHAR(50),
+  district_default            VARCHAR(50)
 );
 
-CREATE TABLE IF NOT EXISTS debts (
+-- Health Score & Credit Scoring
+CREATE TABLE IF NOT EXISTS health_score_log (
+  id             SERIAL PRIMARY KEY,
+  user_id        INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  score          INTEGER NOT NULL,
+  band           VARCHAR(10) NOT NULL CHECK (band IN ('red','amber','green')),
+  factors        JSONB,
+  model_version  VARCHAR(20),
+  calculated_at  TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS credit_scores (
+  id             SERIAL PRIMARY KEY,
+  user_id        INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  score          INTEGER NOT NULL,
+  band           VARCHAR(10) NOT NULL CHECK (band IN ('red','amber','green')),
+  factors        JSONB,
+  risk_flags     JSONB,
+  model_version  VARCHAR(20),
+  calculated_at  TIMESTAMP DEFAULT NOW()
+);
+
+-- Advisory
+CREATE TABLE IF NOT EXISTS advisory_sessions (
+  id            SERIAL PRIMARY KEY,
+  business_id   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  advisor_id    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  scheduled_at  TIMESTAMP,
+  status        VARCHAR(20) DEFAULT 'requested'
+                  CHECK (status IN ('requested','scheduled','completed','cancelled')),
+  notes         TEXT,
+  created_at    TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS advisory_outcomes (
   id           SERIAL PRIMARY KEY,
-  person_name  VARCHAR(100) NOT NULL,
-  amount       BIGINT NOT NULL,
-  type         VARCHAR(20) NOT NULL CHECK (type IN ('receivable','payable')),
-  due_date     DATE,
-  status       VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending','paid')),
-  notes        TEXT,
-  branch_id    INTEGER REFERENCES branches(id) ON DELETE SET NULL,
-  sale_id      INTEGER REFERENCES sales(id) ON DELETE SET NULL,
+  session_id   INTEGER REFERENCES advisory_sessions(id) ON DELETE CASCADE,
+  cause_code   VARCHAR(50),
+  intervention TEXT,
+  outcome      TEXT,
+  recorded_at  TIMESTAMP DEFAULT NOW()
+);
+
+-- Lender / Institution
+CREATE TABLE IF NOT EXISTS lender_clients (
+  id           SERIAL PRIMARY KEY,
+  name         VARCHAR(100) NOT NULL,
+  type         VARCHAR(30) NOT NULL CHECK (type IN ('sacco','bank','ngo','government','investor')),
+  contact_name VARCHAR(100),
+  contact_email VARCHAR(100),
+  contact_phone VARCHAR(20),
+  is_active    BOOLEAN DEFAULT true,
   created_at   TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_sales_created   ON sales(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_sales_branch    ON sales(branch_id);
-CREATE INDEX IF NOT EXISTS idx_sales_worker    ON sales(worker_id);
-CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id);
-CREATE INDEX IF NOT EXISTS idx_stock_branch    ON stock_items(branch_id);
-CREATE INDEX IF NOT EXISTS idx_stock_barcode   ON stock_items(barcode);
-CREATE INDEX IF NOT EXISTS idx_notif_user      ON notifications(user_id, is_read);
-CREATE INDEX IF NOT EXISTS idx_audit_created   ON audit_log(created_at DESC);
+CREATE TABLE IF NOT EXISTS referrals (
+  id            SERIAL PRIMARY KEY,
+  lender_id     INTEGER REFERENCES lender_clients(id) ON DELETE SET NULL,
+  business_id   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  referral_code VARCHAR(20) UNIQUE NOT NULL,
+  status        VARCHAR(20) DEFAULT 'active'
+                  CHECK (status IN ('active','completed','withdrawn')),
+  referred_at   TIMESTAMP DEFAULT NOW()
+);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_sales_created    ON sales(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sales_user       ON sales(user_id);
+CREATE INDEX IF NOT EXISTS idx_sale_items_sale  ON sale_items(sale_id);
+CREATE INDEX IF NOT EXISTS idx_stock_barcode    ON stock_items(barcode);
+CREATE INDEX IF NOT EXISTS idx_notif_user       ON notifications(user_id, is_read);
+CREATE INDEX IF NOT EXISTS idx_audit_created    ON audit_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_health_user      ON health_score_log(user_id, calculated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_credit_user      ON credit_scores(user_id, calculated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ar_customer      ON accounts_receivable(customer_id);
+CREATE INDEX IF NOT EXISTS idx_ar_status        ON accounts_receivable(status);
 
 COMMIT;
+`;
+
+// Migration SQL: safely evolves existing databases
+// All ALTER statements use IF NOT EXISTS / IF EXISTS — safe to re-run
+const MIGRATION_SQL = `
+-- Users: add new columns and update role constraint
+ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_status VARCHAR(20) DEFAULT 'pending';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_date TIMESTAMP;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS lender_id INTEGER;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code VARCHAR(20);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS language VARCHAR(5) DEFAULT 'en';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS sector VARCHAR(50);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS district VARCHAR(50);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'RWF';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_code VARCHAR(10);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_expires_at TIMESTAMP;
+
+-- Suppliers: add Inzira fields (remove Chinese-specific via UI, keep columns for compat)
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS phone VARCHAR(20);
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS email VARCHAR(100);
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS address TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS products_supplied TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS payment_terms TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS outstanding_balance BIGINT DEFAULT 0;
+
+-- Stock items: add unit and Kinyarwanda name
+ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS unit VARCHAR(20) DEFAULT 'pcs';
+ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS name_rw VARCHAR(100);
+
+-- Sales: add offline support and payment reference
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS is_offline BOOLEAN DEFAULT false;
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS synced_at TIMESTAMP;
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(100);
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS payment_status VARCHAR(20) DEFAULT 'completed';
+
+-- Customers: add credit limit
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS credit_limit BIGINT DEFAULT 0;
+
+-- Expenses: add receipt upload and supplier link
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS receipt_url TEXT;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS supplier_id INTEGER;
+
+-- Notifications: add SMS tracking
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sent_via_sms BOOLEAN DEFAULT false;
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sms_sent_at TIMESTAMP;
+
+-- Settings: add language and location defaults
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS language VARCHAR(5) DEFAULT 'en';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS sector_default VARCHAR(50);
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS district_default VARCHAR(50);
 `;
 
 const SEED_SQL = `
 BEGIN;
 
-INSERT INTO branches (name, location, phone) VALUES
-  ('Main Branch', 'Kigali - Nyabugogo Market', '+250788000001'),
-  ('City Branch',  'Kigali - Kimironko Market', '+250788000002')
-ON CONFLICT DO NOTHING;
+INSERT INTO users (name, email, password_hash, role, phone) VALUES
+  ('Admin',         'admin@inzira.rw',      '$2a$12$pqAP/gTVtss0cQuzuEMpdOTk5TRlOTLHgUR/pZ5QuXml07pFCXyza', 'pulse_admin', '+250780000001'),
+  ('Demo Business', 'demo@inzira.rw',       '$2a$12$s1O42VRPCBl1KIvmeIxatu2nE8VW5Wrfy/eVjJZWzPXEMffaA8d0K', 'sme_owner',   '+250780000002'),
+  ('Demo Cashier',  'cashier@inzira.rw',    '$2a$12$s1O42VRPCBl1KIvmeIxatu2nE8VW5Wrfy/eVjJZWzPXEMffaA8d0K', 'cashier',     '+250780000003')
+ON CONFLICT (email) DO NOTHING;
 
-INSERT INTO users (name, email, password_hash, role, branch_id, phone, monthly_target, commission_rate) VALUES
-  ('Rukundo joseph', 'rukundojosephtuyishime@gmail.com', '$2a$12$pqAP/gTVtss0cQuzuEMpdOTk5TRlOTLHgUR/pZ5QuXml07pFCXyza', 'admin',      1, '+250780000001', 5000000, 0),
-  ('Habimana Jean Pierre','manager@valano.rw',   '$2a$12$s1O42VRPCBl1KIvmeIxatu2nE8VW5Wrfy/eVjJZWzPXEMffaA8d0K', 'manager',    1, '+250780000002', 3000000, 2),
-  ('Uwimana Angélique',   'accounts@valano.rw',  '$2a$12$s1O42VRPCBl1KIvmeIxatu2nE8VW5Wrfy/eVjJZWzPXEMffaA8d0K', 'accountant', 1, '+250780000003', 0, 0),
-  ('Uwamahoro Marie',     'worker1@valano.rw',   '$2a$12$s1O42VRPCBl1KIvmeIxatu2nE8VW5Wrfy/eVjJZWzPXEMffaA8d0K', 'worker',     1, '+250780000004', 1500000, 3),
-  ('Ndayisabye Eric',     'worker2@valano.rw',   '$2a$12$s1O42VRPCBl1KIvmeIxatu2nE8VW5Wrfy/eVjJZWzPXEMffaA8d0K', 'worker',     2, '+250780000005', 1500000, 3)
-ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash
-WHERE users.role != 'admin';
-
-INSERT INTO suppliers (name, wechat, whatsapp, city, country, specialty) VALUES
-  ('Guangzhou Fashion Co.',  'gzfashion2024',  '+8613800000001', 'Guangzhou', 'China', 'T-Shirts, Casual Wear'),
-  ('Yiwu Wholesale Hub',     'yiwuhub_trade',  '+8613800000002', 'Yiwu',      'China', 'Accessories, Mixed Clothing'),
-  ('Shenzhen Style Ltd.',    'szstylelimited', '+8613800000003', 'Shenzhen',  'China', 'Formal Wear, Suits')
+INSERT INTO suppliers (name, phone, address, products_supplied) VALUES
+  ('Inyange Industries',  '+250788200001', 'Kigali, Rwanda', 'Dairy products, water'),
+  ('Sulfo Rwanda',        '+250788200002', 'Kigali, Rwanda', 'Cleaning products, soap'),
+  ('Bralirwa',            '+250788200003', 'Gisenyi, Rwanda','Beverages, beer')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO exchange_rates (from_currency, to_currency, rate) VALUES
-  ('CNY', 'RWF', 190.50),
   ('USD', 'RWF', 1350.00),
-  ('EUR', 'RWF', 1460.00)
+  ('EUR', 'RWF', 1460.00),
+  ('KES', 'RWF', 10.40),
+  ('UGX', 'RWF', 0.36)
 ON CONFLICT (from_currency, to_currency) DO UPDATE SET rate = EXCLUDED.rate, updated_at = NOW();
 
-INSERT INTO stock_items (name, category, size, color, quantity, cost_price_rwf, sell_price_rwf, low_stock_threshold, branch_id) VALUES
-  ('Men Plain T-Shirt',      'T-Shirts',  'M',   'White',  50, 3000, 6000, 10, 1),
-  ('Men Plain T-Shirt',      'T-Shirts',  'L',   'Black',  40, 3000, 6000, 10, 1),
-  ('Women Floral Dress',     'Dresses',   'M',   'Red',    25, 8000, 18000, 5, 1),
-  ('Men Slim Jeans',         'Jeans',     '32',  'Blue',   30, 12000, 25000, 8, 1),
-  ('Men Casual Jacket',      'Jackets',   'XL',  'Grey',   15, 15000, 35000, 5, 2),
-  ('Women Blouse',           'Shirts',    'S',   'Pink',   20, 5000, 12000, 5, 2)
+INSERT INTO stock_items (name, name_rw, category, unit, quantity, cost_price_rwf, sell_price_rwf, low_stock_threshold) VALUES
+  ('Sugar 1kg',       'Isukari 1kg',  'Groceries', 'kg',     50, 1200, 1500, 10),
+  ('Cooking Oil 1L',  'Amavuta 1L',   'Groceries', 'litre',  30, 2200, 2800,  5),
+  ('Soap Bar',        'Isabuni',      'Hygiene',   'pcs',   100,  400,  600, 20),
+  ('Rice 1kg',        'Umuceli 1kg',  'Groceries', 'kg',     80,  900, 1200, 15)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO customers (name, phone, location, type, segment) VALUES
-  ('Walk-in Customer', NULL, 'Kigali', 'retailer', 'new'),
-  ('Amani Boutique',   '+250788111001', 'Musanze',  'wholesaler', 'regular'),
-  ('Grace Fashion',    '+250788111002', 'Huye',     'wholesaler', 'regular'),
-  ('VIP Client - Kalisa', '+250788111003', 'Kigali', 'retailer', 'vip')
+  ('Walk-in Customer', NULL,            'Local',    'retailer',   'new'),
+  ('Amani Shop',       '+250788111001', 'Musanze',  'wholesaler', 'regular'),
+  ('Grace Store',      '+250788111002', 'Huye',     'wholesaler', 'regular')
 ON CONFLICT DO NOTHING;
 
-INSERT INTO settings (shop_name, shop_address, shop_phone)
-SELECT 'VALANO SHOP', 'Kigali, Rwanda', '+250788123456'
+INSERT INTO settings (shop_name, shop_address, shop_phone, language)
+SELECT 'My Business', 'Kigali, Rwanda', '+250788123456', 'en'
 WHERE NOT EXISTS (SELECT 1 FROM settings);
 
 COMMIT;
 `;
 
 const BOOTSTRAP_SQL = `
-INSERT INTO branches (name, location, phone) VALUES
-  ('Main Branch', 'Kigali - Nyabugogo Market', '+250788000001'),
-  ('City Branch',  'Kigali - Kimironko Market', '+250788000002')
-ON CONFLICT DO NOTHING;
-
-INSERT INTO users (name, email, password_hash, role, branch_id, phone, monthly_target, commission_rate) VALUES
-  ('Rukundo joseph',       'rukundojosephtuyishime@gmail.com', '$2a$12$pqAP/gTVtss0cQuzuEMpdOTk5TRlOTLHgUR/pZ5QuXml07pFCXyza', 'admin',      1, '+250780000001', 5000000, 0),
-  ('Habimana Jean Pierre', 'manager@valano.rw',                '$2a$12$s1O42VRPCBl1KIvmeIxatu2nE8VW5Wrfy/eVjJZWzPXEMffaA8d0K', 'manager',    1, '+250780000002', 3000000, 2),
-  ('Uwimana Angélique',    'accounts@valano.rw',               '$2a$12$s1O42VRPCBl1KIvmeIxatu2nE8VW5Wrfy/eVjJZWzPXEMffaA8d0K', 'accountant', 1, '+250780000003', 0, 0),
-  ('Uwamahoro Marie',      'worker1@valano.rw',                '$2a$12$s1O42VRPCBl1KIvmeIxatu2nE8VW5Wrfy/eVjJZWzPXEMffaA8d0K', 'worker',     1, '+250780000004', 1500000, 3),
-  ('Ndayisabye Eric',      'worker2@valano.rw',                '$2a$12$s1O42VRPCBl1KIvmeIxatu2nE8VW5Wrfy/eVjJZWzPXEMffaA8d0K', 'worker',     2, '+250780000005', 1500000, 3)
+INSERT INTO users (name, email, password_hash, role, phone) VALUES
+  ('Rukundo Joseph',    'rukundojosephtuyishime@gmail.com', '$2a$12$pqAP/gTVtss0cQuzuEMpdOTk5TRlOTLHgUR/pZ5QuXml07pFCXyza', 'pulse_admin', '+250780000001'),
+  ('Admin',             'admin@inzira.rw',                 '$2a$12$pqAP/gTVtss0cQuzuEMpdOTk5TRlOTLHgUR/pZ5QuXml07pFCXyza', 'pulse_admin', '+250780000004'),
+  ('Demo Business',     'demo@inzira.rw',                  '$2a$12$s1O42VRPCBl1KIvmeIxatu2nE8VW5Wrfy/eVjJZWzPXEMffaA8d0K', 'sme_owner',   '+250780000002'),
+  ('Demo Cashier',      'cashier@inzira.rw',               '$2a$12$s1O42VRPCBl1KIvmeIxatu2nE8VW5Wrfy/eVjJZWzPXEMffaA8d0K', 'cashier',     '+250780000003')
 ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash
-WHERE users.role != 'admin';
+WHERE users.role NOT IN ('pulse_admin', 'sme_owner');
 `;
 
 let initPromise = null;
 
 async function runInit() {
   await pool.query(SCHEMA_SQL);
-
-  // Always ensure core branches + users exist (idempotent).
-  // Non-admin passwords are reset to the known default on every boot
-  // so accounts are never locked out. Admin password is never touched.
+  await pool.query(MIGRATION_SQL);
   await pool.query(BOOTSTRAP_SQL);
 
-  // Full sample data only on a truly empty database.
   const { rows } = await pool.query("SELECT COUNT(*)::int AS count FROM stock_items");
   if (rows[0].count === 0) {
     await pool.query(SEED_SQL);
@@ -322,11 +414,9 @@ async function runInit() {
   }
 }
 
-// Runs at most once per process; subsequent callers await the same promise.
 function ensureDbReady() {
   if (!initPromise) {
     initPromise = runInit().catch((err) => {
-      // Reset so a later request can retry after a transient failure
       initPromise = null;
       throw err;
     });

@@ -9,8 +9,8 @@ const DATABASE_URL =
 // JWT secrets should be set via env in production. Fall back to stable defaults
 // so a fresh deployment still works out-of-the-box; a warning is logged so the
 // operator knows to set real secrets for production security.
-const JWT_SECRET = process.env.JWT_SECRET || "knotty_default_access_secret_change_me";
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || "knotty_default_refresh_secret_change_me";
+const JWT_SECRET = process.env.JWT_SECRET || "inzira_default_access_secret_change_me";
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || "inzira_default_refresh_secret_change_me";
 
 if (!DATABASE_URL) {
   console.error("[ENV] No database connection string found (set DATABASE_URL or POSTGRES_URL).");

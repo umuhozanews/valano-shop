@@ -28,31 +28,37 @@ router.use(verifyToken);
 router.get("/", async (req, res, next) => {
   try {
     const { rows: [settings] } = await pool.query("SELECT * FROM settings LIMIT 1");
-    const { rows: branches } = await pool.query(
-      `SELECT b.*, COUNT(u.id) as worker_count FROM branches b
-       LEFT JOIN users u ON u.branch_id=b.id AND u.is_active=true GROUP BY b.id ORDER BY b.name`
-    );
     const { rows: rates } = await pool.query("SELECT * FROM exchange_rates ORDER BY from_currency");
-    res.json({ settings, branches, exchangeRates: rates });
+    res.json({ settings, exchangeRates: rates });
   } catch (err) { next(err); }
 });
 
-router.put("/", requireRole("admin"), async (req, res, next) => {
+router.put("/", requireRole("admin", "sme_owner", "pulse_admin"), async (req, res, next) => {
   try {
-    const { shop_name, shop_address, shop_phone, default_low_stock_threshold,
-            default_commission_rate, invoice_footer_text } = req.body;
+    const {
+      shop_name, shop_address, shop_phone,
+      default_low_stock_threshold, invoice_footer_text,
+      language, sector_default, district_default,
+    } = req.body;
+
     const { rows: [s] } = await pool.query(
-      `UPDATE settings SET shop_name=$1, shop_address=$2, shop_phone=$3,
-        default_low_stock_threshold=$4, default_commission_rate=$5, invoice_footer_text=$6
+      `UPDATE settings SET
+        shop_name=$1, shop_address=$2, shop_phone=$3,
+        default_low_stock_threshold=$4, invoice_footer_text=$5,
+        language=$6, sector_default=$7, district_default=$8
        WHERE id=1 RETURNING *`,
-      [shop_name, shop_address, shop_phone, default_low_stock_threshold, default_commission_rate, invoice_footer_text]
+      [
+        shop_name, shop_address, shop_phone,
+        default_low_stock_threshold, invoice_footer_text,
+        language || 'en', sector_default || null, district_default || null,
+      ]
     );
     await logAudit(req.user.id, "SETTINGS_UPDATED", "settings", 1, null, req.body, req.ip);
     res.json(s);
   } catch (err) { next(err); }
 });
 
-router.post("/logo", requireRole("admin"), upload.single("logo"), async (req, res, next) => {
+router.post("/logo", requireRole("admin", "sme_owner", "pulse_admin"), upload.single("logo"), async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
     const url = `/uploads/${req.file.filename}`;
@@ -61,62 +67,38 @@ router.post("/logo", requireRole("admin"), upload.single("logo"), async (req, re
   } catch (err) { next(err); }
 });
 
-// Branches
-router.post("/branches", requireRole("admin"), async (req, res, next) => {
+// Exchange rates
+router.put("/exchange-rates", requireRole("admin", "sme_owner", "pulse_admin"), async (req, res, next) => {
   try {
-    const { name, location, phone } = req.body;
-    const { rows: [b] } = await pool.query(
-      "INSERT INTO branches (name, location, phone) VALUES ($1,$2,$3) RETURNING *", [name, location, phone]
+    const { from_currency, to_currency, rate } = req.body;
+    if (!from_currency || !to_currency || !rate)
+      return res.status(400).json({ error: "from_currency, to_currency and rate required" });
+
+    const { rows: [r] } = await pool.query(
+      `INSERT INTO exchange_rates (from_currency, to_currency, rate, updated_by)
+       VALUES ($1,$2,$3,$4)
+       ON CONFLICT (from_currency, to_currency)
+       DO UPDATE SET rate=$3, updated_at=NOW(), updated_by=$4
+       RETURNING *`,
+      [from_currency.toUpperCase(), to_currency.toUpperCase(), rate, req.user.id]
     );
-    res.status(201).json(b);
+    res.json(r);
   } catch (err) { next(err); }
 });
 
-router.put("/branches/:id", requireRole("admin"), async (req, res, next) => {
+// Data backup (Inzira tables)
+router.get("/backup", requireRole("admin", "pulse_admin"), async (req, res, next) => {
   try {
-    const { name, location, phone } = req.body;
-    const { rows: [b] } = await pool.query(
-      "UPDATE branches SET name=$1, location=$2, phone=$3 WHERE id=$4 RETURNING *",
-      [name, location, phone, req.params.id]
-    );
-    res.json(b);
-  } catch (err) { next(err); }
-});
-
-router.post("/branches/:id/clone-stock", requireRole("admin"), async (req, res, next) => {
-  try {
-    const toBranchId = req.params.id;
-    const { from_branch_id } = req.body;
-    if (!from_branch_id) return res.status(400).json({ error: "Source branch required" });
-
-    const { rows: sourceItems } = await pool.query(
-      "SELECT * FROM stock_items WHERE branch_id=$1 AND is_active=true", [from_branch_id]
-    );
-
-    for (const item of sourceItems) {
-      const newBarcode = `VLN${Date.now()}${Math.floor(Math.random() * 1000)}`;
-      await pool.query(
-        `INSERT INTO stock_items (name, category, size, color, barcode, branch_id, quantity, cost_price_rwf, sell_price_rwf, low_stock_threshold)
-         VALUES ($1,$2,$3,$4,$5,$6,0,$7,$8,$9)`,
-        [item.name, item.category, item.size, item.color, newBarcode, toBranchId, item.cost_price_rwf, item.sell_price_rwf, item.low_stock_threshold]
-      );
-    }
-
-    res.json({ message: `Cloned ${sourceItems.length} items to branch successfully.` });
-  } catch (err) { next(err); }
-});
-
-router.get("/backup", requireRole("admin"), async (req, res, next) => {
-  try {
-    const tables = ["branches", "users", "suppliers", "stock_items", "customers", "sales", "expenses", "exchange_rates"];
+    const tables = ["users", "suppliers", "stock_items", "customers", "sales", "expenses", "exchange_rates", "purchase_orders"];
     const backup = {};
     for (const t of tables) {
       const { rows } = await pool.query(`SELECT * FROM ${t}`);
       backup[t] = rows;
     }
     backup.exported_at = new Date().toISOString();
+    backup.app = "Inzira Insights";
     res.setHeader("Content-Type", "application/json");
-    res.setHeader("Content-Disposition", "attachment; filename=valano-backup.json");
+    res.setHeader("Content-Disposition", "attachment; filename=inzira-backup.json");
     res.json(backup);
   } catch (err) { next(err); }
 });

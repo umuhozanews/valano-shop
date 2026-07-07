@@ -1,7 +1,7 @@
 {
-  "name": "valano-shop-backend",
-  "version": "1.0.0",
-  "description": "KNOTTY SYSTEM Business Management System — Backend",
+  "name": "inzira-insights-backend",
+  "version": "2.0.0",
+  "description": "Inzira Insights — Rwanda's SME Survival Platform — Backend",
   "main": "server.js",
   "engines": {
     "node": ">=18"
@@ -12,6 +12,7 @@
     "seed": "node ../scripts/seed.js"
   },
   "dependencies": {
+    "adm-zip": "^0.5.18",
     "bcryptjs": "^2.4.3",
     "bwip-js": "^4.5.1",
     "compression": "^1.7.4",

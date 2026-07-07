@@ -2,9 +2,14 @@ const jwt = require("jsonwebtoken");
 const { JWT_SECRET } = require("../config/env");
 
 const ROLE_HIERARCHY = {
+  pulse_admin: 6,
   admin: 5,
+  sme_owner: 5,
   manager: 4,
   accountant: 3,
+  cashier: 2,
+  databridge_advisor: 2,
+  lender: 2,
   worker: 2,
   viewer: 1,
 };
