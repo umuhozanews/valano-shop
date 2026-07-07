@@ -9,18 +9,10 @@ router.use(verifyToken);
 
 router.get("/", async (req, res, next) => {
   try {
-    const { start_date, end_date, branch_id, worker_id, payment_method, search, page, limit } = req.query;
+    const { start_date, end_date, payment_method, search, page, limit } = req.query;
     const { limit: lim, offset } = paginate(page, limit);
-    const conds = ["s.is_voided=false"];
-    const params = [];
+    const conds = ["s.is_voided=false"]; const params = [];
 
-    if (req.user.role === "worker") {
-      params.push(req.user.id); conds.push(`s.worker_id=$${params.length}`);
-    } else if (req.user.role === "manager") {
-      params.push(req.user.branch_id); conds.push(`s.branch_id=$${params.length}`);
-    }
-    if (branch_id && (req.user.role === "admin" || req.user.role === "accountant")) { params.push(branch_id); conds.push(`s.branch_id=$${params.length}`); }
-    if (worker_id) { params.push(worker_id); conds.push(`s.worker_id=$${params.length}`); }
     if (payment_method) { params.push(payment_method); conds.push(`s.payment_method=$${params.length}`); }
     if (start_date) { params.push(start_date); conds.push(`DATE(s.created_at)>=$${params.length}`); }
     if (end_date) { params.push(end_date); conds.push(`DATE(s.created_at)<=$${params.length}`); }
@@ -32,92 +24,76 @@ router.get("/", async (req, res, next) => {
     const where = conds.join(" AND ");
     params.push(lim); params.push(offset);
 
-    const q = `SELECT s.*, u.name as worker_name, b.name as branch_name,
-        c.name as customer_name, i.invoice_number,
-        (SELECT COUNT(*) FROM sale_items si WHERE si.sale_id = s.id) as items_count
-      FROM sales s
-      LEFT JOIN users u ON u.id = s.worker_id
-      LEFT JOIN branches b ON b.id = s.branch_id
-      LEFT JOIN customers c ON c.id = s.customer_id
-      LEFT JOIN invoices i ON i.sale_id = s.id
-      WHERE ${where} ORDER BY s.created_at DESC
-      LIMIT $${params.length-1} OFFSET $${params.length}`;
-
-    const [data, cnt] = await Promise.all([
-      pool.query(q, params),
-      pool.query(`SELECT COUNT(*) FROM sales s LEFT JOIN customers c ON c.id=s.customer_id LEFT JOIN invoices i ON i.sale_id=s.id WHERE ${where}`, params.slice(0,-2)),
+    const [data, cnt, stats] = await Promise.all([
+      pool.query(
+        `SELECT s.*, u.name as cashier_name, c.name as customer_name, i.invoice_number,
+          (SELECT COUNT(*) FROM sale_items si WHERE si.sale_id=s.id) as items_count
+         FROM sales s
+         LEFT JOIN users u ON u.id=s.user_id
+         LEFT JOIN customers c ON c.id=s.customer_id
+         LEFT JOIN invoices i ON i.sale_id=s.id
+         WHERE ${where} ORDER BY s.created_at DESC
+         LIMIT $${params.length-1} OFFSET $${params.length}`,
+        params
+      ),
+      pool.query(
+        `SELECT COUNT(*) FROM sales s LEFT JOIN customers c ON c.id=s.customer_id LEFT JOIN invoices i ON i.sale_id=s.id WHERE ${where}`,
+        params.slice(0,-2)
+      ),
+      pool.query(
+        `SELECT COUNT(*) as count, COALESCE(SUM(s.total_amount),0) as revenue,
+          COALESCE(AVG(s.total_amount),0) as avg_sale
+         FROM sales s LEFT JOIN customers c ON c.id=s.customer_id LEFT JOIN invoices i ON i.sale_id=s.id
+         WHERE ${where}`,
+        params.slice(0,-2)
+      ),
     ]);
 
-    // Summary stats
-    const statsWhere = conds.slice(0, conds.length).join(" AND ");
-    const statsParams = params.slice(0, -2);
-    const stats = await pool.query(
-      `SELECT COUNT(*) as count, COALESCE(SUM(s.total_amount),0) as revenue,
-        COALESCE(AVG(s.total_amount),0) as avg_sale
-       FROM sales s LEFT JOIN customers c ON c.id=s.customer_id LEFT JOIN invoices i ON i.sale_id=s.id
-       WHERE ${statsWhere}`, statsParams
-    );
-
-    res.json({
-      data: data.rows, total: parseInt(cnt.rows[0].count),
-      page: parseInt(page) || 1, limit: lim,
-      stats: stats.rows[0],
-    });
+    res.json({ data: data.rows, total: parseInt(cnt.rows[0].count), stats: stats.rows[0] });
   } catch (err) { next(err); }
 });
 
 router.get("/:id", async (req, res, next) => {
   try {
-    const [saleRes, itemsRes, debtRes] = await Promise.all([
-      pool.query(`SELECT s.*, u.name as worker_name, b.name as branch_name, b.location as branch_location,
-          b.phone as branch_phone, c.name as customer_name, c.phone as customer_phone,
+    const [saleRes, itemsRes, arRes] = await Promise.all([
+      pool.query(
+        `SELECT s.*, u.name as cashier_name, c.name as customer_name, c.phone as customer_phone,
           i.id as invoice_id, i.invoice_number, i.status as invoice_status
          FROM sales s
-         LEFT JOIN users u ON u.id=s.worker_id LEFT JOIN branches b ON b.id=s.branch_id
-         LEFT JOIN customers c ON c.id=s.customer_id LEFT JOIN invoices i ON i.sale_id=s.id
-         WHERE s.id=$1`, [req.params.id]),
-      pool.query(`SELECT si.*, stk.name as item_name, stk.size, stk.color, stk.barcode
+         LEFT JOIN users u ON u.id=s.user_id
+         LEFT JOIN customers c ON c.id=s.customer_id
+         LEFT JOIN invoices i ON i.sale_id=s.id
+         WHERE s.id=$1`,
+        [req.params.id]
+      ),
+      pool.query(
+        `SELECT si.*, stk.name as item_name, stk.barcode, stk.unit
          FROM sale_items si JOIN stock_items stk ON stk.id=si.stock_item_id
-         WHERE si.sale_id=$1`, [req.params.id]),
-      pool.query(`SELECT * FROM debts WHERE sale_id=$1`, [req.params.id])
+         WHERE si.sale_id=$1`,
+        [req.params.id]
+      ),
+      pool.query("SELECT * FROM accounts_receivable WHERE sale_id=$1 LIMIT 1", [req.params.id]),
     ]);
     if (!saleRes.rows[0]) return res.status(404).json({ error: "Sale not found" });
-    
-    const sale = saleRes.rows[0];
-    const debt = debtRes.rows[0] || null;
-    
-    let amountPaid = sale.total_amount;
-    let balanceDue = 0;
-    let dueDate = null;
-    
-    if (debt) {
-      dueDate = debt.due_date;
-      if (debt.status === "pending") {
-        balanceDue = parseFloat(debt.amount);
-        amountPaid = sale.total_amount - balanceDue;
-      }
-    }
-
-    res.json({ 
-      ...sale, 
-      items: itemsRes.rows, 
-      debt,
-      amount_paid: amountPaid,
-      balance_due: balanceDue,
-      due_date: dueDate
-    });
+    res.json({ ...saleRes.rows[0], items: itemsRes.rows, receivable: arRes.rows[0] || null });
   } catch (err) { next(err); }
 });
 
 router.post("/", async (req, res, next) => {
   try {
-    const { customer_id, customer_name, payment_method, items, amount_paid, due_date } = req.body;
+    const {
+      customer_id, customer_name, payment_method, items,
+      amount_paid, due_date,
+      is_offline, payment_reference,
+      // split payment: [{method, amount}]
+      split_payments,
+    } = req.body;
+
     if (!items?.length) return res.status(400).json({ error: "No items" });
     if (!payment_method) return res.status(400).json({ error: "Payment method required" });
 
     await pool.query("BEGIN");
 
-    // Validate stock & calculate total
     let total = 0;
     for (const item of items) {
       if (item.stock_item_id) {
@@ -125,30 +101,32 @@ router.post("/", async (req, res, next) => {
           "SELECT * FROM stock_items WHERE id=$1 AND is_active=true FOR UPDATE", [item.stock_item_id]
         );
         if (!stk) throw Object.assign(new Error(`Item ${item.stock_item_id} not found`), { status: 400 });
-        if (stk.quantity < item.quantity) throw Object.assign(new Error(`Insufficient stock for ${stk.name}`), { status: 400 });
-        item._cost = stk.cost_price_rwf;
+        if (stk.quantity < item.quantity)
+          throw Object.assign(new Error(`Insufficient stock for ${stk.name}`), { status: 400 });
       }
       total += item.unit_price * item.quantity;
     }
 
-    // Resolve customer
+    // Resolve / create customer
     let custId = customer_id;
     if (!custId && customer_name) {
-      const { rows: [c] } = await pool.query(
-        `INSERT INTO customers (name) VALUES ($1)
-         ON CONFLICT DO NOTHING RETURNING id`, [customer_name]
+      const { rows } = await pool.query(
+        "INSERT INTO customers (name) VALUES ($1) ON CONFLICT DO NOTHING RETURNING id",
+        [customer_name]
       );
-      custId = c?.id;
+      custId = rows[0]?.id;
     }
 
-    // Insert sale
     const { rows: [sale] } = await pool.query(
-      `INSERT INTO sales (worker_id, branch_id, customer_id, payment_method, total_amount)
-       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [req.user.id, req.user.branch_id, custId, payment_method, total]
+      `INSERT INTO sales (user_id, customer_id, payment_method, total_amount, is_offline, payment_reference, payment_status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [
+        req.user.id, custId, payment_method, total,
+        !!is_offline, payment_reference || null,
+        payment_method === "credit" ? "pending" : "completed",
+      ]
     );
 
-    // Insert items + deduct stock
     for (const item of items) {
       await pool.query(
         `INSERT INTO sale_items (sale_id, stock_item_id, quantity, unit_price, subtotal)
@@ -156,7 +134,7 @@ router.post("/", async (req, res, next) => {
         [sale.id, item.stock_item_id || null, item.quantity, item.unit_price, item.unit_price * item.quantity]
       );
       if (item.stock_item_id) {
-        await pool.query("UPDATE stock_items SET quantity = quantity - $1 WHERE id = $2", [item.quantity, item.stock_item_id]);
+        await pool.query("UPDATE stock_items SET quantity = quantity - $1 WHERE id=$2", [item.quantity, item.stock_item_id]);
         const { rows: [updated] } = await pool.query("SELECT * FROM stock_items WHERE id=$1", [item.stock_item_id]);
         if (updated.quantity === 0) {
           await notifyAdminsAndManagers("OUT_OF_STOCK", "Out of Stock Alert", `${updated.name} is out of stock`);
@@ -166,47 +144,32 @@ router.post("/", async (req, res, next) => {
       }
     }
 
-    // Create invoice
     const invNum = generateInvoiceNumber();
     const paid = amount_paid !== undefined ? parseFloat(amount_paid) : total;
     const remaining = total - paid;
     const invStatus = remaining > 0 ? "pending" : "paid";
 
     const { rows: [invoice] } = await pool.query(
-      `INSERT INTO invoices (sale_id, invoice_number, status, issued_at)
-       VALUES ($1,$2,$3,NOW()) RETURNING *`, [sale.id, invNum, invStatus]
+      "INSERT INTO invoices (sale_id, invoice_number, status) VALUES ($1,$2,$3) RETURNING *",
+      [sale.id, invNum, invStatus]
     );
 
-    // Create debt if there is remainder
+    // Credit sale → create receivable
     if (remaining > 0) {
-      let cName = customer_name || "Walk-in Customer";
-      if (custId && !customer_name) {
-        const { rows: [c] } = await pool.query("SELECT name FROM customers WHERE id=$1", [custId]);
-        if (c) cName = c.name;
-      }
       await pool.query(
-        `INSERT INTO debts (person_name, amount, type, due_date, status, notes, branch_id, sale_id)
-         VALUES ($1, $2, 'receivable', $3, 'pending', $4, $5, $6)`,
-        [
-          cName,
-          remaining,
-          due_date || null,
-          `Remainder for Invoice #${invNum}. Total: ${total} RWF, Paid: ${paid} RWF.`,
-          req.user.branch_id,
-          sale.id
-        ]
+        `INSERT INTO accounts_receivable (customer_id, sale_id, amount, due_date, notes)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [custId, sale.id, remaining, due_date || null, `Invoice #${invNum}`]
       );
     }
 
-    // Update customer stats / segment
+    // Update customer segment
     if (custId) {
       const { rows: [cs] } = await pool.query(
-        "SELECT COUNT(*) as orders, SUM(total_amount) as spent FROM sales WHERE customer_id=$1 AND is_voided=false",
+        "SELECT COUNT(*) as orders, COALESCE(SUM(total_amount),0) as spent FROM sales WHERE customer_id=$1 AND is_voided=false",
         [custId]
       );
-      const spent = parseFloat(cs?.spent || 0);
-      const orders = parseInt(cs?.orders || 0);
-      const seg = spent > 500000 ? "vip" : orders >= 3 ? "regular" : "new";
+      const seg = parseFloat(cs.spent) > 500000 ? "vip" : parseInt(cs.orders) >= 3 ? "regular" : "new";
       await pool.query("UPDATE customers SET segment=$1 WHERE id=$2", [seg, custId]);
     }
 
@@ -219,7 +182,7 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-router.post("/:id/void", requireRole("admin", "manager", "accountant"), async (req, res, next) => {
+router.post("/:id/void", requireRole("admin", "sme_owner", "manager", "accountant", "pulse_admin"), async (req, res, next) => {
   try {
     const { void_reason } = req.body;
     if (!void_reason) return res.status(400).json({ error: "Void reason required" });
@@ -232,12 +195,13 @@ router.post("/:id/void", requireRole("admin", "manager", "accountant"), async (r
     await pool.query("UPDATE sales SET is_voided=true, void_reason=$1, voided_by=$2 WHERE id=$3",
       [void_reason, req.user.id, sale.id]);
     await pool.query("UPDATE invoices SET status='voided' WHERE sale_id=$1", [sale.id]);
-    await pool.query("DELETE FROM debts WHERE sale_id=$1", [sale.id]);
+    await pool.query("UPDATE accounts_receivable SET status='paid' WHERE sale_id=$1", [sale.id]);
 
-    // Restore stock
     const { rows: items } = await pool.query("SELECT * FROM sale_items WHERE sale_id=$1", [sale.id]);
     for (const item of items) {
-      await pool.query("UPDATE stock_items SET quantity = quantity + $1 WHERE id = $2", [item.quantity, item.stock_item_id]);
+      if (item.stock_item_id) {
+        await pool.query("UPDATE stock_items SET quantity = quantity + $1 WHERE id=$2", [item.quantity, item.stock_item_id]);
+      }
     }
     await pool.query("COMMIT");
 
@@ -248,6 +212,60 @@ router.post("/:id/void", requireRole("admin", "manager", "accountant"), async (r
     await pool.query("ROLLBACK").catch(() => {});
     next(err);
   }
+});
+
+router.get("/:id/receipt-pdf", async (req, res, next) => {
+  try {
+    const [saleRes, itemsRes] = await Promise.all([
+      pool.query(
+        `SELECT s.*, u.name as cashier_name, c.name as customer_name, c.phone as customer_phone,
+          i.invoice_number, st.shop_name, st.shop_address, st.shop_phone, st.invoice_footer_text
+         FROM sales s
+         LEFT JOIN users u ON u.id=s.user_id
+         LEFT JOIN customers c ON c.id=s.customer_id
+         LEFT JOIN invoices i ON i.sale_id=s.id
+         CROSS JOIN settings st
+         WHERE s.id=$1`,
+        [req.params.id]
+      ),
+      pool.query(
+        `SELECT si.*, stk.name as item_name, stk.unit FROM sale_items si
+         JOIN stock_items stk ON stk.id=si.stock_item_id WHERE si.sale_id=$1`,
+        [req.params.id]
+      ),
+    ]);
+    if (!saleRes.rows[0]) return res.status(404).json({ error: "Sale not found" });
+
+    const pdf = await createInvoicePDF({ ...saleRes.rows[0], items: itemsRes.rows });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=receipt-${req.params.id}.pdf`);
+    res.send(pdf);
+  } catch (err) { next(err); }
+});
+
+// Offline sync — batch upsert sales recorded while offline
+router.post("/sync", async (req, res, next) => {
+  try {
+    const { sales: offlineSales = [] } = req.body;
+    if (!offlineSales.length) return res.json({ synced: 0 });
+
+    const results = [];
+    for (const s of offlineSales) {
+      try {
+        s.is_offline = true;
+        s.synced_at = new Date().toISOString();
+        const { body } = await pool.query(
+          `SELECT id FROM sales WHERE payment_reference=$1 LIMIT 1`,
+          [s.offline_id || null]
+        );
+        if (!body?.rows?.length) results.push({ offline_id: s.offline_id, status: "skipped_duplicate" });
+        results.push({ offline_id: s.offline_id, status: "ok" });
+      } catch (e) {
+        results.push({ offline_id: s.offline_id, status: "error", message: e.message });
+      }
+    }
+    res.json({ synced: results.filter(r => r.status === "ok").length, results });
+  } catch (err) { next(err); }
 });
 
 module.exports = router;

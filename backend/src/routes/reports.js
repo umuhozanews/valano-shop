@@ -5,162 +5,286 @@ const { verifyToken, requireRole } = require("../middleware/auth");
 const { createReportPDF } = require("../utils/pdf");
 const { exportToExcel } = require("../utils/excel");
 
-router.use(verifyToken, requireRole("admin", "manager", "accountant"));
+router.use(verifyToken, requireRole("admin", "sme_owner", "manager", "accountant", "pulse_admin"));
 
-function dateFilter(params, conds, { start_date, end_date, dateCol = "created_at" }) {
-  if (start_date) { params.push(start_date); conds.push(`DATE(${dateCol})>=$${params.length}`); }
-  if (end_date) { params.push(end_date); conds.push(`DATE(${dateCol})<=$${params.length}`); }
+function addDateFilter(params, conds, { start_date, end_date, col = "created_at" }) {
+  if (start_date) { params.push(start_date); conds.push(`DATE(${col})>=$${params.length}`); }
+  if (end_date) { params.push(end_date); conds.push(`DATE(${col})<=$${params.length}`); }
 }
 
+// ─── Sales report ─────────────────────────────────────────────────────────────
 router.get("/sales", async (req, res, next) => {
   try {
-    const { start_date, end_date, branch_id, export: exp } = req.query;
+    const { start_date, end_date, payment_method, export: exp } = req.query;
     const conds = ["s.is_voided=false"]; const params = [];
-    const bf = req.user.role === "manager" ? req.user.branch_id : branch_id;
-    if (bf) { params.push(bf); conds.push(`s.branch_id=$${params.length}`); }
-    dateFilter(params, conds, { start_date, end_date, dateCol: "s.created_at" });
+    if (payment_method) { params.push(payment_method); conds.push(`s.payment_method=$${params.length}`); }
+    addDateFilter(params, conds, { start_date, end_date, col: "s.created_at" });
 
-    const [sales, daily, workers, totals] = await Promise.all([
-      pool.query(`SELECT s.*, u.name as worker_name, b.name as branch_name,
-          c.name as customer_name, i.invoice_number
-         FROM sales s
-         LEFT JOIN users u ON u.id=s.worker_id
-         LEFT JOIN branches b ON b.id=s.branch_id
-         LEFT JOIN customers c ON c.id=s.customer_id
-         LEFT JOIN invoices i ON i.sale_id=s.id
-         WHERE ${conds.join(" AND ")} ORDER BY s.created_at DESC`, params),
-      pool.query(`SELECT DATE(s.created_at) as date, COUNT(*) as count, SUM(s.total_amount) as revenue
-        FROM sales s WHERE ${conds.join(" AND ")} GROUP BY DATE(s.created_at) ORDER BY date`, params),
-      pool.query(`SELECT u.name, b.name as branch, COUNT(s.id) as sales, SUM(s.total_amount) as revenue,
-          AVG(s.total_amount) as avg_sale, MAX(s.created_at) as best_day
-         FROM sales s JOIN users u ON u.id=s.worker_id JOIN branches b ON b.id=s.branch_id
-         WHERE ${conds.join(" AND ")} GROUP BY u.id, u.name, b.name ORDER BY revenue DESC`, params),
-      pool.query(`SELECT COUNT(*) as total_sales, COALESCE(SUM(total_amount),0) as total_revenue,
-          COALESCE(AVG(total_amount),0) as avg_sale
-         FROM sales s WHERE ${conds.join(" AND ")}`, params),
+    const [sales, daily, byPayment, totals] = await Promise.all([
+      pool.query(
+        `SELECT s.*, u.name as cashier_name, c.name as customer_name, i.invoice_number
+         FROM sales s LEFT JOIN users u ON u.id=s.user_id LEFT JOIN customers c ON c.id=s.customer_id
+         LEFT JOIN invoices i ON i.sale_id=s.id WHERE ${conds.join(" AND ")} ORDER BY s.created_at DESC`,
+        params
+      ),
+      pool.query(
+        `SELECT DATE(s.created_at) as date, COUNT(*) as count, SUM(s.total_amount) as revenue
+         FROM sales s WHERE ${conds.join(" AND ")} GROUP BY DATE(s.created_at) ORDER BY date`,
+        params
+      ),
+      pool.query(
+        `SELECT payment_method, COUNT(*) as count, SUM(total_amount) as revenue
+         FROM sales s WHERE ${conds.join(" AND ")} GROUP BY payment_method`,
+        params
+      ),
+      pool.query(
+        `SELECT COUNT(*) as total_sales, COALESCE(SUM(total_amount),0) as total_revenue,
+          COALESCE(AVG(total_amount),0) as avg_sale FROM sales s WHERE ${conds.join(" AND ")}`,
+        params
+      ),
     ]);
 
     if (exp === "pdf") {
       return createReportPDF(res, {
         title: "Sales Report",
         dateRange: `${start_date || "All time"} – ${end_date || "Today"}`,
-        columns: ["Date", "Sales Count", "Revenue (RWF)"],
+        columns: ["Date", "Transactions", "Revenue (RWF)"],
         rows: daily.rows.map(r => [r.date, r.count, parseInt(r.revenue).toLocaleString()]),
         totalsRow: ["TOTAL", totals.rows[0].total_sales, parseInt(totals.rows[0].total_revenue).toLocaleString()],
       });
     }
     if (exp === "excel") {
       return exportToExcel(res, [
-        { name: "Daily Sales", headers: ["Date", "Sales Count", "Revenue (RWF)"],
-          rows: daily.rows.map(r => [r.date, r.count, r.revenue]),
-          totals: ["TOTAL", totals.rows[0].total_sales, totals.rows[0].total_revenue] },
-        { name: "By Worker", headers: ["Worker", "Branch", "Sales", "Revenue", "Avg Sale"],
-          rows: workers.rows.map(r => [r.name, r.branch, r.sales, r.revenue, Math.round(r.avg_sale)]) },
+        { name: "Daily", headers: ["Date", "Transactions", "Revenue"],
+          rows: daily.rows.map(r => [r.date, r.count, r.revenue]) },
+        { name: "By Payment", headers: ["Method", "Count", "Revenue"],
+          rows: byPayment.rows.map(r => [r.payment_method, r.count, r.revenue]) },
       ]);
     }
-
-    res.json({ sales: sales.rows, daily: daily.rows, workers: workers.rows, totals: totals.rows[0] });
+    res.json({ sales: sales.rows, daily: daily.rows, byPayment: byPayment.rows, totals: totals.rows[0] });
   } catch (err) { next(err); }
 });
 
+// ─── Stock report ─────────────────────────────────────────────────────────────
 router.get("/stock", async (req, res, next) => {
   try {
-    const { branch_id, export: exp } = req.query;
-    const conds = ["si.is_active=true"]; const params = [];
-    const bf = req.user.role === "manager" ? req.user.branch_id : branch_id;
-    if (bf) { params.push(bf); conds.push(`si.branch_id=$${params.length}`); }
-
-    const { rows } = await pool.query(`
-      SELECT si.*, b.name as branch_name,
-        si.quantity * si.cost_price_rwf as total_value,
+    const { export: exp } = req.query;
+    const { rows } = await pool.query(
+      `SELECT si.*,
+        si.quantity * si.cost_price_rwf as total_cost_value,
         CASE WHEN si.quantity=0 THEN 'out_of_stock'
              WHEN si.quantity<=si.low_stock_threshold THEN 'low_stock'
-             ELSE 'in_stock' END as status
-      FROM stock_items si LEFT JOIN branches b ON b.id=si.branch_id
-      WHERE ${conds.join(" AND ")} ORDER BY si.category, si.name`, params);
-
+             ELSE 'in_stock' END as stock_status
+       FROM stock_items si WHERE si.is_active=true ORDER BY si.category, si.name`
+    );
     const totals = rows.reduce((a, r) => ({
       items: a.items + 1,
-      value: a.value + parseInt(r.total_value || 0),
-      low: a.low + (r.status === "low_stock" ? 1 : 0),
-      out: a.out + (r.status === "out_of_stock" ? 1 : 0),
+      value: a.value + parseInt(r.total_cost_value || 0),
+      low: a.low + (r.stock_status === "low_stock" ? 1 : 0),
+      out: a.out + (r.stock_status === "out_of_stock" ? 1 : 0),
     }), { items: 0, value: 0, low: 0, out: 0 });
 
-    if (exp === "pdf") {
-      return createReportPDF(res, {
-        title: "Stock Report",
-        columns: ["Name", "Category", "Size", "Branch", "Qty", "Cost (RWF)", "Sell (RWF)", "Status"],
-        rows: rows.map(r => [r.name, r.category || "", r.size || "", r.branch_name, r.quantity, r.cost_price_rwf, r.sell_price_rwf, r.status]),
-      });
-    }
     if (exp === "excel") {
       return exportToExcel(res, [{
         name: "Stock",
-        headers: ["Name", "Category", "Size", "Color", "Branch", "Qty", "Cost RWF", "Sell RWF", "Total Value", "Status"],
-        rows: rows.map(r => [r.name, r.category, r.size, r.color, r.branch_name, r.quantity, r.cost_price_rwf, r.sell_price_rwf, r.total_value, r.status]),
-        totals: ["TOTAL", "", "", "", "", "", "", "", totals.value, ""],
+        headers: ["Name", "Kinyarwanda", "Category", "Unit", "Qty", "Cost RWF", "Sell RWF", "Total Value", "Status"],
+        rows: rows.map(r => [r.name, r.name_rw||"", r.category||"", r.unit||"pcs", r.quantity, r.cost_price_rwf, r.sell_price_rwf, r.total_cost_value, r.stock_status]),
+        totals: ["TOTAL","","","","","","", totals.value,""],
       }]);
     }
-
     res.json({ data: rows, totals });
   } catch (err) { next(err); }
 });
 
-router.get("/worker-performance", requireRole("admin", "manager", "accountant"), async (req, res, next) => {
+// ─── Financial P&L ────────────────────────────────────────────────────────────
+router.get("/financial", async (req, res, next) => {
   try {
-    const { start_date, end_date, export: exp } = req.query;
+    const { start_date, end_date } = req.query;
     const conds = ["s.is_voided=false"]; const params = [];
-    dateFilter(params, conds, { start_date, end_date, dateCol: "s.created_at" });
-    if (req.user.role === "manager") { params.push(req.user.branch_id); conds.push(`u.branch_id=$${params.length}`); }
+    addDateFilter(params, conds, { start_date, end_date, col: "s.created_at" });
 
-    const { rows } = await pool.query(`
-      SELECT u.id, u.name, b.name as branch, u.monthly_target, u.commission_rate,
-        COUNT(s.id) as sales_count,
-        COALESCE(SUM(s.total_amount),0) as revenue,
-        CASE WHEN u.monthly_target > 0
-             THEN ROUND(COALESCE(SUM(s.total_amount),0)::numeric / u.monthly_target * 100, 1)
-             ELSE 0 END as achievement_pct,
-        ROUND(COALESCE(SUM(s.total_amount),0) * u.commission_rate / 100) as commission_due
-      FROM users u
-      JOIN branches b ON b.id=u.branch_id
-      LEFT JOIN sales s ON s.worker_id=u.id AND ${conds.join(" AND ")}
-      WHERE u.role='worker' AND u.is_active=true
-      GROUP BY u.id, u.name, b.name, u.monthly_target, u.commission_rate
-      ORDER BY revenue DESC`, params
-    );
+    const expConds = ["1=1"]; const expParams = [];
+    addDateFilter(expParams, expConds, { start_date, end_date, col: "e.expense_date" });
 
-    if (exp === "excel") {
-      return exportToExcel(res, [{
-        name: "Worker Performance",
-        headers: ["Worker", "Branch", "Sales", "Revenue", "Target", "Achievement %", "Commission Due"],
-        rows: rows.map(r => [r.name, r.branch, r.sales_count, r.revenue, r.monthly_target, r.achievement_pct + "%", r.commission_due]),
-      }]);
-    }
-    res.json(rows);
+    const [revenue, cogs, expenses] = await Promise.all([
+      pool.query(`SELECT COALESCE(SUM(total_amount),0) as v FROM sales s WHERE ${conds.join(" AND ")}`, params),
+      pool.query(
+        `SELECT COALESCE(SUM(si.quantity * stk.cost_price_rwf),0) as v FROM sale_items si
+         JOIN sales s ON s.id=si.sale_id JOIN stock_items stk ON stk.id=si.stock_item_id
+         WHERE ${conds.join(" AND ")}`,
+        params
+      ),
+      pool.query(
+        `SELECT category, COALESCE(SUM(amount),0) as total FROM expenses e
+         WHERE ${expConds.join(" AND ")} GROUP BY category ORDER BY total DESC`,
+        expParams
+      ),
+    ]);
+
+    const rev = parseInt(revenue.rows[0].v);
+    const costOfGoods = parseInt(cogs.rows[0].v);
+    const grossProfit = rev - costOfGoods;
+    const totalExpenses = expenses.rows.reduce((s, r) => s + parseInt(r.total), 0);
+    const netProfit = grossProfit - totalExpenses;
+
+    res.json({
+      revenue: rev,
+      costOfGoods,
+      grossProfit,
+      grossMargin: rev > 0 ? Math.round((grossProfit / rev) * 100) : 0,
+      expenses: expenses.rows,
+      totalExpenses,
+      netProfit,
+      netMargin: rev > 0 ? Math.round((netProfit / rev) * 100) : 0,
+    });
   } catch (err) { next(err); }
 });
 
-router.get("/procurement", requireRole("admin", "accountant"), async (req, res, next) => {
+// ─── Daily summary ────────────────────────────────────────────────────────────
+router.get("/daily", async (req, res, next) => {
   try {
-    const { start_date, end_date, export: exp } = req.query;
-    const conds = ["1=1"]; const params = [];
-    dateFilter(params, conds, { start_date, end_date, dateCol: "po.order_date" });
+    const date = req.query.date || new Date().toISOString().split("T")[0];
 
-    const { rows } = await pool.query(`
-      SELECT po.*, s.name as supplier_name,
-        (SELECT COALESCE(SUM(pi.quantity * pi.unit_cost),0) FROM procurement_items pi WHERE pi.order_id=po.id) as items_cost_cny,
-        (SELECT COALESCE(SUM(pi.quantity * pi.unit_cost),0) FROM procurement_items pi WHERE pi.order_id=po.id) * COALESCE(po.exchange_rate,190) as items_cost_rwf
-      FROM procurement_orders po LEFT JOIN suppliers s ON s.id=po.supplier_id
-      WHERE ${conds.join(" AND ")} ORDER BY po.order_date DESC`, params);
+    const [sales, expenses, topItems, stockAlerts] = await Promise.all([
+      pool.query(
+        `SELECT COUNT(*) as tx_count, COALESCE(SUM(total_amount),0) as revenue,
+          payment_method, COUNT(*) as method_count
+         FROM sales WHERE DATE(created_at)=$1 AND is_voided=false
+         GROUP BY payment_method`,
+        [date]
+      ),
+      pool.query(
+        "SELECT category, COALESCE(SUM(amount),0) as total FROM expenses WHERE expense_date=$1 GROUP BY category",
+        [date]
+      ),
+      pool.query(
+        `SELECT stk.name, SUM(si.quantity) as qty, SUM(si.subtotal) as revenue
+         FROM sale_items si JOIN sales s ON s.id=si.sale_id JOIN stock_items stk ON stk.id=si.stock_item_id
+         WHERE DATE(s.created_at)=$1 AND s.is_voided=false GROUP BY stk.id, stk.name ORDER BY revenue DESC LIMIT 5`,
+        [date]
+      ),
+      pool.query("SELECT name, quantity, low_stock_threshold FROM stock_items WHERE is_active=true AND quantity<=low_stock_threshold ORDER BY quantity ASC LIMIT 10"),
+    ]);
 
-    if (exp === "excel") {
-      return exportToExcel(res, [{
-        name: "Procurement",
-        headers: ["Order#", "Supplier", "Date", "Currency", "Items Cost", "Shipping", "Customs", "Total RWF", "Status"],
-        rows: rows.map(r => [r.id, r.supplier_name, r.order_date, r.currency, r.items_cost_cny, r.shipping_cost, r.customs_cost, Math.round(r.items_cost_rwf + parseFloat(r.shipping_cost||0) + parseFloat(r.customs_cost||0)), r.status]),
-      }]);
-    }
-    res.json(rows);
+    const totalRevenue = sales.rows.reduce((s, r) => s + parseInt(r.revenue), 0);
+    const totalExpenses = expenses.rows.reduce((s, r) => s + parseInt(r.total), 0);
+
+    res.json({
+      date,
+      totalRevenue,
+      totalExpenses,
+      netCash: totalRevenue - totalExpenses,
+      transactions: sales.rows,
+      expenseByCategory: expenses.rows,
+      topItems: topItems.rows,
+      stockAlerts: stockAlerts.rows,
+    });
+  } catch (err) { next(err); }
+});
+
+// ─── Weekly report ────────────────────────────────────────────────────────────
+router.get("/weekly", async (req, res, next) => {
+  try {
+    const [thisWeek, lastWeek, byDay, topItems] = await Promise.all([
+      pool.query(
+        `SELECT COALESCE(SUM(total_amount),0) as revenue, COUNT(*) as tx
+         FROM sales WHERE created_at>=DATE_TRUNC('week',NOW()) AND is_voided=false`
+      ),
+      pool.query(
+        `SELECT COALESCE(SUM(total_amount),0) as revenue, COUNT(*) as tx
+         FROM sales WHERE created_at>=DATE_TRUNC('week',NOW()-INTERVAL '1 week')
+           AND created_at<DATE_TRUNC('week',NOW()) AND is_voided=false`
+      ),
+      pool.query(
+        `SELECT DATE(created_at) as date, SUM(total_amount) as revenue, COUNT(*) as tx
+         FROM sales WHERE created_at>=NOW()-INTERVAL '7 days' AND is_voided=false
+         GROUP BY DATE(created_at) ORDER BY date`
+      ),
+      pool.query(
+        `SELECT stk.name, SUM(si.quantity) as qty_sold, SUM(si.subtotal) as revenue
+         FROM sale_items si JOIN sales s ON s.id=si.sale_id JOIN stock_items stk ON stk.id=si.stock_item_id
+         WHERE s.created_at>=NOW()-INTERVAL '7 days' AND s.is_voided=false
+         GROUP BY stk.id, stk.name ORDER BY revenue DESC LIMIT 5`
+      ),
+    ]);
+
+    const thisRev = parseInt(thisWeek.rows[0].revenue);
+    const lastRev = parseInt(lastWeek.rows[0].revenue);
+
+    res.json({
+      thisWeek: { revenue: thisRev, transactions: parseInt(thisWeek.rows[0].tx) },
+      lastWeek: { revenue: lastRev, transactions: parseInt(lastWeek.rows[0].tx) },
+      weekOnWeekChange: lastRev > 0 ? Math.round(((thisRev - lastRev) / lastRev) * 100) : null,
+      byDay: byDay.rows,
+      topItems: topItems.rows,
+    });
+  } catch (err) { next(err); }
+});
+
+// ─── Monthly business report ──────────────────────────────────────────────────
+router.get("/monthly", async (req, res, next) => {
+  try {
+    const month = req.query.month || new Date().toISOString().slice(0, 7);
+    const startDate = `${month}-01`;
+    const endDate = new Date(new Date(startDate).getFullYear(), new Date(startDate).getMonth() + 1, 0)
+      .toISOString().split("T")[0];
+
+    const [revenue, cogs, expenses, stockVal, arSummary, healthScore, topItems] = await Promise.all([
+      pool.query(
+        `SELECT COALESCE(SUM(total_amount),0) as v, COUNT(*) as tx FROM sales
+         WHERE DATE(created_at) BETWEEN $1 AND $2 AND is_voided=false`,
+        [startDate, endDate]
+      ),
+      pool.query(
+        `SELECT COALESCE(SUM(si.quantity*stk.cost_price_rwf),0) as v
+         FROM sale_items si JOIN sales s ON s.id=si.sale_id JOIN stock_items stk ON stk.id=si.stock_item_id
+         WHERE DATE(s.created_at) BETWEEN $1 AND $2 AND s.is_voided=false`,
+        [startDate, endDate]
+      ),
+      pool.query(
+        `SELECT category, SUM(amount) as total FROM expenses
+         WHERE expense_date BETWEEN $1 AND $2 GROUP BY category ORDER BY total DESC`,
+        [startDate, endDate]
+      ),
+      pool.query("SELECT COALESCE(SUM(quantity*cost_price_rwf),0) as v FROM stock_items WHERE is_active=true"),
+      pool.query(
+        `SELECT COALESCE(SUM(amount-amount_paid),0) as outstanding,
+          COUNT(*) FILTER (WHERE status='overdue') as overdue_count
+         FROM accounts_receivable WHERE status IN ('pending','partial','overdue')`
+      ),
+      pool.query(
+        "SELECT score, band, factors FROM health_score_log WHERE user_id=$1 ORDER BY calculated_at DESC LIMIT 1",
+        [req.user.id]
+      ),
+      pool.query(
+        `SELECT stk.name, SUM(si.quantity) as qty_sold, SUM(si.subtotal) as revenue
+         FROM sale_items si JOIN sales s ON s.id=si.sale_id JOIN stock_items stk ON stk.id=si.stock_item_id
+         WHERE DATE(s.created_at) BETWEEN $1 AND $2 AND s.is_voided=false
+         GROUP BY stk.id, stk.name ORDER BY revenue DESC LIMIT 10`,
+        [startDate, endDate]
+      ),
+    ]);
+
+    const rev = parseInt(revenue.rows[0].v);
+    const costOfGoods = parseInt(cogs.rows[0].v);
+    const totalExp = expenses.rows.reduce((s, r) => s + parseInt(r.total), 0);
+
+    res.json({
+      period: { month, startDate, endDate },
+      revenue: rev,
+      transactions: parseInt(revenue.rows[0].tx),
+      costOfGoods,
+      grossProfit: rev - costOfGoods,
+      grossMargin: rev > 0 ? Math.round(((rev - costOfGoods) / rev) * 100) : 0,
+      expenses: expenses.rows,
+      totalExpenses: totalExp,
+      netProfit: rev - costOfGoods - totalExp,
+      netMargin: rev > 0 ? Math.round(((rev - costOfGoods - totalExp) / rev) * 100) : 0,
+      stockValue: parseInt(stockVal.rows[0].v),
+      accountsReceivable: arSummary.rows[0],
+      healthScore: healthScore.rows[0] || null,
+      topItems: topItems.rows,
+    });
   } catch (err) { next(err); }
 });
 
