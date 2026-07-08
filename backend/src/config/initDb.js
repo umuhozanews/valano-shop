@@ -304,6 +304,11 @@ const INDEX_SQL = [
 // Migration SQL: safely evolves existing databases
 // All ALTER statements use IF NOT EXISTS / IF EXISTS — safe to re-run
 const MIGRATION_SQL = `
+-- Users: update role CHECK constraint to include all Inzira roles
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+ALTER TABLE users ADD CONSTRAINT users_role_check
+  CHECK (role IN ('pulse_admin','sme_owner','admin','manager','accountant','cashier','databridge_advisor','lender','viewer'));
+
 -- Users: add new columns and update role constraint
 ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_status VARCHAR(20) DEFAULT 'pending';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_date TIMESTAMP;
