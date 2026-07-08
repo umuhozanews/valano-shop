@@ -284,20 +284,22 @@ CREATE TABLE IF NOT EXISTS referrals (
   created_at      TIMESTAMP DEFAULT NOW()
 );
 
--- Indexes
-CREATE INDEX IF NOT EXISTS idx_sales_created    ON sales(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_sales_user       ON sales(user_id);
-CREATE INDEX IF NOT EXISTS idx_sale_items_sale  ON sale_items(sale_id);
-CREATE INDEX IF NOT EXISTS idx_stock_barcode    ON stock_items(barcode);
-CREATE INDEX IF NOT EXISTS idx_notif_user       ON notifications(user_id, is_read);
-CREATE INDEX IF NOT EXISTS idx_audit_created    ON audit_log(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_health_user      ON health_score_log(user_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_credit_user      ON credit_scores(user_id, calculated_at DESC);
-CREATE INDEX IF NOT EXISTS idx_ar_customer      ON accounts_receivable(customer_id);
-CREATE INDEX IF NOT EXISTS idx_ar_status        ON accounts_receivable(status);
-
 COMMIT;
 `;
+
+// Indexes run outside the transaction so one failure doesn't roll back everything
+const INDEX_SQL = [
+  "CREATE INDEX IF NOT EXISTS idx_sales_created   ON sales(created_at DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_sales_user      ON sales(user_id)",
+  "CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id)",
+  "CREATE INDEX IF NOT EXISTS idx_stock_barcode   ON stock_items(barcode)",
+  "CREATE INDEX IF NOT EXISTS idx_notif_user      ON notifications(user_id, is_read)",
+  "CREATE INDEX IF NOT EXISTS idx_audit_created   ON audit_log(created_at DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_health_user     ON health_score_log(user_id, created_at DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_credit_user     ON credit_scores(user_id, calculated_at DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_ar_customer     ON accounts_receivable(customer_id)",
+  "CREATE INDEX IF NOT EXISTS idx_ar_status       ON accounts_receivable(status)",
+];
 
 // Migration SQL: safely evolves existing databases
 // All ALTER statements use IF NOT EXISTS / IF EXISTS — safe to re-run
@@ -349,20 +351,26 @@ ALTER TABLE settings ADD COLUMN IF NOT EXISTS language VARCHAR(5) DEFAULT 'en';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS sector_default VARCHAR(50);
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS district_default VARCHAR(50);
 
--- Health score log: add Sprint 4 columns
+-- Health score log: ensure core columns exist (handles old schema)
+ALTER TABLE health_score_log ADD COLUMN IF NOT EXISTS user_id         INTEGER REFERENCES users(id) ON DELETE CASCADE;
+ALTER TABLE health_score_log ADD COLUMN IF NOT EXISTS score           INTEGER;
+ALTER TABLE health_score_log ADD COLUMN IF NOT EXISTS band            VARCHAR(10);
+ALTER TABLE health_score_log ADD COLUMN IF NOT EXISTS factors         JSONB;
 ALTER TABLE health_score_log ADD COLUMN IF NOT EXISTS recommendations JSONB;
-ALTER TABLE health_score_log ADD COLUMN IF NOT EXISTS advisory_token VARCHAR(64);
-ALTER TABLE health_score_log ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
+ALTER TABLE health_score_log ADD COLUMN IF NOT EXISTS advisory_token  VARCHAR(64);
+ALTER TABLE health_score_log ADD COLUMN IF NOT EXISTS model_version   VARCHAR(20);
+ALTER TABLE health_score_log ADD COLUMN IF NOT EXISTS created_at      TIMESTAMP DEFAULT NOW();
 
--- Credit scores: add advisory token and unique constraint
+-- Credit scores: ensure user_id and advisory_token exist (handles old schema)
+ALTER TABLE credit_scores ADD COLUMN IF NOT EXISTS user_id        INTEGER REFERENCES users(id) ON DELETE CASCADE;
 ALTER TABLE credit_scores ADD COLUMN IF NOT EXISTS advisory_token VARCHAR(64);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_credit_scores_user ON credit_scores(user_id);
+ALTER TABLE credit_scores ADD COLUMN IF NOT EXISTS model_version  VARCHAR(20);
+ALTER TABLE credit_scores ADD COLUMN IF NOT EXISTS calculated_at  TIMESTAMP DEFAULT NOW();
 
 -- Lender clients: convert to user-to-user join table
 ALTER TABLE lender_clients ADD COLUMN IF NOT EXISTS lender_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
 ALTER TABLE lender_clients ADD COLUMN IF NOT EXISTS sme_user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE;
 ALTER TABLE lender_clients ADD COLUMN IF NOT EXISTS notes TEXT;
-CREATE UNIQUE INDEX IF NOT EXISTS uq_lender_clients ON lender_clients(lender_user_id, sme_user_id) WHERE lender_user_id IS NOT NULL AND sme_user_id IS NOT NULL;
 
 -- Referrals: convert to user-to-user references
 ALTER TABLE referrals ADD COLUMN IF NOT EXISTS lender_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
@@ -429,6 +437,15 @@ async function runInit() {
   await pool.query(SCHEMA_SQL);
   await pool.query(MIGRATION_SQL);
   await pool.query(BOOTSTRAP_SQL);
+
+  // Run indexes individually — skip any that fail (column may not exist in old schema)
+  for (const sql of INDEX_SQL) {
+    try { await pool.query(sql); } catch (e) { /* skip silently */ }
+  }
+
+  // Safe unique indexes — run after migration ensures columns exist
+  try { await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS uq_credit_scores_user ON credit_scores(user_id) WHERE user_id IS NOT NULL"); } catch (e) { /* skip */ }
+  try { await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS uq_lender_clients ON lender_clients(lender_user_id, sme_user_id) WHERE lender_user_id IS NOT NULL AND sme_user_id IS NOT NULL"); } catch (e) { /* skip */ }
 
   const { rows } = await pool.query("SELECT COUNT(*)::int AS count FROM stock_items");
   if (rows[0].count === 0) {
