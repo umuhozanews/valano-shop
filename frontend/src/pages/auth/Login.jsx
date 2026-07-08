@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
+import { roleHomePath } from "../../App";
 import { Mail, Eye, EyeOff, Store, Loader2, Globe } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../context/LanguageContext";
@@ -15,7 +16,7 @@ export default function Login() {
   const [error, setError] = useState("");
 
   if (user) {
-    return <Navigate to={user.role === "worker" ? "/app/sales" : "/app/dashboard"} replace />;
+    return <Navigate to={roleHomePath(user.role)} replace />;
   }
 
   async function handleSubmit(e) {

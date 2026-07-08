@@ -54,9 +54,9 @@ export const NAV_ITEMS = [
   {
     section: "MAIN",
     items: [
-      { label: "Dashboard",     icon: "LayoutDashboard", path: "/app/dashboard"  },
-      { label: "Point of Sale", icon: "ShoppingCart",    path: "/app/sales/new", roles: ["pulse_admin","sme_owner","admin","manager","cashier"] },
-      { label: "Sales History", icon: "Receipt",         path: "/app/sales",     roles: ["pulse_admin","sme_owner","admin","manager","accountant","cashier"] },
+      { label: "Dashboard",     icon: "LayoutDashboard", path: "/app/dashboard",  roles: ["pulse_admin","sme_owner","admin","manager","accountant","databridge_advisor"] },
+      { label: "Point of Sale", icon: "ShoppingCart",    path: "/app/sales/new",  roles: ["pulse_admin","sme_owner","admin","manager","cashier"] },
+      { label: "Sales History", icon: "Receipt",         path: "/app/sales",      roles: ["pulse_admin","sme_owner","admin","manager","accountant","cashier"] },
     ],
   },
   {
@@ -94,7 +94,7 @@ export const NAV_ITEMS = [
     section: "INTELLIGENCE",
     items: [
       { label: "Health Score",    icon: "Activity",      path: "/app/health-score",     roles: ["pulse_admin","sme_owner","admin"] },
-      { label: "Notifications",   icon: "Bell",          path: "/app/notifications" },
+      { label: "Notifications",   icon: "Bell",          path: "/app/notifications",    roles: ["pulse_admin","sme_owner","admin","manager","accountant","cashier","databridge_advisor","lender"] },
     ],
   },
   {

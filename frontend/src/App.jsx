@@ -64,19 +64,26 @@ const AdvisoryPublic    = L(() => import("./pages/intelligence/AdvisoryPublic"))
 const SettingsPage      = L(() => import("./pages/settings/SettingsPage"));
 
 // ── Role groups ───────────────────────────────────────────────────────────────
-const ALL    = ["pulse_admin","sme_owner","admin","manager","cashier","accountant","viewer"];
+const ALL    = ["pulse_admin","sme_owner","admin","manager","cashier","accountant","viewer","databridge_advisor"];
 const OWNER  = ["pulse_admin","sme_owner","admin"];
-const STAFF  = ["pulse_admin","sme_owner","admin","manager","accountant"];
+const STAFF  = ["pulse_admin","sme_owner","admin","manager","accountant","databridge_advisor"];
 const POS    = ["pulse_admin","sme_owner","admin","manager","cashier"];
 const FIN    = ["pulse_admin","sme_owner","admin","accountant"];
+
+// Returns the home path for a given role — used for post-login redirect and fallback.
+export function roleHomePath(role) {
+  if (role === "pulse_admin")        return "/app/admin";
+  if (role === "lender")             return "/app/lender";
+  if (role === "cashier" || role === "viewer") return "/app/sales/new";
+  return "/app/dashboard";
+}
 
 const P = ({ children, roles }) => <ProtectedRoute roles={roles}>{children}</ProtectedRoute>;
 
 function AppRoot() {
   const { user } = useAuth();
   if (!user) return <Navigate to="/app/login" replace />;
-  const cashierOnly = ["cashier", "viewer"].includes(user.role);
-  return <Navigate to={cashierOnly ? "/app/sales/new" : "/app/dashboard"} replace />;
+  return <Navigate to={roleHomePath(user.role)} replace />;
 }
 
 export default function App() {

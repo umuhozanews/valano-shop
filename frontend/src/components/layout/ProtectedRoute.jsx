@@ -1,5 +1,6 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { roleHomePath } from "../../App";
 
 export default function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth();
@@ -18,9 +19,7 @@ export default function ProtectedRoute({ children, roles }) {
   if (!user) return <Navigate to="/app/login" replace />;
 
   if (roles && !roles.includes(user.role)) {
-    // Workers land on sales; everyone else goes to dashboard
-    const fallback = user.role === "worker" ? "/app/sales" : "/app/dashboard";
-    return <Navigate to={fallback} replace />;
+    return <Navigate to={roleHomePath(user.role)} replace />;
   }
 
   return children;
