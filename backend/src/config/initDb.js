@@ -433,8 +433,10 @@ INSERT INTO users (name, email, password_hash, role, phone) VALUES
   ('Admin',             'admin@inzira.rw',                 '$2a$12$pqAP/gTVtss0cQuzuEMpdOTk5TRlOTLHgUR/pZ5QuXml07pFCXyza', 'pulse_admin', '+250780000004'),
   ('Demo Business',     'demo@inzira.rw',                  '$2a$12$s1O42VRPCBl1KIvmeIxatu2nE8VW5Wrfy/eVjJZWzPXEMffaA8d0K', 'sme_owner',   '+250780000002'),
   ('Demo Cashier',      'cashier@inzira.rw',               '$2a$12$s1O42VRPCBl1KIvmeIxatu2nE8VW5Wrfy/eVjJZWzPXEMffaA8d0K', 'cashier',     '+250780000003')
-ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash
-WHERE users.role NOT IN ('pulse_admin', 'sme_owner');
+ON CONFLICT (email) DO UPDATE SET
+  password_hash = EXCLUDED.password_hash,
+  role          = EXCLUDED.role,
+  name          = EXCLUDED.name;
 `;
 
 let initPromise = null;
