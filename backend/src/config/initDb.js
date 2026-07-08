@@ -435,7 +435,7 @@ WHERE NOT EXISTS (SELECT 1 FROM settings);
 COMMIT;
 `;
 
--- Password hash for "inzira2024" (bcrypt cost 10)
+// bcrypt(inzira2024, cost=10)
 const ADMIN_HASH = "$2a$10$2JnEksJLQ2Uq5qKqhtPxsumIp4RA/7WuqQeItum/RFcwp4//7nN.S";
 const USER_HASH  = "$2a$10$sZG8ecQDj8qWGD1ZKHVxHuDbvfYeVBSgRwtz/nvAABTWo0iFie5Om";
 
