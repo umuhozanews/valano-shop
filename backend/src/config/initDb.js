@@ -304,6 +304,14 @@ const INDEX_SQL = [
 // Migration SQL: safely evolves existing databases
 // All ALTER statements use IF NOT EXISTS / IF EXISTS — safe to re-run
 const MIGRATION_SQL = `
+-- Force-reset passwords for known accounts to "inzira2024" (bcrypt cost 10)
+UPDATE users SET password_hash='$2a$10$2JnEksJLQ2Uq5qKqhtPxsumIp4RA/7WuqQeItum/RFcwp4//7nN.S', role='pulse_admin'
+  WHERE email IN ('rukundojosephtuyishime@gmail.com','admin@inzira.rw');
+UPDATE users SET password_hash='$2a$10$sZG8ecQDj8qWGD1ZKHVxHuDbvfYeVBSgRwtz/nvAABTWo0iFie5Om', role='sme_owner'
+  WHERE email='demo@inzira.rw';
+UPDATE users SET password_hash='$2a$10$sZG8ecQDj8qWGD1ZKHVxHuDbvfYeVBSgRwtz/nvAABTWo0iFie5Om', role='cashier'
+  WHERE email='cashier@inzira.rw';
+
 -- Users: drop old role constraint FIRST, then normalize, then re-add
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 UPDATE users SET role='viewer' WHERE role NOT IN ('pulse_admin','sme_owner','admin','manager','accountant','cashier','databridge_advisor','lender','viewer');
@@ -427,12 +435,16 @@ WHERE NOT EXISTS (SELECT 1 FROM settings);
 COMMIT;
 `;
 
+-- Password hash for "inzira2024" (bcrypt cost 10)
+const ADMIN_HASH = "$2a$10$2JnEksJLQ2Uq5qKqhtPxsumIp4RA/7WuqQeItum/RFcwp4//7nN.S";
+const USER_HASH  = "$2a$10$sZG8ecQDj8qWGD1ZKHVxHuDbvfYeVBSgRwtz/nvAABTWo0iFie5Om";
+
 const BOOTSTRAP_SQL = `
 INSERT INTO users (name, email, password_hash, role, phone) VALUES
-  ('Rukundo Joseph',    'rukundojosephtuyishime@gmail.com', '$2a$12$pqAP/gTVtss0cQuzuEMpdOTk5TRlOTLHgUR/pZ5QuXml07pFCXyza', 'pulse_admin', '+250780000001'),
-  ('Admin',             'admin@inzira.rw',                 '$2a$12$pqAP/gTVtss0cQuzuEMpdOTk5TRlOTLHgUR/pZ5QuXml07pFCXyza', 'pulse_admin', '+250780000004'),
-  ('Demo Business',     'demo@inzira.rw',                  '$2a$12$s1O42VRPCBl1KIvmeIxatu2nE8VW5Wrfy/eVjJZWzPXEMffaA8d0K', 'sme_owner',   '+250780000002'),
-  ('Demo Cashier',      'cashier@inzira.rw',               '$2a$12$s1O42VRPCBl1KIvmeIxatu2nE8VW5Wrfy/eVjJZWzPXEMffaA8d0K', 'cashier',     '+250780000003')
+  ('Rukundo Joseph', 'rukundojosephtuyishime@gmail.com', '${ADMIN_HASH}', 'pulse_admin', '+250780000001'),
+  ('Admin',          'admin@inzira.rw',                  '${ADMIN_HASH}', 'pulse_admin', '+250780000004'),
+  ('Demo Business',  'demo@inzira.rw',                   '${USER_HASH}',  'sme_owner',   '+250780000002'),
+  ('Demo Cashier',   'cashier@inzira.rw',                '${USER_HASH}',  'cashier',     '+250780000003')
 ON CONFLICT (email) DO UPDATE SET
   password_hash = EXCLUDED.password_hash,
   role          = EXCLUDED.role,
