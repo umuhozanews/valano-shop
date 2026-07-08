@@ -304,6 +304,12 @@ const INDEX_SQL = [
 // Migration SQL: safely evolves existing databases
 // All ALTER statements use IF NOT EXISTS / IF EXISTS — safe to re-run
 const MIGRATION_SQL = `
+-- Users: normalize old role values before updating constraint
+UPDATE users SET role='pulse_admin'        WHERE role IN ('super_admin','superadmin','owner','root');
+UPDATE users SET role='sme_owner'          WHERE role IN ('business_owner','shop_owner','proprietor');
+UPDATE users SET role='databridge_advisor' WHERE role IN ('advisor','consultant','databridge');
+UPDATE users SET role='viewer'             WHERE role NOT IN ('pulse_admin','sme_owner','admin','manager','accountant','cashier','databridge_advisor','lender','viewer');
+
 -- Users: update role CHECK constraint to include all Inzira roles
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ADD CONSTRAINT users_role_check
