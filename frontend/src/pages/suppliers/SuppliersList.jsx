@@ -23,7 +23,7 @@ export default function SuppliersList() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    try { const { data } = await api.get("/suppliers", { params: { search } }); setSuppliers(data); }
+    try { const { data } = await api.get("/suppliers", { params: { search } }); setSuppliers(data.data || data || []); }
     finally { setLoading(false); }
   }, [search]);
 
@@ -51,7 +51,7 @@ export default function SuppliersList() {
     { key:"specialty", label:"Specialty" },
     { key:"wechat", label:"WeChat" },
     { key:"orders_count", label:"Orders", render:v => parseInt(v)||0 },
-    { key:"total_rwf", label:"Total Invested", render:v => formatRWF(Math.round(v||0)) },
+    { key:"total_purchased_rwf", label:"Total Invested", render:v => formatRWF(Math.round(v||0)) },
     { key:"reliability_pct", label:"Reliability", render:v => (
       <div className="flex items-center gap-2">
         <div className="w-16 h-1.5 bg-border rounded-full overflow-hidden">
