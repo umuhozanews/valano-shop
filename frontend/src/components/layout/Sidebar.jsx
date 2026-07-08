@@ -75,7 +75,7 @@ export default function Sidebar({ open, onClose }) {
             if (!visible.length) return null;
             return (
               <div key={section.section}>
-                <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-sidebar-muted px-3 mb-1 opacity-60">
+                <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-sidebar-muted px-3 mb-1">
                   {section.section}
                 </p>
                 <div className="space-y-0.5">

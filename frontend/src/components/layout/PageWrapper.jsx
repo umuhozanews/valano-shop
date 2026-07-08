@@ -4,7 +4,7 @@ import Header from "./Header";
 import api from "../../utils/api";
 import { AlertTriangle } from "lucide-react";
 
-export default function PageWrapper({ title, subtitle, breadcrumbs, children }) {
+export default function PageWrapper({ title, subtitle, breadcrumbs, action, children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   // Only warn when a real backend was configured but is currently unreachable.
@@ -34,6 +34,7 @@ export default function PageWrapper({ title, subtitle, breadcrumbs, children }) 
           subtitle={subtitle}
           breadcrumbs={breadcrumbs}
           notificationCount={unreadCount}
+          action={action}
         />
 
         <main className="flex-1 overflow-y-auto p-6">

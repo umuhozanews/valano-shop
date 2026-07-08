@@ -14,7 +14,7 @@ const ROLE_STATUS = {
   viewer:  "neutral",
 };
 
-export default function Header({ onMenuClick, title, subtitle, breadcrumbs = [], notificationCount = 0 }) {
+export default function Header({ onMenuClick, title, subtitle, breadcrumbs = [], notificationCount = 0, action }) {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -77,6 +77,9 @@ export default function Header({ onMenuClick, title, subtitle, breadcrumbs = [],
           )}
         </div>
       </div>
+
+      {/* Page action button */}
+      {action && <div className="shrink-0">{action}</div>}
 
       {/* Right: bell + user */}
       <div className="flex items-center gap-3 shrink-0">

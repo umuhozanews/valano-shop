@@ -36,7 +36,7 @@ router.get("/dashboard", async (req, res, next) => {
       ORDER BY cs.calculated_at DESC LIMIT 5`, [lenderId]);
 
     const { rows: atRisk } = await pool.query(`
-      SELECT u.name, u.email, u.sector, cs.score, cs.band
+      SELECT lc.sme_user_id, u.name, u.email, u.sector, cs.score, cs.band
       FROM lender_clients lc
       JOIN users u ON u.id = lc.sme_user_id
       JOIN credit_scores cs ON cs.user_id = lc.sme_user_id
