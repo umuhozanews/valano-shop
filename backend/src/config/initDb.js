@@ -343,14 +343,29 @@ ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS outstanding_balance BIGINT DEFAUL
 ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS unit VARCHAR(20) DEFAULT 'pcs';
 ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS name_rw VARCHAR(100);
 
--- Sales: add offline support and payment reference
-ALTER TABLE sales ADD COLUMN IF NOT EXISTS is_offline BOOLEAN DEFAULT false;
-ALTER TABLE sales ADD COLUMN IF NOT EXISTS synced_at TIMESTAMP;
+-- Sales: ensure user_id exists (handles pre-existing tables) and add new columns
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS user_id           INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS customer_id       INTEGER REFERENCES customers(id) ON DELETE SET NULL;
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS is_voided         BOOLEAN DEFAULT false;
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS void_reason       TEXT;
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS voided_by         INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS is_offline        BOOLEAN DEFAULT false;
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS synced_at         TIMESTAMP;
 ALTER TABLE sales ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(100);
-ALTER TABLE sales ADD COLUMN IF NOT EXISTS payment_status VARCHAR(20) DEFAULT 'completed';
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS payment_status    VARCHAR(20) DEFAULT 'completed';
+-- Widen payment_method constraint to include all methods used by the app
+ALTER TABLE sales DROP CONSTRAINT IF EXISTS sales_payment_method_check;
+ALTER TABLE sales ADD CONSTRAINT sales_payment_method_check
+  CHECK (payment_method IN ('cash','mtn_momo','airtel','card','bank_transfer','credit','split'));
 
--- Customers: add credit limit
+-- Customers: add credit limit and widen type/segment constraints
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS credit_limit BIGINT DEFAULT 0;
+ALTER TABLE customers DROP CONSTRAINT IF EXISTS customers_type_check;
+ALTER TABLE customers ADD CONSTRAINT customers_type_check
+  CHECK (type IN ('wholesaler','retailer','individual','business'));
+ALTER TABLE customers DROP CONSTRAINT IF EXISTS customers_segment_check;
+ALTER TABLE customers ADD CONSTRAINT customers_segment_check
+  CHECK (segment IN ('vip','regular','new','inactive','wholesale'));
 
 -- Expenses: add receipt upload and supplier link
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS receipt_url TEXT;
@@ -391,6 +406,28 @@ ALTER TABLE referrals ADD COLUMN IF NOT EXISTS lender_user_id INTEGER REFERENCES
 ALTER TABLE referrals ADD COLUMN IF NOT EXISTS sme_user_id    INTEGER REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE referrals ADD COLUMN IF NOT EXISTS notes TEXT;
 ALTER TABLE referrals ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
+
+-- Advisory sessions: ensure columns exist (handles old schema)
+ALTER TABLE advisory_sessions ADD COLUMN IF NOT EXISTS business_id  INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE advisory_sessions ADD COLUMN IF NOT EXISTS advisor_id   INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE advisory_sessions ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMP;
+ALTER TABLE advisory_sessions ADD COLUMN IF NOT EXISTS status       VARCHAR(20) DEFAULT 'requested';
+ALTER TABLE advisory_sessions ADD COLUMN IF NOT EXISTS notes        TEXT;
+ALTER TABLE advisory_sessions ADD COLUMN IF NOT EXISTS created_at   TIMESTAMP DEFAULT NOW();
+
+-- Advisory outcomes: ensure columns exist
+ALTER TABLE advisory_outcomes ADD COLUMN IF NOT EXISTS session_id   INTEGER REFERENCES advisory_sessions(id) ON DELETE CASCADE;
+ALTER TABLE advisory_outcomes ADD COLUMN IF NOT EXISTS cause_code   VARCHAR(50);
+ALTER TABLE advisory_outcomes ADD COLUMN IF NOT EXISTS intervention TEXT;
+ALTER TABLE advisory_outcomes ADD COLUMN IF NOT EXISTS outcome      TEXT;
+ALTER TABLE advisory_outcomes ADD COLUMN IF NOT EXISTS recorded_at  TIMESTAMP DEFAULT NOW();
+
+-- Expenses: ensure recorded_by exists (handles old schema)
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS recorded_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS expense_date DATE;
+
+-- Purchase orders: ensure created_by exists
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
 `;
 
 const SEED_SQL = `

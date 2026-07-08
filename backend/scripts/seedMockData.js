@@ -521,11 +521,20 @@ async function seed() {
   }
   console.log("\n✅  Done!\n");
 
-  await pool.end();
+  // Only close the pool when run as a standalone script (not as a module)
+  if (require.main === module) await pool.end();
+
+  return { smeResults, allAccounts };
 }
 
-seed().catch(err => {
-  console.error("\n❌  Seed failed:", err.message);
-  console.error(err.stack);
-  process.exit(1);
-});
+// Export for API endpoint usage
+module.exports = { seed };
+
+// Run when invoked directly
+if (require.main === module) {
+  seed().catch(err => {
+    console.error("\n❌  Seed failed:", err.message);
+    console.error(err.stack);
+    process.exit(1);
+  });
+}

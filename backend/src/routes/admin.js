@@ -228,4 +228,26 @@ router.get("/audit", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// POST /v2/admin/seed-mock-data — seed demo/mock data into the production DB
+// Protected: pulse_admin only. Idempotent (safe to run multiple times).
+router.post("/seed-mock-data", async (req, res, next) => {
+  try {
+    const { seedFast } = require("../../scripts/seedMockDataFast");
+    const result = await seedFast();
+    res.json({
+      ok: true,
+      message: "Mock data seeded successfully",
+      accounts: result.allAccounts,
+      log: result.log,
+    });
+  } catch (err) {
+    res.status(500).json({
+      ok: false,
+      error: err.message,
+      code: err.code,
+      detail: err.detail,
+    });
+  }
+});
+
 module.exports = router;
