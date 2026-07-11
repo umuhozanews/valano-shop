@@ -66,9 +66,9 @@ export default function CustomersList() {
     { key:"name", label: t("customer"), render:(v,r) => (
       <div className="flex items-center gap-2">
         <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
-          <span className="text-[12px] font-bold text-primary">{v?.charAt(0)}</span>
+          <span className="text-[13px] font-bold text-primary">{v?.charAt(0)}</span>
         </div>
-        <div><p className="font-medium text-text-primary">{v}</p><p className="text-[11px] text-text-secondary">{r.phone||"No phone"}</p></div>
+        <div><p className="font-medium text-text-primary">{v}</p><p className="text-[13px] text-text-secondary">{r.phone||"No phone"}</p></div>
       </div>
     )},
     { key:"type", label:"Type", render:v => <Badge status={v==="wholesaler"?"warning":"neutral"} label={v} /> },
@@ -106,17 +106,17 @@ export default function CustomersList() {
           <div className="relative flex-1 min-w-[180px]">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
             <input value={filters.search} onChange={e=>setFilters(f=>({...f,search:e.target.value}))} placeholder={`${t("search")}…`}
-              className="w-full h-9 pl-9 pr-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary" />
+              className="w-full h-9 pl-9 pr-3 border border-border rounded-card text-[14px] focus:outline-none focus:ring-2 focus:ring-primary" />
           </div>
           <select value={filters.type} onChange={e=>setFilters(f=>({...f,type:e.target.value}))}
-            className="h-9 px-3 border border-border rounded-card text-[13px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary">
+            className="h-9 px-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary">
             <option value="">All Types</option><option value="retailer">Retailer</option><option value="wholesaler">Wholesaler</option>
           </select>
         </div>
         <Table columns={columns} data={customers} loading={loading} emptyMessage={t("loading")} />
         {total > 20 && (
           <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
-            <p className="text-[13px] text-text-secondary">Showing {(page-1)*20+1}–{Math.min(page*20,total)} of {total}</p>
+            <p className="text-[14px] text-text-secondary">Showing {(page-1)*20+1}–{Math.min(page*20,total)} of {total}</p>
             <div className="flex gap-2">
               <Button variant="secondary" size="sm" disabled={page===1} onClick={() => setPage(p=>p-1)}>Previous</Button>
               <Button variant="secondary" size="sm" disabled={page*20>=total} onClick={() => setPage(p=>p+1)}>Next</Button>
@@ -132,8 +132,8 @@ export default function CustomersList() {
           <Input label={t("phone")} value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} />
           <Input label="Location" value={form.location} onChange={e=>setForm(f=>({...f,location:e.target.value}))} />
           <div>
-            <label className="block text-[13px] font-medium text-text-primary mb-1">Type</label>
-            <select value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))} className="w-full h-9 px-3 border border-border rounded-card text-[13px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary">
+            <label className="block text-[14px] font-medium text-text-primary mb-1">Type</label>
+            <select value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))} className="w-full h-9 px-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary">
               <option value="retailer">Retailer</option><option value="wholesaler">Wholesaler</option>
             </select>
           </div>

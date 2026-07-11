@@ -11,13 +11,13 @@ function CalendarMock() {
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
         <span className="text-xs font-semibold text-white">January 2026</span>
         <span
-          className="rounded-full px-2.5 py-0.5 text-[10px] font-bold"
+          className="rounded-full px-2.5 py-0.5 text-[12px] font-bold"
           style={{ backgroundColor: LIME, color: "#000" }}
         >
           Add new +
         </span>
       </div>
-      <div className="grid grid-cols-3 px-4 gap-2 text-[9px] text-gray-500 mb-1">
+      <div className="grid grid-cols-3 px-4 gap-2 text-[11px] text-gray-500 mb-1">
         {["MON", "TUE", "WED"].map((d) => (
           <span key={d}>{d}</span>
         ))}
@@ -29,24 +29,24 @@ function CalendarMock() {
       </div>
       <div className="px-4 pb-3 space-y-1">
         <div className="flex gap-2 items-start">
-          <span className="text-[8px] text-gray-500 w-8 flex-shrink-0">2 pm</span>
+          <span className="text-[10px] text-gray-500 w-8 flex-shrink-0">2 pm</span>
           <div
             className="flex-1 rounded px-2 py-1"
             style={{ backgroundColor: "#2a5cff", minHeight: 28 }}
           >
-            <p className="text-[8px] font-semibold text-white leading-tight">Intro Call – Prime Design</p>
-            <p className="text-[7px] text-blue-200">1:00pm – 2pm</p>
+            <p className="text-[10px] font-semibold text-white leading-tight">Intro Call – Prime Design</p>
+            <p className="text-[9px] text-blue-200">1:00pm – 2pm</p>
           </div>
         </div>
         <div className="flex gap-2 items-center">
-          <span className="text-[8px] text-gray-500 w-8">3 pm</span>
+          <span className="text-[10px] text-gray-500 w-8">3 pm</span>
           <div className="flex-1 rounded bg-gray-800 px-2 py-0.5">
-            <p className="text-[7px] text-gray-300">30 min</p>
+            <p className="text-[9px] text-gray-300">30 min</p>
           </div>
         </div>
         <div className="flex gap-2 items-center ml-10">
           <div className="flex items-center gap-1">
-            <span className="text-[7px] text-blue-400 font-medium">▶ Join with Google Meet</span>
+            <span className="text-[9px] text-blue-400 font-medium">▶ Join with Google Meet</span>
           </div>
         </div>
       </div>
@@ -65,19 +65,19 @@ function SlackMock() {
           <span className="text-white text-xs font-bold">KNOTY</span>
         </div>
         {["Threads", "Huddles", "Drafts & sent", "Directories"].map((item) => (
-          <p key={item} className="text-[8px] text-gray-400 py-0.5 px-1">{item}</p>
+          <p key={item} className="text-[10px] text-gray-400 py-0.5 px-1">{item}</p>
         ))}
-        <p className="text-[8px] text-gray-500 mt-2 px-1 uppercase tracking-wider">Channels</p>
+        <p className="text-[10px] text-gray-500 mt-2 px-1 uppercase tracking-wider">Channels</p>
         {["product-launch"].map((c) => (
-          <p key={c} className="text-[8px] text-gray-400 py-0.5 px-1"># {c}</p>
+          <p key={c} className="text-[10px] text-gray-400 py-0.5 px-1"># {c}</p>
         ))}
         <p
-          className="text-[8px] py-0.5 px-1 font-semibold"
+          className="text-[10px] py-0.5 px-1 font-semibold"
           style={{ color: LIME }}
         >
           # onboarding
         </p>
-        <p className="text-[8px] text-gray-400 py-0.5 px-1"># general <span className="inline-block w-1.5 h-1.5 rounded-full bg-yellow-400 ml-0.5" /></p>
+        <p className="text-[10px] text-gray-400 py-0.5 px-1"># general <span className="inline-block w-1.5 h-1.5 rounded-full bg-yellow-400 ml-0.5" /></p>
       </div>
 
       <div className="flex-1 flex flex-col pt-3 px-3">
@@ -93,7 +93,7 @@ function SlackMock() {
           <Message name="KNOTY" time="10:36 AM" text="Hey! Welcome to KNOTY 🔥" highlight />
         </div>
         <div className="mt-2 rounded-lg border border-gray-600 px-3 py-1.5 flex items-center justify-between">
-          <span className="text-[8px] text-gray-500">Message #onboarding</span>
+          <span className="text-[10px] text-gray-500">Message #onboarding</span>
           <span className="text-gray-500 text-xs">◎</span>
         </div>
       </div>
@@ -105,17 +105,17 @@ function Message({ name, time, text, highlight }) {
   return (
     <div className="flex gap-2 items-start">
       <div
-        className="w-5 h-5 rounded-md flex-shrink-0 flex items-center justify-center text-[7px] font-bold text-white"
+        className="w-5 h-5 rounded-md flex-shrink-0 flex items-center justify-center text-[9px] font-bold text-white"
         style={{ backgroundColor: highlight ? "#4a90d9" : "#5a3e6b" }}
       >
         {name[0]}
       </div>
       <div>
         <div className="flex items-baseline gap-1.5">
-          <span className="text-[8px] font-semibold text-white">{name}</span>
-          <span className="text-[7px] text-gray-500">{time}</span>
+          <span className="text-[10px] font-semibold text-white">{name}</span>
+          <span className="text-[9px] text-gray-500">{time}</span>
         </div>
-        <p className="text-[8px] text-gray-300">{text}</p>
+        <p className="text-[10px] text-gray-300">{text}</p>
       </div>
     </div>
   );
@@ -131,13 +131,13 @@ function DesignMock() {
         <div className="w-1.5 h-1.5 rounded-full bg-red-400" />
         <div className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
         <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
-          <span className="ml-3 text-[8px] text-gray-400 font-medium">knoty.rw</span>
+          <span className="ml-3 text-[10px] text-gray-400 font-medium">knoty.rw</span>
         <div className="ml-auto flex gap-1">
           {["Home", "About", "Pricing", "Team"].map((t) => (
-            <span key={t} className="text-[7px] text-gray-500">{t}</span>
+            <span key={t} className="text-[9px] text-gray-500">{t}</span>
           ))}
           <span
-            className="text-[7px] font-bold rounded px-1"
+            className="text-[9px] font-bold rounded px-1"
             style={{ backgroundColor: LIME, color: "#000" }}
           >
             Start
@@ -149,28 +149,28 @@ function DesignMock() {
         <div className="absolute top-2 right-6 flex flex-col items-end gap-0.5">
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded-full bg-purple-500" />
-            <span className="text-[7px] text-purple-300 bg-purple-900 rounded px-1">Casey</span>
+            <span className="text-[9px] text-purple-300 bg-purple-900 rounded px-1">Casey</span>
           </div>
         </div>
         <div className="absolute bottom-6 left-8 flex items-center gap-1">
           <div className="w-3 h-3 rounded-full bg-green-500" />
-          <span className="text-[7px] text-green-300 bg-green-900 rounded px-1">Jordan</span>
+          <span className="text-[9px] text-green-300 bg-green-900 rounded px-1">Jordan</span>
         </div>
         <div className="absolute bottom-3 left-6 flex items-center gap-1">
           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: LIME }} />
-          <span className="text-[7px] font-bold rounded px-1" style={{ backgroundColor: "#3a4a00", color: LIME }}>Taylor</span>
+          <span className="text-[9px] font-bold rounded px-1" style={{ backgroundColor: "#3a4a00", color: LIME }}>Taylor</span>
         </div>
 
         <div className="rounded-lg bg-gray-900 border border-gray-700 p-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[9px] font-bold text-white">LOGO</span>
+            <span className="text-[11px] font-bold text-white">LOGO</span>
           </div>
           <div className="bg-gray-800 rounded p-2 mb-1.5">
-            <p className="text-[8px] font-bold text-white leading-tight">Manage smarter.</p>
-            <p className="text-[8px] font-bold text-white leading-tight">Grow faster.</p>
-            <p className="text-[7px] text-gray-400 mt-0.5">Track sales, invoices & more daily.</p>
+            <p className="text-[10px] font-bold text-white leading-tight">Manage smarter.</p>
+            <p className="text-[10px] font-bold text-white leading-tight">Grow faster.</p>
+            <p className="text-[9px] text-gray-400 mt-0.5">Track sales, invoices & more daily.</p>
             <div
-              className="mt-1.5 rounded-full px-2 py-0.5 text-[7px] font-bold inline-block"
+              className="mt-1.5 rounded-full px-2 py-0.5 text-[9px] font-bold inline-block"
               style={{ backgroundColor: LIME, color: "#000" }}
             >
               Get started

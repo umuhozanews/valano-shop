@@ -79,15 +79,15 @@ export default function ExpensesList() {
         <StatCard title={t("total")} value={formatRWF(totals.total)} icon={Receipt} color="danger" />
         <StatCard title={t("all")} value={totals.count} />
         <Button variant="primary" size="lg" icon={Plus} onClick={() => setShowModal(true)} className="!h-auto flex-col gap-1 py-4">
-          <span className="text-[15px]">{t("add")}</span>
+          <span className="text-[16px]">{t("add")}</span>
         </Button>
       </div>
 
       <Card>
         <div className="flex flex-wrap gap-3 mb-4">
-          <input type="date" value={filters.start_date} onChange={e=>setFilters(f=>({...f,start_date:e.target.value}))} className="h-9 px-3 border border-border rounded-card text-[13px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary" />
-          <input type="date" value={filters.end_date} onChange={e=>setFilters(f=>({...f,end_date:e.target.value}))} className="h-9 px-3 border border-border rounded-card text-[13px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary" />
-          <select value={filters.category} onChange={e=>setFilters(f=>({...f,category:e.target.value}))} className="h-9 px-3 border border-border rounded-card text-[13px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary">
+          <input type="date" value={filters.start_date} onChange={e=>setFilters(f=>({...f,start_date:e.target.value}))} className="h-9 px-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary" />
+          <input type="date" value={filters.end_date} onChange={e=>setFilters(f=>({...f,end_date:e.target.value}))} className="h-9 px-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary" />
+          <select value={filters.category} onChange={e=>setFilters(f=>({...f,category:e.target.value}))} className="h-9 px-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary">
             <option value="">{t("category")} ({t("all")})</option>
             {EXPENSE_CATEGORIES.map(c=><option key={c}>{c}</option>)}
           </select>
@@ -100,17 +100,17 @@ export default function ExpensesList() {
         footer={<><Button variant="secondary" onClick={() => setShowModal(false)}>{t("cancel")}</Button><Button loading={saving} onClick={handleAdd}>{t("save")}</Button></>}>
         <div className="space-y-3">
           <div>
-            <label className="block text-[13px] font-medium text-text-primary mb-1">{t("category")}</label>
-            <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} className="w-full h-9 px-3 border border-border rounded-card text-[13px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary">
+            <label className="block text-[14px] font-medium text-text-primary mb-1">{t("category")}</label>
+            <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} className="w-full h-9 px-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary">
               {EXPENSE_CATEGORIES.map(c=><option key={c}>{c}</option>)}
             </select>
           </div>
           <Input label={t("amount")} type="number" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} />
           <Input label={t("date")} type="date" value={form.expense_date} onChange={e=>setForm(f=>({...f,expense_date:e.target.value}))} />
           <div>
-            <label className="block text-[13px] font-medium text-text-primary mb-1">{t("description")}</label>
+            <label className="block text-[14px] font-medium text-text-primary mb-1">{t("description")}</label>
             <textarea value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} rows={3}
-              className="w-full p-3 border border-border rounded-card text-[13px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary" />
+              className="w-full p-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary" />
           </div>
         </div>
       </Modal>

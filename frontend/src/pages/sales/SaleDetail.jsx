@@ -156,15 +156,15 @@ export default function SaleDetail() {
         {/* Left Column: Management Metadata */}
         <div className="xl:col-span-4 space-y-6">
           <Card title="Sales Metadata">
-            <div className="space-y-4 text-[13px]">
+            <div className="space-y-4 text-[14px]">
               <div>
                 <p className="text-text-secondary font-medium mb-1">Customer / Tenant</p>
-                <p className="font-semibold text-text-primary text-[14px]">{sale.customer_name || "Walk-in Customer"}</p>
-                {sale.customer_phone && <p className="text-text-secondary text-[12px]">{sale.customer_phone}</p>}
+                <p className="font-semibold text-text-primary text-[15px]">{sale.customer_name || "Walk-in Customer"}</p>
+                {sale.customer_phone && <p className="text-text-secondary text-[13px]">{sale.customer_phone}</p>}
               </div>
               <div className="pt-3 border-t border-border">
                 <p className="text-text-secondary font-medium mb-1">{t("payment_method")}</p>
-                <p className="font-semibold text-text-primary uppercase text-[12px]">{sale.payment_method?.replace("_", " ")}</p>
+                <p className="font-semibold text-text-primary uppercase text-[13px]">{sale.payment_method?.replace("_", " ")}</p>
               </div>
               <div className="pt-3 border-t border-border">
                 <p className="text-text-secondary font-medium mb-1">Recorded By</p>
@@ -173,7 +173,7 @@ export default function SaleDetail() {
               <div className="pt-3 border-t border-border">
                 <p className="text-text-secondary font-medium mb-1">Sales Branch</p>
                 <p className="font-semibold text-text-primary">{sale.branch_name}</p>
-                {sale.branch_location && <p className="text-text-secondary text-[12px]">{sale.branch_location}</p>}
+                {sale.branch_location && <p className="text-text-secondary text-[13px]">{sale.branch_location}</p>}
               </div>
             </div>
           </Card>
@@ -190,7 +190,7 @@ export default function SaleDetail() {
             <div className="relative pt-8 pb-6 pl-16 pr-6 motion-gradient-bg border-b border-[#e5e0d8]/40 z-0">
               {/* Left Vertical Accent & Branding */}
               <div className="absolute left-4 w-8 top-8 flex flex-col items-center select-none z-10">
-                <div className="writing-vertical text-[#7C3AED] font-black text-[14px] tracking-[0.25em] uppercase"
+                <div className="writing-vertical text-[#7C3AED] font-black text-[15px] tracking-[0.25em] uppercase"
                      style={{ transform: "rotate(180deg)", writingMode: "vertical-rl" }}>
                   {shopSettings?.shop_name || sale.branch_name || "INZIRA INSIGHTS"}
                 </div>
@@ -199,8 +199,8 @@ export default function SaleDetail() {
 
               {/* Top Row: Sender Info & Invoice Title */}
               <div className="flex justify-between items-start mb-6">
-                <div className="text-[11px] text-text-secondary leading-relaxed font-sans">
-                  <p className="font-bold text-text-primary text-[12px] mb-0.5">{shopSettings?.shop_name || sale.branch_name || "INZIRA INSIGHTS"}</p>
+                <div className="text-[13px] text-text-secondary leading-relaxed font-sans">
+                  <p className="font-bold text-text-primary text-[13px] mb-0.5">{shopSettings?.shop_name || sale.branch_name || "INZIRA INSIGHTS"}</p>
                   <p>{shopSettings?.shop_address || sale.branch_location || "Kigali, Rwanda"}</p>
                   {(shopSettings?.shop_phone || sale.branch_phone) && (
                     <p>Tel: {shopSettings?.shop_phone || sale.branch_phone}</p>
@@ -224,24 +224,24 @@ export default function SaleDetail() {
               </div>
 
               {/* Middle Row: Bill To & Invoice Info */}
-              <div className="grid grid-cols-2 gap-4 text-[11px] leading-normal">
+              <div className="grid grid-cols-2 gap-4 text-[13px] leading-normal">
                 <div>
-                  <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1">Bill to:</p>
-                  <p className="font-extrabold text-text-primary text-[14px] tracking-tight leading-tight mb-1">
+                  <p className="text-[12px] font-bold text-text-secondary uppercase tracking-wider mb-1">Bill to:</p>
+                  <p className="font-extrabold text-text-primary text-[15px] tracking-tight leading-tight mb-1">
                     {sale.customer_name || "Walk-in Customer"}
                   </p>
-                  <div className="text-[11px] text-text-secondary space-y-0.5 font-sans">
+                  <div className="text-[13px] text-text-secondary space-y-0.5 font-sans">
                     {sale.customer_phone && <p>Tel: {sale.customer_phone}</p>}
                     <p>E-mail: {sale.customer_email || "customer@inzira-insights.rw"}</p>
                     <p>Address: Kigali, Rwanda</p>
                   </div>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1 text-right">Invoice number:</p>
-                  <p className="font-extrabold text-text-primary text-[18px] tracking-tight leading-tight text-right mb-1">
+                  <p className="text-[12px] font-bold text-text-secondary uppercase tracking-wider mb-1 text-right">Invoice number:</p>
+                  <p className="font-extrabold text-text-primary text-[20px] tracking-tight leading-tight text-right mb-1">
                     #{sale.invoice_number}
                   </p>
-                  <p className="text-[11px] text-text-secondary text-right">
+                  <p className="text-[13px] text-text-secondary text-right">
                     Kigali, {formatDate(sale.created_at, "d. MM. yyyy")}
                   </p>
                 </div>
@@ -252,7 +252,7 @@ export default function SaleDetail() {
             <div className="flex-1 pt-6 pb-8 pl-16 pr-6 bg-white flex flex-col justify-between">
               <div>
                 {/* Service Table Header */}
-                <div className="grid grid-cols-12 gap-2 border-b border-border pb-2 text-[10px] font-bold text-text-primary uppercase tracking-wider">
+                <div className="grid grid-cols-12 gap-2 border-b border-border pb-2 text-[12px] font-bold text-text-primary uppercase tracking-wider">
                   <div className="col-span-6">Service description</div>
                   <div className="col-span-2 text-right">Quantity</div>
                   <div className="col-span-2 text-right">Price</div>
@@ -268,12 +268,12 @@ export default function SaleDetail() {
                     {sale.items?.map((item, idx) => (
                       <div 
                         key={idx} 
-                        className="grid grid-cols-12 gap-2 text-[11px] items-center"
+                        className="grid grid-cols-12 gap-2 text-[13px] items-center"
                       >
                         <div className="col-span-6">
                           <p className="font-semibold text-text-primary leading-snug">{item.item_name}</p>
                           {(item.size || item.color) && (
-                            <p className="text-[9px] text-text-secondary mt-0.5">
+                            <p className="text-[11px] text-text-secondary mt-0.5">
                               {item.size ? `Size: ${item.size}` : ""}{item.color ? ` • Color: ${item.color}` : ""}
                             </p>
                           )}
@@ -296,36 +296,36 @@ export default function SaleDetail() {
                 {/* Totals Block */}
                 <div className="flex flex-col items-end space-y-1">
                   <div className="flex items-center gap-6">
-                    <span className="text-[11px] font-bold text-text-primary">Total:</span>
-                    <span className="text-[14px] font-semibold text-text-secondary font-mono">
+                    <span className="text-[13px] font-bold text-text-primary">Total:</span>
+                    <span className="text-[15px] font-semibold text-text-secondary font-mono">
                       {formatRWF(sale.total_amount)}
                     </span>
                   </div>
                   {sale.balance_due > 0 ? (
                     <>
                       <div className="flex items-center gap-6">
-                        <span className="text-[11px] font-bold text-text-primary">Amount paid:</span>
-                        <span className="text-[14px] font-semibold text-text-secondary font-mono">
+                        <span className="text-[13px] font-bold text-text-primary">Amount paid:</span>
+                        <span className="text-[15px] font-semibold text-text-secondary font-mono">
                           {formatRWF(sale.amount_paid)}
                         </span>
                       </div>
                       <div className="flex items-center gap-6">
-                        <span className="text-[11px] font-bold text-text-primary">Balance due:</span>
-                        <span className="text-[16px] font-extrabold text-danger font-mono">
+                        <span className="text-[13px] font-bold text-text-primary">Balance due:</span>
+                        <span className="text-[17px] font-extrabold text-danger font-mono">
                           {formatRWF(sale.balance_due)}
                         </span>
                       </div>
                       <div className="flex items-center gap-6">
-                        <span className="text-[11px] font-bold text-text-primary">Due date:</span>
-                        <span className="text-[12px] font-extrabold text-[#7C3AED] font-mono">
+                        <span className="text-[13px] font-bold text-text-primary">Due date:</span>
+                        <span className="text-[13px] font-extrabold text-[#7C3AED] font-mono">
                           {sale.due_date ? formatDate(sale.due_date, "dd. MM. yyyy") : "—"}
                         </span>
                       </div>
                     </>
                   ) : (
                     <div className="flex items-center gap-6">
-                      <span className="text-[11px] font-bold text-text-primary">Balance due:</span>
-                      <span className="text-[16px] font-extrabold text-success font-mono">
+                      <span className="text-[13px] font-bold text-text-primary">Balance due:</span>
+                      <span className="text-[17px] font-extrabold text-success font-mono">
                         {formatRWF(0)} (Paid)
                       </span>
                     </div>
@@ -335,8 +335,8 @@ export default function SaleDetail() {
                 {/* Bank Info & Signature Line */}
                 <div className="grid grid-cols-2 gap-4 mt-8 pt-4 border-t border-border">
                   <div>
-                    <p className="text-[10px] font-bold text-text-primary uppercase tracking-wider mb-2">Contact Information:</p>
-                    <div className="space-y-1 text-[10px] font-mono text-[#7C3AED] font-semibold leading-none">
+                    <p className="text-[12px] font-bold text-text-primary uppercase tracking-wider mb-2">Contact Information:</p>
+                    <div className="space-y-1 text-[12px] font-mono text-[#7C3AED] font-semibold leading-none">
                       {(shopSettings?.shop_phone || sale.branch_phone) && (
                         <p>Tel: {shopSettings?.shop_phone || sale.branch_phone}</p>
                       )}
@@ -346,14 +346,14 @@ export default function SaleDetail() {
 
                   <div className="flex flex-col justify-between items-end">
                     <div className="text-right">
-                      <p className="text-[10px] font-bold text-text-primary uppercase tracking-wider">Invoiced by {shopSettings?.shop_name || sale.branch_name || "INZIRA INSIGHTS"}</p>
+                      <p className="text-[12px] font-bold text-text-primary uppercase tracking-wider">Invoiced by {shopSettings?.shop_name || sale.branch_name || "INZIRA INSIGHTS"}</p>
                     </div>
                     <div className="w-full max-w-[120px] border-b border-border mt-6" />
                   </div>
                 </div>
 
                 {/* Footer disclaimer */}
-                <div className="text-[9px] text-text-secondary/50 leading-normal text-center mt-6 border-t border-border pt-4">
+                <div className="text-[11px] text-text-secondary/50 leading-normal text-center mt-6 border-t border-border pt-4">
                   <p className="font-medium">
                     This is a computer-generated document. Technical data is verified automatically.
                   </p>

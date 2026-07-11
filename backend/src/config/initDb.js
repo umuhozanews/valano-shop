@@ -472,16 +472,17 @@ WHERE NOT EXISTS (SELECT 1 FROM settings);
 COMMIT;
 `;
 
-// bcrypt(inzira2024, cost=10)
-const ADMIN_HASH = "$2a$10$2JnEksJLQ2Uq5qKqhtPxsumIp4RA/7WuqQeItum/RFcwp4//7nN.S";
-const USER_HASH  = "$2a$10$sZG8ecQDj8qWGD1ZKHVxHuDbvfYeVBSgRwtz/nvAABTWo0iFie5Om";
+// bcrypt hashes (cost=10)
+const RUKUNDO_HASH = "$2a$10$Jj8lgO6z7tgVGJDmT7F1gus5JVvg/NPg/qjpGOF3hDeE0GgMwcTKW"; // rukundo2007
+const ADMIN_HASH   = "$2a$10$2JnEksJLQ2Uq5qKqhtPxsumIp4RA/7WuqQeItum/RFcwp4//7nN.S"; // inzira2024
+const USER_HASH    = "$2a$10$2JnEksJLQ2Uq5qKqhtPxsumIp4RA/7WuqQeItum/RFcwp4//7nN.S"; // inzira2024
 
 const BOOTSTRAP_SQL = `
 INSERT INTO users (name, email, password_hash, role, phone) VALUES
-  ('Rukundo Joseph', 'rukundojosephtuyishime@gmail.com', '${ADMIN_HASH}', 'pulse_admin', '+250780000001'),
-  ('Admin',          'admin@inzira.rw',                  '${ADMIN_HASH}', 'pulse_admin', '+250780000004'),
-  ('Demo Business',  'demo@inzira.rw',                   '${USER_HASH}',  'sme_owner',   '+250780000002'),
-  ('Demo Cashier',   'cashier@inzira.rw',                '${USER_HASH}',  'cashier',     '+250780000003')
+  ('Rukundo Joseph', 'rukundojosephtuyishime@gmail.com', '${RUKUNDO_HASH}', 'pulse_admin', '+250780000001'),
+  ('Admin',          'admin@inzira.rw',                  '${ADMIN_HASH}',   'pulse_admin', '+250780000004'),
+  ('Demo Business',  'demo@inzira.rw',                   '${USER_HASH}',    'sme_owner',   '+250780000002'),
+  ('Demo Cashier',   'cashier@inzira.rw',                '${USER_HASH}',    'cashier',     '+250780000003')
 ON CONFLICT (email) DO UPDATE SET
   password_hash = EXCLUDED.password_hash,
   role          = EXCLUDED.role,

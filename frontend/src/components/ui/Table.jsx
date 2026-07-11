@@ -9,7 +9,7 @@ export default function Table({ columns = [], data = [], loading = false, emptyM
             {columns.map((col) => (
               <th
                 key={col.key}
-                className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.05em] text-text-secondary border-b border-border"
+                className="px-4 py-3 text-left text-[13px] font-semibold uppercase tracking-[0.05em] text-text-secondary border-b border-border"
                 style={{ width: col.width }}
               >
                 {col.label}
@@ -28,7 +28,7 @@ export default function Table({ columns = [], data = [], loading = false, emptyM
             <tr>
               <td
                 colSpan={columns.length}
-                className="text-center py-12 text-[14px] text-text-secondary"
+                className="text-center py-12 text-[15px] text-text-secondary"
               >
                 {emptyMessage}
               </td>
@@ -43,7 +43,7 @@ export default function Table({ columns = [], data = [], loading = false, emptyM
                 {columns.map((col, j) => (
                   <td
                     key={col.key}
-                    className={`px-4 py-3 text-[14px] ${
+                    className={`px-4 py-3 text-[15px] ${
                       j === 0
                         ? "font-medium text-text-primary"
                         : "text-text-secondary"

@@ -16,8 +16,8 @@
     font-family: "Inter", system-ui, sans-serif;
     background-color: #FAFAFA;
     color: #111827;
-    font-size: 14px;
-    line-height: 20px;
+    font-size: 15px;
+    line-height: 22px;
   }
 
   ::-webkit-scrollbar {
@@ -29,7 +29,7 @@
     background: #D1D5DB;
     border-radius: 99px;
   }
-  ::-webkit-scrollbar-thumb:hover { background: #F97316; }
+  ::-webkit-scrollbar-thumb:hover { background: #006C49; }
 }
 
 @layer utilities {

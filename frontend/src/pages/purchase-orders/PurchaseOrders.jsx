@@ -57,7 +57,7 @@ export default function PurchaseOrders() {
       breadcrumbs={[{ label: "Purchase Orders", path: "/app/purchase-orders" }]}
       action={
         <button onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-[6px] text-[13px] font-medium hover:bg-primary/90">
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-[6px] text-[14px] font-medium hover:bg-primary/90">
           <Plus size={15} /> New Order
         </button>
       }
@@ -66,34 +66,34 @@ export default function PurchaseOrders() {
         <Card title="New Purchase Order" className="mb-4">
           <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="text-[12px] text-text-secondary mb-1 block">Supplier</label>
-              <select className="w-full border border-border rounded-[6px] px-3 py-2 text-[13px] bg-background"
+              <label className="text-[13px] text-text-secondary mb-1 block">Supplier</label>
+              <select className="w-full border border-border rounded-[6px] px-3 py-2 text-[14px] bg-background"
                 value={form.supplier_id} onChange={e => setForm(p => ({ ...p, supplier_id: e.target.value }))} required>
                 <option value="">Select supplier...</option>
                 {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-[12px] text-text-secondary mb-1 block">Order Date</label>
-              <input type="date" className="w-full border border-border rounded-[6px] px-3 py-2 text-[13px] bg-background"
+              <label className="text-[13px] text-text-secondary mb-1 block">Order Date</label>
+              <input type="date" className="w-full border border-border rounded-[6px] px-3 py-2 text-[14px] bg-background"
                 value={form.order_date} onChange={e => setForm(p => ({ ...p, order_date: e.target.value }))} />
             </div>
             <div>
-              <label className="text-[12px] text-text-secondary mb-1 block">Expected Arrival</label>
-              <input type="date" className="w-full border border-border rounded-[6px] px-3 py-2 text-[13px] bg-background"
+              <label className="text-[13px] text-text-secondary mb-1 block">Expected Arrival</label>
+              <input type="date" className="w-full border border-border rounded-[6px] px-3 py-2 text-[14px] bg-background"
                 value={form.arrival_date} onChange={e => setForm(p => ({ ...p, arrival_date: e.target.value }))} />
             </div>
             <div>
-              <label className="text-[12px] text-text-secondary mb-1 block">Notes</label>
-              <input type="text" className="w-full border border-border rounded-[6px] px-3 py-2 text-[13px] bg-background"
+              <label className="text-[13px] text-text-secondary mb-1 block">Notes</label>
+              <input type="text" className="w-full border border-border rounded-[6px] px-3 py-2 text-[14px] bg-background"
                 placeholder="Optional notes..." value={form.notes}
                 onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} />
             </div>
             <div className="sm:col-span-3 flex gap-2 justify-end">
               <button type="button" onClick={() => setShowForm(false)}
-                className="px-4 py-2 border border-border rounded-[6px] text-[13px]">Cancel</button>
+                className="px-4 py-2 border border-border rounded-[6px] text-[14px]">Cancel</button>
               <button type="submit"
-                className="px-4 py-2 bg-primary text-white rounded-[6px] text-[13px] font-medium">Create Order</button>
+                className="px-4 py-2 bg-primary text-white rounded-[6px] text-[14px] font-medium">Create Order</button>
             </div>
           </form>
         </Card>
@@ -101,30 +101,30 @@ export default function PurchaseOrders() {
 
       <Card>
         {loading ? (
-          <div className="text-center py-12 text-text-secondary text-[13px]">Loading orders...</div>
+          <div className="text-center py-12 text-text-secondary text-[14px]">Loading orders...</div>
         ) : !orders.length ? (
           <div className="text-center py-12">
             <Truck size={36} className="mx-auto text-text-secondary/30 mb-3" />
-            <p className="text-[14px] font-medium text-text-primary">No purchase orders yet</p>
-            <p className="text-[13px] text-text-secondary mt-1">Create an order to start tracking stock from suppliers</p>
+            <p className="text-[15px] font-medium text-text-primary">No purchase orders yet</p>
+            <p className="text-[14px] text-text-secondary mt-1">Create an order to start tracking stock from suppliers</p>
           </div>
         ) : (
           <div className="divide-y divide-border">
             {orders.map(o => (
               <div key={o.id} className="flex items-center justify-between py-3 px-1">
                 <div className="min-w-0">
-                  <p className="text-[13px] font-medium text-text-primary">{o.supplier_name || `Supplier #${o.supplier_id}`}</p>
-                  <p className="text-[11px] text-text-secondary mt-0.5">
+                  <p className="text-[14px] font-medium text-text-primary">{o.supplier_name || `Supplier #${o.supplier_id}`}</p>
+                  <p className="text-[13px] text-text-secondary mt-0.5">
                     {new Date(o.order_date || o.created_at).toLocaleDateString("en-RW")}
                     {o.expected_arrival && ` · Expected ${new Date(o.expected_arrival).toLocaleDateString("en-RW")}`}
                   </p>
-                  {o.notes && <p className="text-[11px] text-text-secondary">{o.notes}</p>}
+                  {o.notes && <p className="text-[13px] text-text-secondary">{o.notes}</p>}
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <Badge status={STATUS_BADGE[o.status] || "neutral"} label={o.status?.replace("_", " ")} />
                   {o.status !== "stocked" && (
                     <button onClick={() => advanceStatus(o.id, o.status)}
-                      className="flex items-center gap-1 text-[11px] text-primary hover:underline">
+                      className="flex items-center gap-1 text-[13px] text-primary hover:underline">
                       Advance <ChevronRight size={12} />
                     </button>
                   )}

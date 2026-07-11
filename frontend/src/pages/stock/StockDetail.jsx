@@ -59,8 +59,8 @@ export default function StockDetail() {
                 [t("category"), item.category],
               ].map(([l, v]) => (
                 <div key={l} className="flex justify-between border-b border-border pb-2 last:border-0">
-                  <span className="text-[13px] text-text-secondary">{l}</span>
-                  <span className="text-[13px] font-medium text-text-primary">{v}</span>
+                  <span className="text-[14px] text-text-secondary">{l}</span>
+                  <span className="text-[14px] font-medium text-text-primary">{v}</span>
                 </div>
               ))}
             </div>
@@ -74,8 +74,8 @@ export default function StockDetail() {
                 [t("quantity"), item.quantity],
               ].map(([l, v]) => (
                 <div key={l} className="flex justify-between border-b border-border pb-2 last:border-0">
-                  <span className="text-[13px] text-text-secondary">{l}</span>
-                  <span className="text-[14px] font-bold text-primary">{v}</span>
+                  <span className="text-[14px] text-text-secondary">{l}</span>
+                  <span className="text-[15px] font-bold text-primary">{v}</span>
                 </div>
               ))}
             </div>

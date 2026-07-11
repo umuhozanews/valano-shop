@@ -27,7 +27,7 @@ export default function CustomerProfile() {
   if (!customer) return null;
 
   const saleColumns = [
-    { key:"invoice_number", label:"Invoice", render:v => <span className="font-mono text-[12px] text-primary">{v||"—"}</span> },
+    { key:"invoice_number", label:"Invoice", render:v => <span className="font-mono text-[13px] text-primary">{v||"—"}</span> },
     { key:"items_count", label:"Items" },
     { key:"payment_method", label:"Payment" },
     { key:"total_amount", label:"Total", render:v => <span className="font-medium text-primary">{formatRWF(v)}</span> },
@@ -52,10 +52,10 @@ export default function CustomerProfile() {
         <Card>
           <div className="flex items-center gap-3 mb-4">
             <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
-              <span className="text-[22px] font-bold text-primary">{customer.name?.charAt(0)}</span>
+              <span className="text-[24px] font-bold text-primary">{customer.name?.charAt(0)}</span>
             </div>
             <div>
-              <h3 className="font-bold text-text-primary text-[16px]">{customer.name}</h3>
+              <h3 className="font-bold text-text-primary text-[17px]">{customer.name}</h3>
               <div className="flex gap-1 mt-1">
                 <Badge status={customer.type==="wholesaler"?"warning":"neutral"} label={customer.type} />
                 <Badge status={SEG_MAP[customer.segment]||"neutral"} label={customer.segment} />
@@ -64,8 +64,8 @@ export default function CustomerProfile() {
           </div>
           {[["Phone", customer.phone||"—"], ["Location", customer.location||"—"], ["Notes", customer.notes||"—"]].map(([l,v]) => (
             <div key={l} className="mb-2">
-              <p className="text-[11px] text-text-secondary uppercase tracking-wide">{l}</p>
-              <p className="text-[13px] text-text-primary">{v}</p>
+              <p className="text-[13px] text-text-secondary uppercase tracking-wide">{l}</p>
+              <p className="text-[14px] text-text-primary">{v}</p>
             </div>
           ))}
         </Card>
@@ -78,8 +78,8 @@ export default function CustomerProfile() {
             ["Last Purchase", customer.last_purchase ? formatDate(customer.last_purchase) : "—"],
           ].map(([label, val]) => (
             <Card key={label}>
-              <p className="text-[11px] text-text-secondary uppercase tracking-wide mb-1">{label}</p>
-              <p className="text-[18px] font-bold text-text-primary">{val}</p>
+              <p className="text-[13px] text-text-secondary uppercase tracking-wide mb-1">{label}</p>
+              <p className="text-[20px] font-bold text-text-primary">{val}</p>
             </Card>
           ))}
         </div>

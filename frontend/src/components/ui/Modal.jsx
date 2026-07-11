@@ -22,7 +22,7 @@ export default function Modal({ open, onClose, title, children, footer }) {
         style={{ backdropFilter: "blur(10px)" }}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
-          <h2 className="text-[18px] font-semibold text-text-primary">{title}</h2>
+          <h2 className="text-[20px] font-semibold text-text-primary">{title}</h2>
           <button
             onClick={onClose}
             className="text-text-secondary hover:text-text-primary transition-colors p-1 rounded"

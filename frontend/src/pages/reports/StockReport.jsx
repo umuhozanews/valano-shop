@@ -43,12 +43,12 @@ export default function StockReport() {
       action={
         <div className="flex gap-2">
           <button onClick={generate}
-            className="px-3 py-2 border border-border rounded-[6px] text-[13px] text-text-primary hover:bg-background">
+            className="px-3 py-2 border border-border rounded-[6px] text-[14px] text-text-primary hover:bg-background">
             Refresh
           </button>
           {data && (
             <button onClick={exportExcel}
-              className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-[6px] text-[13px] text-text-secondary hover:text-text-primary">
+              className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-[6px] text-[14px] text-text-secondary hover:text-text-primary">
               <Download size={13} /> Excel
             </button>
           )}
@@ -64,24 +64,24 @@ export default function StockReport() {
           { label: "Out of Stock",   value: totals.out  || 0 },
         ].map(({ label, value }) => (
           <div key={label} className="bg-surface border border-border rounded-[8px] p-4">
-            <p className="text-[11px] text-text-secondary">{label}</p>
-            <p className="text-[20px] font-bold text-text-primary mt-1">{value}</p>
+            <p className="text-[13px] text-text-secondary">{label}</p>
+            <p className="text-[22px] font-bold text-text-primary mt-1">{value}</p>
           </div>
         ))}
       </div>
 
       <Card>
         {loading ? (
-          <div className="py-12 text-center text-[13px] text-text-secondary">Loading stock report…</div>
+          <div className="py-12 text-center text-[14px] text-text-secondary">Loading stock report…</div>
         ) : !rows.length ? (
-          <div className="py-12 text-center text-[13px] text-text-secondary">No stock items found</div>
+          <div className="py-12 text-center text-[14px] text-text-secondary">No stock items found</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
+            <table className="w-full text-[14px]">
               <thead>
                 <tr className="border-b border-border">
                   {["Product","Kinyarwanda","Category","Unit","Qty","Cost (RWF)","Sell (RWF)","Total Value","Status"].map(h => (
-                    <th key={h} className="pb-2 text-left text-[11px] font-semibold text-text-secondary uppercase tracking-wide pr-3">{h}</th>
+                    <th key={h} className="pb-2 text-left text-[13px] font-semibold text-text-secondary uppercase tracking-wide pr-3">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -102,7 +102,7 @@ export default function StockReport() {
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-border">
-                  <td colSpan={7} className="pt-2 font-bold text-text-primary text-[13px]">TOTAL</td>
+                  <td colSpan={7} className="pt-2 font-bold text-text-primary text-[14px]">TOTAL</td>
                   <td className="pt-2 font-bold text-primary">{formatRWF(totals.value)}</td>
                   <td></td>
                 </tr>

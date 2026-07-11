@@ -38,7 +38,7 @@ function HealthGauge({ score, band }) {
         </text>
         <text x="80" y="92" textAnchor="middle" fontSize="11" fill="#6B7280">{label}</text>
       </svg>
-      <p className="text-[11px] text-text-secondary -mt-1">out of 100</p>
+      <p className="text-[13px] text-text-secondary -mt-1">out of 100</p>
     </div>
   );
 }
@@ -51,7 +51,7 @@ function AlertBanner({ alerts }) {
       {alerts.map((a, i) => (
         <div key={i} className="flex items-start gap-3 px-4 py-3 rounded-[6px] bg-warning/10 border border-warning/30">
           <AlertTriangle size={15} className="text-warning mt-0.5 shrink-0" />
-          <p className="text-[13px] text-text-primary">{a.message}</p>
+          <p className="text-[14px] text-text-primary">{a.message}</p>
         </div>
       ))}
     </div>
@@ -63,11 +63,11 @@ function KPI({ label, value, sub, icon: Icon, color = "text-primary" }) {
   return (
     <div className="bg-surface border border-border rounded-[8px] p-4">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-[12px] text-text-secondary">{label}</p>
+        <p className="text-[13px] text-text-secondary">{label}</p>
         {Icon && <Icon size={16} className={color} />}
       </div>
-      <p className="text-[22px] font-bold text-text-primary">{value}</p>
-      {sub && <p className="text-[11px] text-text-secondary mt-0.5">{sub}</p>}
+      <p className="text-[24px] font-bold text-text-primary">{value}</p>
+      {sub && <p className="text-[13px] text-text-secondary mt-0.5">{sub}</p>}
     </div>
   );
 }
@@ -115,17 +115,17 @@ export default function Dashboard() {
         <button onClick={() => navigate("/app/sales/new")}
           className="flex flex-col items-center gap-1.5 py-4 bg-primary text-white rounded-[8px] hover:bg-primary/90 transition-colors">
           <ShoppingCart size={20} />
-          <span className="text-[12px] font-semibold">New Sale</span>
+          <span className="text-[13px] font-semibold">New Sale</span>
         </button>
         <button onClick={() => navigate("/app/expenses")}
           className="flex flex-col items-center gap-1.5 py-4 bg-surface border border-border rounded-[8px] hover:bg-background transition-colors">
           <PlusCircle size={20} className="text-text-primary" />
-          <span className="text-[12px] font-semibold text-text-primary">Add Expense</span>
+          <span className="text-[13px] font-semibold text-text-primary">Add Expense</span>
         </button>
         <button onClick={() => navigate("/app/stock")}
           className="flex flex-col items-center gap-1.5 py-4 bg-surface border border-border rounded-[8px] hover:bg-background transition-colors">
           <Package size={20} className="text-text-primary" />
-          <span className="text-[12px] font-semibold text-text-primary">Receive Stock</span>
+          <span className="text-[13px] font-semibold text-text-primary">Receive Stock</span>
         </button>
       </div>
 
@@ -152,12 +152,12 @@ export default function Dashboard() {
               <HealthGauge score={score?.score} band={score?.band} />
               {score?.score < 50 && (
                 <button onClick={() => navigate("/app/health-score")}
-                  className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 text-[12px] text-primary font-medium hover:underline">
+                  className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 text-[13px] text-primary font-medium hover:underline">
                   Get advisory help <ArrowRight size={13} />
                 </button>
               )}
               {!score && (
-                <p className="text-center text-[12px] text-text-secondary mt-2">
+                <p className="text-center text-[13px] text-text-secondary mt-2">
                   No score yet — add sales and expenses to get scored
                 </p>
               )}
@@ -180,7 +180,7 @@ export default function Dashboard() {
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-48 flex items-center justify-center text-[13px] text-text-secondary">
+              <div className="h-48 flex items-center justify-center text-[14px] text-text-secondary">
                 No sales data yet — make your first sale to see the trend
               </div>
             )
@@ -191,18 +191,18 @@ export default function Dashboard() {
           <div className="space-y-2 max-h-48 overflow-y-auto">
             {lowStock.length ? lowStock.map(item => (
               <div key={item.id} className="flex items-center justify-between py-1">
-                <p className="text-[13px] text-text-primary truncate flex-1">{item.name}</p>
-                <span className={`text-[12px] font-bold ml-2 ${item.quantity === 0 ? "text-danger" : "text-warning"}`}>
+                <p className="text-[14px] text-text-primary truncate flex-1">{item.name}</p>
+                <span className={`text-[13px] font-bold ml-2 ${item.quantity === 0 ? "text-danger" : "text-warning"}`}>
                   {item.quantity === 0 ? "OUT" : item.quantity}
                 </span>
               </div>
             )) : (
-              <p className="text-[13px] text-success py-4 text-center">✓ All stock levels OK</p>
+              <p className="text-[14px] text-success py-4 text-center">✓ All stock levels OK</p>
             )}
           </div>
           {lowStock.length > 0 && (
             <button onClick={() => navigate("/app/stock")}
-              className="mt-3 w-full text-[12px] text-primary font-medium hover:underline text-center">
+              className="mt-3 w-full text-[13px] text-primary font-medium hover:underline text-center">
               View all stock →
             </button>
           )}
@@ -221,14 +221,14 @@ export default function Dashboard() {
                 <p className="text-[12.5px] text-text-primary font-medium">
                   {a.user_name || "System"} — {a.action?.replace(/_/g, " ")}
                 </p>
-                <p className="text-[11px] text-text-secondary">
+                <p className="text-[13px] text-text-secondary">
                   {new Date(a.created_at).toLocaleString("en-RW", { dateStyle: "short", timeStyle: "short" })}
                 </p>
               </div>
             </div>
           ))}
           {!activity.length && (
-            <p className="text-[13px] text-text-secondary py-6 text-center">No recent activity</p>
+            <p className="text-[14px] text-text-secondary py-6 text-center">No recent activity</p>
           )}
         </div>
       </Card>

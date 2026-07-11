@@ -40,33 +40,33 @@ export default function WorkerProfile() {
       <Card className="mb-4">
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
-            <span className="text-[24px] font-bold text-primary">{worker.name?.charAt(0)}</span>
+            <span className="text-[26px] font-bold text-primary">{worker.name?.charAt(0)}</span>
           </div>
           <div className="flex-1">
-            <h2 className="text-[20px] font-bold text-text-primary">{worker.name}</h2>
+            <h2 className="text-[22px] font-bold text-text-primary">{worker.name}</h2>
             <div className="flex items-center gap-2 mt-1">
               <Badge status={worker.role==="manager"?"warning":"neutral"} label={worker.role} />
               <Badge status={worker.is_active?"success":"danger"} label={worker.is_active?"Active":"Inactive"} />
-              <span className="text-[13px] text-text-secondary">{worker.branch_name}</span>
+              <span className="text-[14px] text-text-secondary">{worker.branch_name}</span>
             </div>
-            <p className="text-[13px] text-text-secondary mt-1">{worker.email} · {worker.phone}</p>
+            <p className="text-[14px] text-text-secondary mt-1">{worker.email} · {worker.phone}</p>
           </div>
         </div>
       </Card>
 
       {/* Performance cards */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
-        <Card><p className="text-[11px] text-text-secondary uppercase tracking-wide mb-1">Total Sales</p><p className="text-[24px] font-bold text-text-primary">{perf?.totalSales||0}</p></Card>
-        <Card><p className="text-[11px] text-text-secondary uppercase tracking-wide mb-1">Total Revenue</p><p className="text-[18px] font-bold text-primary">{formatRWF(perf?.totalRevenue||0)}</p></Card>
-        <Card><p className="text-[11px] text-text-secondary uppercase tracking-wide mb-1">Avg Sale Value</p><p className="text-[18px] font-bold text-text-primary">{formatRWF(Math.round(perf?.avgSaleValue||0))}</p></Card>
-        <Card><p className="text-[11px] text-text-secondary uppercase tracking-wide mb-1">Commission Earned</p><p className="text-[18px] font-bold text-success">{formatRWF(perf?.commissionEarned||0)}</p></Card>
+        <Card><p className="text-[13px] text-text-secondary uppercase tracking-wide mb-1">Total Sales</p><p className="text-[26px] font-bold text-text-primary">{perf?.totalSales||0}</p></Card>
+        <Card><p className="text-[13px] text-text-secondary uppercase tracking-wide mb-1">Total Revenue</p><p className="text-[20px] font-bold text-primary">{formatRWF(perf?.totalRevenue||0)}</p></Card>
+        <Card><p className="text-[13px] text-text-secondary uppercase tracking-wide mb-1">Avg Sale Value</p><p className="text-[20px] font-bold text-text-primary">{formatRWF(Math.round(perf?.avgSaleValue||0))}</p></Card>
+        <Card><p className="text-[13px] text-text-secondary uppercase tracking-wide mb-1">Commission Earned</p><p className="text-[20px] font-bold text-success">{formatRWF(perf?.commissionEarned||0)}</p></Card>
       </div>
 
       {/* Monthly target progress */}
       <Card title="Monthly Target Progress" className="mb-4">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[13px] text-text-secondary">{formatRWF(perf?.monthlyRevenue||0)} of {formatRWF(perf?.monthlyTarget||0)}</span>
-          <span className="text-[15px] font-bold text-primary">{targetPct}%</span>
+          <span className="text-[14px] text-text-secondary">{formatRWF(perf?.monthlyRevenue||0)} of {formatRWF(perf?.monthlyTarget||0)}</span>
+          <span className="text-[16px] font-bold text-primary">{targetPct}%</span>
         </div>
         <div className="w-full h-3 bg-background rounded-full overflow-hidden">
           <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${Math.min(100,targetPct)}%` }} />
@@ -104,10 +104,10 @@ export default function WorkerProfile() {
             {perf.topItems.map((item,i) => (
               <div key={i} className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold text-text-secondary w-4">{i+1}</span>
-                  <div><p className="text-[13px] font-medium text-text-primary">{item.name}</p><p className="text-[11px] text-text-secondary">{item.units} units</p></div>
+                  <span className="text-[13px] font-bold text-text-secondary w-4">{i+1}</span>
+                  <div><p className="text-[14px] font-medium text-text-primary">{item.name}</p><p className="text-[13px] text-text-secondary">{item.units} units</p></div>
                 </div>
-                <span className="text-[13px] font-semibold text-primary">{formatRWF(item.revenue)}</span>
+                <span className="text-[14px] font-semibold text-primary">{formatRWF(item.revenue)}</span>
               </div>
             ))}
           </div>

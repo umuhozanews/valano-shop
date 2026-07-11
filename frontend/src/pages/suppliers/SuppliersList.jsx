@@ -57,7 +57,7 @@ export default function SuppliersList() {
         <div className="w-16 h-1.5 bg-border rounded-full overflow-hidden">
           <div className="h-full bg-primary rounded-full" style={{ width:`${v||0}%` }} />
         </div>
-        <span className="text-[12px]">{v||0}%</span>
+        <span className="text-[13px]">{v||0}%</span>
       </div>
     )},
     { key:"id", label:"", render:(v,r) => (
@@ -76,7 +76,7 @@ export default function SuppliersList() {
           <div className="relative">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search…"
-              className="h-8 pl-8 pr-3 border border-border rounded-card text-[12px] focus:outline-none focus:ring-1 focus:ring-primary w-40" />
+              className="h-8 pl-8 pr-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-1 focus:ring-primary w-40" />
           </div>
           <Button icon={Plus} size="sm" onClick={() => { setEditS(null); setForm(EMPTY); setShowModal(true); }}>Add Supplier</Button>
         </div>

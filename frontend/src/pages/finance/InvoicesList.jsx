@@ -45,7 +45,7 @@ export default function InvoicesList() {
   };
 
   const columns = [
-    { key:"invoice_number", label: t("invoice_no"), render:v => <span className="font-mono text-[12px] font-medium text-primary">{v}</span> },
+    { key:"invoice_number", label: t("invoice_no"), render:v => <span className="font-mono text-[13px] font-medium text-primary">{v}</span> },
     { key:"customer_name", label: t("customer"), render:v => v || "Walk-in" },
     { key:"total_amount", label: t("total"), render:v => <span className="font-semibold">{formatRWF(v)}</span> },
     { key:"issued_at", label: t("date"), render:v => formatDate(v, "dd MMM yyyy") },
@@ -66,7 +66,7 @@ export default function InvoicesList() {
           <div className="relative flex-1 min-w-[180px]">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
             <input value={filters.search} onChange={e=>setFilters(f=>({...f,search:e.target.value}))} placeholder={`${t("search")}…`}
-              className="w-full h-9 pl-9 pr-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary" />
+              className="w-full h-9 pl-9 pr-3 border border-border rounded-card text-[14px] focus:outline-none focus:ring-2 focus:ring-primary" />
           </div>
         </div>
 

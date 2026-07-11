@@ -50,10 +50,10 @@ export default function AuditLog() {
           <div className="relative flex-1 min-w-[200px]">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by user or action…"
-              className="w-full h-9 pl-8 pr-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary" />
+              className="w-full h-9 pl-8 pr-3 border border-border rounded-card text-[14px] focus:outline-none focus:ring-2 focus:ring-primary" />
           </div>
           <select value={filterAction} onChange={e => setFilterAction(e.target.value)}
-            className="h-9 px-3 border border-border rounded-card text-[13px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary">
+            className="h-9 px-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary">
             <option value="">All Actions</option>
             {actionTypes.map(a => <option key={a} value={a}>{ACTION_CONFIG[a]?.label || a}</option>)}
           </select>
@@ -84,17 +84,17 @@ export default function AuditLog() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[13px] font-semibold text-text-primary">{log.user_name}</span>
+                      <span className="text-[14px] font-semibold text-text-primary">{log.user_name}</span>
                       <Badge status="neutral" label={cfg.label} />
                     </div>
-                    <p className="text-[12px] text-text-secondary mt-0.5">{log.details}</p>
+                    <p className="text-[13px] text-text-secondary mt-0.5">{log.details}</p>
                   </div>
-                  <p className="text-[11px] text-text-secondary shrink-0 mt-0.5">{formatDate(log.created_at, "dd MMM HH:mm")}</p>
+                  <p className="text-[13px] text-text-secondary shrink-0 mt-0.5">{formatDate(log.created_at, "dd MMM HH:mm")}</p>
                 </div>
               );
             })}
             {filtered.length === 0 && (
-              <p className="text-center text-text-secondary text-[13px] py-8">No matching audit entries</p>
+              <p className="text-center text-text-secondary text-[14px] py-8">No matching audit entries</p>
             )}
           </div>
         )}

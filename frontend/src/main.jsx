@@ -22,7 +22,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                 <Toaster
                   position="top-right"
                   toastOptions={{
-                    className: "text-[13px] font-medium",
+                    className: "text-[14px] font-medium",
                     duration: 4000,
                   }}
                 />

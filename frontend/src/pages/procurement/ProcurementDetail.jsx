@@ -97,7 +97,7 @@ export default function ProcurementDetail() {
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${done?"bg-primary border-primary":"border-border bg-surface"}`}>
                     {done ? <CheckCircle size={16} className="text-white" /> : <Circle size={16} className="text-border" />}
                   </div>
-                  <p className={`text-[10px] font-medium mt-1 ${current?"text-primary":done?"text-text-primary":"text-text-secondary"}`}>
+                  <p className={`text-[12px] font-medium mt-1 ${current?"text-primary":done?"text-text-primary":"text-text-secondary"}`}>
                     {STATUS_LABELS[status]}
                   </p>
                 </div>
@@ -128,8 +128,8 @@ export default function ProcurementDetail() {
               ["Notes", order.notes || "—"],
             ].map(([l,v]) => (
               <div key={l} className="flex justify-between gap-2">
-                <span className="text-[12px] text-text-secondary shrink-0">{l}</span>
-                <span className="text-[12px] font-medium text-text-primary text-right">{v}</span>
+                <span className="text-[13px] text-text-secondary shrink-0">{l}</span>
+                <span className="text-[13px] font-medium text-text-primary text-right">{v}</span>
               </div>
             ))}
           </div>
@@ -141,9 +141,9 @@ export default function ProcurementDetail() {
         footer={<><Button variant="secondary" onClick={() => setShowStockIn(false)}>Cancel</Button><Button loading={stocking} onClick={handleStockIn}>Confirm Stock In</Button></>}>
         <div className="space-y-3">
           <div>
-            <label className="block text-[13px] font-medium text-text-primary mb-1">Assign to Branch</label>
+            <label className="block text-[14px] font-medium text-text-primary mb-1">Assign to Branch</label>
             <select value={stockBranch} onChange={e=>setStockBranch(e.target.value)}
-              className="w-full h-9 px-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface">
+              className="w-full h-9 px-3 border border-border rounded-card text-[14px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface">
               <option value="">Select branch…</option>
               {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
@@ -151,13 +151,13 @@ export default function ProcurementDetail() {
           <div className="space-y-2">
             {stockItems.map((item, i) => (
               <div key={i} className="flex items-center justify-between gap-3">
-                <span className="text-[13px] text-text-primary flex-1">{item.item_name} ({item.size} {item.color})</span>
+                <span className="text-[14px] text-text-primary flex-1">{item.item_name} ({item.size} {item.color})</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-text-secondary">Received:</span>
+                  <span className="text-[13px] text-text-secondary">Received:</span>
                   <input type="number" min="0" max={item.quantity} value={item.actual_qty}
                     onChange={e => setStockItems(si => si.map((x,j) => j===i ? {...x,actual_qty:parseInt(e.target.value)||0} : x))}
-                    className="w-16 h-8 px-2 border border-border rounded text-[12px] text-center focus:outline-none focus:ring-1 focus:ring-primary" />
-                  <span className="text-[11px] text-text-secondary">/ {item.quantity}</span>
+                    className="w-16 h-8 px-2 border border-border rounded text-[13px] text-center focus:outline-none focus:ring-1 focus:ring-primary" />
+                  <span className="text-[13px] text-text-secondary">/ {item.quantity}</span>
                 </div>
               </div>
             ))}

@@ -156,8 +156,8 @@ export default function SettingsPage() {
                       ${activeSection === s.key ? "bg-primary/10 text-primary" : "hover:bg-background text-text-secondary"}`}>
                     <Icon size={15} className="shrink-0" />
                     <div className="min-w-0">
-                      <p className={`text-[13px] font-semibold ${activeSection === s.key ? "text-primary" : "text-text-primary"}`}>{s.label}</p>
-                      <p className="text-[11px] text-text-secondary truncate">{s.desc}</p>
+                      <p className={`text-[14px] font-semibold ${activeSection === s.key ? "text-primary" : "text-text-primary"}`}>{s.label}</p>
+                      <p className="text-[13px] text-text-secondary truncate">{s.desc}</p>
                     </div>
                   </button>
                 );
@@ -193,10 +193,10 @@ export default function SettingsPage() {
 
                     {/* Sector */}
                     <div>
-                      <label className="block text-[13px] font-medium text-text-primary mb-1">Sector</label>
+                      <label className="block text-[14px] font-medium text-text-primary mb-1">Sector</label>
                       <select value={business.sector}
                         onChange={e => setBusiness(b => ({ ...b, sector: e.target.value }))}
-                        className="w-full h-9 px-3 border border-border rounded-[6px] text-[13px] bg-surface">
+                        className="w-full h-9 px-3 border border-border rounded-[6px] text-[14px] bg-surface">
                         <option value="">Select sector…</option>
                         {SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
@@ -204,20 +204,20 @@ export default function SettingsPage() {
 
                     {/* District */}
                     <div>
-                      <label className="block text-[13px] font-medium text-text-primary mb-1">District</label>
+                      <label className="block text-[14px] font-medium text-text-primary mb-1">District</label>
                       <select value={business.district}
                         onChange={e => setBusiness(b => ({ ...b, district: e.target.value }))}
-                        className="w-full h-9 px-3 border border-border rounded-[6px] text-[13px] bg-surface">
+                        className="w-full h-9 px-3 border border-border rounded-[6px] text-[14px] bg-surface">
                         <option value="">Select district…</option>
                         {DISTRICTS.map(d => <option key={d} value={d}>{d}</option>)}
                       </select>
                     </div>
 
                     <div className="col-span-2">
-                      <label className="block text-[13px] font-medium text-text-primary mb-1">Invoice Footer Text</label>
+                      <label className="block text-[14px] font-medium text-text-primary mb-1">Invoice Footer Text</label>
                       <textarea value={business.footer}
                         onChange={e => setBusiness(b => ({ ...b, footer: e.target.value }))} rows={2}
-                        className="w-full p-2 border border-border rounded-[6px] text-[13px] bg-surface focus:outline-none focus:ring-1 focus:ring-primary" />
+                        className="w-full p-2 border border-border rounded-[6px] text-[14px] bg-surface focus:outline-none focus:ring-1 focus:ring-primary" />
                     </div>
                   </div>
 
@@ -226,12 +226,12 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-2">
                       <Globe size={15} className="text-primary" />
                       <div>
-                        <p className="text-[13px] font-medium text-text-primary">Interface Language</p>
-                        <p className="text-[11px] text-text-secondary">Currently: {lang === "en" ? "English" : "Kinyarwanda"}</p>
+                        <p className="text-[14px] font-medium text-text-primary">Interface Language</p>
+                        <p className="text-[13px] text-text-secondary">Currently: {lang === "en" ? "English" : "Kinyarwanda"}</p>
                       </div>
                     </div>
                     <button onClick={() => switchLanguage(lang === "en" ? "rw" : "en")}
-                      className="px-3 py-1.5 bg-primary/10 text-primary text-[12px] font-medium rounded-[6px] hover:bg-primary/20">
+                      className="px-3 py-1.5 bg-primary/10 text-primary text-[13px] font-medium rounded-[6px] hover:bg-primary/20">
                       Switch to {lang === "en" ? "Kinyarwanda" : "English"}
                     </button>
                   </div>
@@ -245,7 +245,7 @@ export default function SettingsPage() {
                 <div className="space-y-4">
                   <Card title="Data Usage Consent"
                     subtitle="Control how Inzira Insights uses your business data">
-                    <p className="text-[13px] text-text-secondary mb-5 leading-relaxed">
+                    <p className="text-[14px] text-text-secondary mb-5 leading-relaxed">
                       Inzira Insights uses your sales, expenses, and inventory data to calculate a
                       Health Score that helps you understand your business performance. You can choose
                       whether this data is also shared with verified lenders for credit scoring.
@@ -257,8 +257,8 @@ export default function SettingsPage() {
                           onChange={e => setConsent(c => ({ ...c, scoring: e.target.checked }))}
                           className="mt-0.5 h-4 w-4 accent-primary" />
                         <div>
-                          <p className="text-[13px] font-medium text-text-primary">Allow Health Score Calculation</p>
-                          <p className="text-[12px] text-text-secondary mt-0.5">
+                          <p className="text-[14px] font-medium text-text-primary">Allow Health Score Calculation</p>
+                          <p className="text-[13px] text-text-secondary mt-0.5">
                             Your operational data (sales, expenses, stock) will be used to calculate
                             your monthly Health Score. This score is visible to you only.
                           </p>
@@ -270,8 +270,8 @@ export default function SettingsPage() {
                           onChange={e => setConsent(c => ({ ...c, lender_sharing: e.target.checked }))}
                           className="mt-0.5 h-4 w-4 accent-primary" />
                         <div>
-                          <p className="text-[13px] font-medium text-text-primary">Share Score with Lenders</p>
-                          <p className="text-[12px] text-text-secondary mt-0.5">
+                          <p className="text-[14px] font-medium text-text-primary">Share Score with Lenders</p>
+                          <p className="text-[13px] text-text-secondary mt-0.5">
                             Allow verified lenders (banks, SACCOs, MFIs) who have referred you to Inzira
                             to view your Health Score and basic business metrics. No raw transaction data is shared.
                           </p>
@@ -280,7 +280,7 @@ export default function SettingsPage() {
                     </div>
 
                     <div className="mt-6 p-3 bg-primary/5 border border-primary/20 rounded-[8px]">
-                      <p className="text-[12px] text-text-secondary">
+                      <p className="text-[13px] text-text-secondary">
                         You can withdraw consent at any time. If you withdraw consent for scoring,
                         your Health Score will be set to NULL and lenders will no longer see your data.
                         This complies with Rwanda Data Protection Law (Law N°058/2021).
@@ -334,9 +334,9 @@ export default function SettingsPage() {
                       return (
                         <div key={r.role} className="p-4 border border-border rounded-[8px]">
                           <div className="flex items-center gap-3 mb-2">
-                            <span className={`px-2.5 py-1 rounded-[4px] text-[11px] font-bold uppercase ${r.color}`}>{r.label}</span>
+                            <span className={`px-2.5 py-1 rounded-[4px] text-[13px] font-bold uppercase ${r.color}`}>{r.label}</span>
                           </div>
-                          <p className="text-[13px] text-text-secondary mb-3">{r.desc}</p>
+                          <p className="text-[14px] text-text-secondary mb-3">{r.desc}</p>
                           {modules.length > 0 && (
                             <div className="grid grid-cols-3 gap-1.5">
                               {modules.map(m => (
@@ -344,7 +344,7 @@ export default function SettingsPage() {
                                   <div className="w-4 h-4 rounded-full bg-success flex items-center justify-center">
                                     <Check size={9} className="text-white" />
                                   </div>
-                                  <span className="text-[12px] text-text-primary">{m}</span>
+                                  <span className="text-[13px] text-text-primary">{m}</span>
                                 </div>
                               ))}
                             </div>

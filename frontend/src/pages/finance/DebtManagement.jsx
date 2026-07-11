@@ -77,7 +77,7 @@ export default function DebtManagement() {
         </div>
         <div>
           <p className="font-medium text-text-primary">{v}</p>
-          <p className="text-[11px] text-text-secondary">{r.type === 'receivable' ? t("receivables") : t("payables")}</p>
+          <p className="text-[13px] text-text-secondary">{r.type === 'receivable' ? t("receivables") : t("payables")}</p>
         </div>
       </div>
     )},
@@ -109,7 +109,7 @@ export default function DebtManagement() {
         <StatCard title={t("receivables")} value={formatRWF(totalReceivable)} color="success" />
         <StatCard title={t("payables")} value={formatRWF(totalPayable)} color="danger" />
         <Button variant="primary" size="lg" icon={Plus} onClick={() => setShowModal(true)} className="!h-auto flex-col gap-1 py-4">
-          <span className="text-[15px]">{t("add_debt")}</span>
+          <span className="text-[16px]">{t("add_debt")}</span>
         </Button>
       </div>
 
@@ -118,7 +118,7 @@ export default function DebtManagement() {
           <div className="relative w-64">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder={`${t("search")}…`}
-              className="w-full h-9 pl-9 pr-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-1 focus:ring-primary bg-surface" />
+              className="w-full h-9 pl-9 pr-3 border border-border rounded-card text-[14px] focus:outline-none focus:ring-1 focus:ring-primary bg-surface" />
           </div>
         </div>
         <Table columns={columns} data={filtered} loading={loading} />
@@ -131,8 +131,8 @@ export default function DebtManagement() {
           <div className="grid grid-cols-2 gap-3">
             <Input label={t("amount")} type="number" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} required />
             <div>
-              <label className="block text-[13px] font-medium text-text-primary mb-1">Type</label>
-              <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="w-full h-9 px-3 border border-border rounded-card text-[13px] bg-surface">
+              <label className="block text-[14px] font-medium text-text-primary mb-1">Type</label>
+              <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="w-full h-9 px-3 border border-border rounded-card text-[14px] bg-surface">
                 <option value="receivable">{t("receivables")}</option>
                 <option value="payable">{t("payables")}</option>
               </select>
@@ -140,9 +140,9 @@ export default function DebtManagement() {
           </div>
           <Input label={t("due_date")} type="date" value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} />
           <div>
-            <label className="block text-[13px] font-medium text-text-primary mb-1">{t("description")}</label>
+            <label className="block text-[14px] font-medium text-text-primary mb-1">{t("description")}</label>
             <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={2}
-              className="w-full p-2 border border-border rounded-card text-[13px] bg-surface focus:outline-none focus:ring-1 focus:ring-primary" />
+              className="w-full p-2 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-1 focus:ring-primary" />
           </div>
         </div>
       </Modal>

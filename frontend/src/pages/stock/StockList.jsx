@@ -106,11 +106,11 @@ export default function StockList() {
     { key:"name", label:"Product", render:(v,r) => (
       <div>
         <p className="font-medium text-text-primary">{v}</p>
-        {r.name_rw && <p className="text-[11px] text-text-secondary">{r.name_rw}</p>}
-        <p className="text-[11px] text-text-secondary">{r.category}{r.unit ? ` · ${r.unit}` : ""}</p>
+        {r.name_rw && <p className="text-[13px] text-text-secondary">{r.name_rw}</p>}
+        <p className="text-[13px] text-text-secondary">{r.category}{r.unit ? ` · ${r.unit}` : ""}</p>
       </div>
     )},
-    { key:"barcode",       label:"Barcode",  render:v => <span className="font-mono text-[11px] text-text-secondary">{v || "—"}</span> },
+    { key:"barcode",       label:"Barcode",  render:v => <span className="font-mono text-[13px] text-text-secondary">{v || "—"}</span> },
     { key:"quantity",      label:"Qty",      render:(v,r) => (
       <span className={`font-semibold ${r.status==="out_of_stock"?"text-danger":r.status==="low_stock"?"text-warning":"text-text-primary"}`}>{v} {r.unit}</span>
     )},
@@ -133,7 +133,7 @@ export default function StockList() {
       breadcrumbs={[{ label:"Stock", path:"/app/stock" }]}
       action={canEdit && (
         <button onClick={() => { setEditItem(null); setForm(EMPTY_FORM); setShowModal(true); }}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-[6px] text-[13px] font-medium hover:bg-primary/90">
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-[6px] text-[14px] font-medium hover:bg-primary/90">
           <Plus size={15} /> Add Product
         </button>
       )}
@@ -150,15 +150,15 @@ export default function StockList() {
           <div className="relative flex-1 min-w-[180px]">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
             <input value={filters.search} onChange={e=>setFilters(f=>({...f,search:e.target.value}))} placeholder="Search products…"
-              className="w-full h-9 pl-9 pr-3 border border-border rounded-[6px] text-[13px] focus:outline-none focus:ring-1 focus:ring-primary" />
+              className="w-full h-9 pl-9 pr-3 border border-border rounded-[6px] text-[14px] focus:outline-none focus:ring-1 focus:ring-primary" />
           </div>
           <select value={filters.category} onChange={e=>setFilters(f=>({...f,category:e.target.value}))}
-            className="h-9 px-3 border border-border rounded-[6px] text-[13px] bg-surface">
+            className="h-9 px-3 border border-border rounded-[6px] text-[14px] bg-surface">
             <option value="">All Categories</option>
             {ITEM_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
           <select value={filters.status} onChange={e=>setFilters(f=>({...f,status:e.target.value}))}
-            className="h-9 px-3 border border-border rounded-[6px] text-[13px] bg-surface">
+            className="h-9 px-3 border border-border rounded-[6px] text-[14px] bg-surface">
             <option value="">All Status</option>
             <option value="in_stock">In Stock</option>
             <option value="low_stock">Low Stock</option>
@@ -171,10 +171,10 @@ export default function StockList() {
         {total > 20 && (
           <div className="flex justify-center gap-2 mt-4">
             <button disabled={page===1} onClick={() => setPage(p=>p-1)}
-              className="px-3 py-1.5 border border-border rounded text-[12px] disabled:opacity-40">Prev</button>
-            <span className="px-3 py-1.5 text-[12px] text-text-secondary">Page {page} of {Math.ceil(total/20)}</span>
+              className="px-3 py-1.5 border border-border rounded text-[13px] disabled:opacity-40">Prev</button>
+            <span className="px-3 py-1.5 text-[13px] text-text-secondary">Page {page} of {Math.ceil(total/20)}</span>
             <button disabled={page>=Math.ceil(total/20)} onClick={() => setPage(p=>p+1)}
-              className="px-3 py-1.5 border border-border rounded text-[12px] disabled:opacity-40">Next</button>
+              className="px-3 py-1.5 border border-border rounded text-[13px] disabled:opacity-40">Next</button>
           </div>
         )}
       </Card>
@@ -191,17 +191,17 @@ export default function StockList() {
               onChange={e=>setForm(f=>({...f,name_rw:e.target.value}))} placeholder="e.g. Umuceri" />
           </div>
           <div>
-            <label className="block text-[13px] font-medium text-text-primary mb-1">Category</label>
+            <label className="block text-[14px] font-medium text-text-primary mb-1">Category</label>
             <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))}
-              className="w-full h-9 px-3 border border-border rounded-[6px] text-[13px] bg-surface">
+              className="w-full h-9 px-3 border border-border rounded-[6px] text-[14px] bg-surface">
               <option value="">Select…</option>
               {ITEM_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-[13px] font-medium text-text-primary mb-1">Unit of Measure</label>
+            <label className="block text-[14px] font-medium text-text-primary mb-1">Unit of Measure</label>
             <select value={form.unit} onChange={e=>setForm(f=>({...f,unit:e.target.value}))}
-              className="w-full h-9 px-3 border border-border rounded-[6px] text-[13px] bg-surface">
+              className="w-full h-9 px-3 border border-border rounded-[6px] text-[14px] bg-surface">
               {STOCK_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
             </select>
           </div>

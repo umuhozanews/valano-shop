@@ -125,12 +125,12 @@ export default function WorkerPerformance() {
       const isTop3 = idx >= 0 && idx < 3;
       return (
         <div className="flex items-center gap-3">
-          <span className="w-6 text-center text-[15px] font-semibold">
+          <span className="w-6 text-center text-[16px] font-semibold">
             {isTop3 ? MEDALS[idx] : idx + 1}
           </span>
           <div>
-            <p className="font-semibold text-text-primary text-[13px]">{v}</p>
-            <p className="text-[11px] text-text-secondary">{r.branch}</p>
+            <p className="font-semibold text-text-primary text-[14px]">{v}</p>
+            <p className="text-[13px] text-text-secondary">{r.branch}</p>
           </div>
         </div>
       );
@@ -147,7 +147,7 @@ export default function WorkerPerformance() {
           />
         </div>
         <div>
-          <span className="text-[12px] font-bold text-text-primary mr-1">{v}%</span>
+          <span className="text-[13px] font-bold text-text-primary mr-1">{v}%</span>
           <Badge status={getAchievementBadgeStatus(v)} label={v >= 100 ? "Superstar" : v >= 75 ? "High Achiever" : v >= 50 ? "On Track" : "Needs Focus"} />
         </div>
       </div>
@@ -172,21 +172,21 @@ export default function WorkerPerformance() {
         <div className="flex flex-wrap gap-4 items-center justify-between">
           <div className="flex flex-wrap gap-3 items-center">
             <div>
-              <label className="block text-[11px] font-semibold text-text-secondary uppercase mb-1">Start Date</label>
+              <label className="block text-[13px] font-semibold text-text-secondary uppercase mb-1">Start Date</label>
               <input 
                 type="date" 
                 value={filters.start_date} 
                 onChange={e => setFilters(f => ({ ...f, start_date: e.target.value }))}
-                className="h-9 px-3 border border-border rounded-card text-[13px] bg-surface focus:outline-none focus:ring-1 focus:ring-primary font-medium" 
+                className="h-9 px-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-1 focus:ring-primary font-medium" 
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-text-secondary uppercase mb-1">End Date</label>
+              <label className="block text-[13px] font-semibold text-text-secondary uppercase mb-1">End Date</label>
               <input 
                 type="date" 
                 value={filters.end_date} 
                 onChange={e => setFilters(f => ({ ...f, end_date: e.target.value }))}
-                className="h-9 px-3 border border-border rounded-card text-[13px] bg-surface focus:outline-none focus:ring-1 focus:ring-primary font-medium" 
+                className="h-9 px-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-1 focus:ring-primary font-medium" 
               />
             </div>
           </div>
@@ -201,8 +201,8 @@ export default function WorkerPerformance() {
       {data.length === 0 && !loading && (
         <Card className="text-center py-12">
           <Users className="mx-auto text-text-secondary opacity-30 mb-3" size={48} />
-          <h3 className="text-[16px] font-bold text-text-primary mb-1">No sales data recorded</h3>
-          <p className="text-[13px] text-text-secondary">Please adjust the date ranges or record new sales to see performance reports.</p>
+          <h3 className="text-[17px] font-bold text-text-primary mb-1">No sales data recorded</h3>
+          <p className="text-[14px] text-text-secondary">Please adjust the date ranges or record new sales to see performance reports.</p>
         </Card>
       )}
 
@@ -240,7 +240,7 @@ export default function WorkerPerformance() {
 
           {/* Top 3 Performers Visual Showcase (Podium) */}
           <div className="space-y-3">
-            <h3 className="text-[15px] font-bold text-text-primary flex items-center gap-2">
+            <h3 className="text-[16px] font-bold text-text-primary flex items-center gap-2">
               <span>🏆</span> Top Achievers Podium
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -254,23 +254,23 @@ export default function WorkerPerformance() {
                     {MEDALS[idx]}
                   </div>
 
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-text-secondary">
+                  <p className="text-[13px] font-bold uppercase tracking-wider text-text-secondary">
                     {idx === 0 ? "Gold Leader" : idx === 1 ? "Silver Runner-Up" : "Bronze Finalist"}
                   </p>
                   
-                  <h4 className="text-[18px] font-black text-text-primary mt-2 leading-tight">
+                  <h4 className="text-[20px] font-black text-text-primary mt-2 leading-tight">
                     {w.name}
                   </h4>
-                  <p className="text-[12px] text-text-secondary">{w.branch}</p>
+                  <p className="text-[13px] text-text-secondary">{w.branch}</p>
 
-                  <div className="mt-4 pt-3 border-t border-border/60 grid grid-cols-2 gap-2 text-[12px]">
+                  <div className="mt-4 pt-3 border-t border-border/60 grid grid-cols-2 gap-2 text-[13px]">
                     <div>
                       <p className="text-text-secondary font-medium">Revenue</p>
-                      <p className={`text-[15px] font-extrabold ${TEXT_COLORS[idx]}`}>{formatRWF(w.revenue)}</p>
+                      <p className={`text-[16px] font-extrabold ${TEXT_COLORS[idx]}`}>{formatRWF(w.revenue)}</p>
                     </div>
                     <div>
                       <p className="text-text-secondary font-medium">Achievement</p>
-                      <p className="text-[15px] font-extrabold text-text-primary">{w.achievement_pct}%</p>
+                      <p className="text-[16px] font-extrabold text-text-primary">{w.achievement_pct}%</p>
                     </div>
                   </div>
 
@@ -317,23 +317,23 @@ export default function WorkerPerformance() {
 
             {/* Quick Insights List */}
             <Card className="lg:col-span-4" title="Performance Insights">
-              <div className="space-y-4 mt-3 text-[13px] text-text-secondary leading-relaxed">
+              <div className="space-y-4 mt-3 text-[14px] text-text-secondary leading-relaxed">
                 <div className="p-3 bg-surface border border-border rounded-card">
-                  <p className="font-bold text-text-primary mb-1 text-[13px]">🚀 Target Achieved</p>
+                  <p className="font-bold text-text-primary mb-1 text-[14px]">🚀 Target Achieved</p>
                   <p>
                     <strong>{data.filter(w => w.achievement_pct >= 100).length}</strong> out of <strong>{data.length}</strong> active workers have successfully reached or surpassed their monthly target.
                   </p>
                 </div>
 
                 <div className="p-3 bg-surface border border-border rounded-card">
-                  <p className="font-bold text-text-primary mb-1 text-[13px]">💰 Average Sales Volume</p>
+                  <p className="font-bold text-text-primary mb-1 text-[14px]">💰 Average Sales Volume</p>
                   <p>
                     The average revenue per worker this period is <strong>{formatRWF(Math.round(totalRevenue / data.length))}</strong> over a total of <strong>{totalSales}</strong> sales events.
                   </p>
                 </div>
 
                 <div className="p-3 bg-surface border border-border rounded-card">
-                  <p className="font-bold text-text-primary mb-1 text-[13px]">🔔 Action Required</p>
+                  <p className="font-bold text-text-primary mb-1 text-[14px]">🔔 Action Required</p>
                   <p>
                     <strong>{data.filter(w => w.achievement_pct < 50 && w.monthly_target > 0).length}</strong> worker(s) are performing under 50% target and may require mentoring or training support.
                   </p>
@@ -351,7 +351,7 @@ export default function WorkerPerformance() {
                   value={search} 
                   onChange={e => setSearch(e.target.value)} 
                   placeholder="Search workers or branches…"
-                  className="w-full h-9 pl-9 pr-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-1 focus:ring-primary bg-surface font-medium" 
+                  className="w-full h-9 pl-9 pr-3 border border-border rounded-card text-[14px] focus:outline-none focus:ring-1 focus:ring-primary bg-surface font-medium" 
                 />
               </div>
             </div>

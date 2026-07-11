@@ -35,8 +35,8 @@ export default function CartDrawer({ open, onClose }) {
         <div className="flex items-center justify-between px-6 py-5 border-b" style={{ borderColor: "#e5e0d8" }}>
           <div className="flex items-center gap-2">
             <ShoppingBag size={18} style={{ color: "#1B4332" }} />
-            <h2 className="text-[16px] font-bold tracking-wider" style={{ color: "#1B4332" }}>
-              CART {cart.length > 0 && <span className="text-[13px] font-normal text-gray-500">({cart.reduce((s,i)=>s+i.quantity,0)} items)</span>}
+            <h2 className="text-[17px] font-bold tracking-wider" style={{ color: "#1B4332" }}>
+              CART {cart.length > 0 && <span className="text-[14px] font-normal text-gray-500">({cart.reduce((s,i)=>s+i.quantity,0)} items)</span>}
             </h2>
           </div>
           <button onClick={onClose} className="p-1.5 hover:bg-black/5 rounded-sm transition-colors">
@@ -49,10 +49,10 @@ export default function CartDrawer({ open, onClose }) {
           {cart.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center gap-4 py-16">
               <ShoppingBag size={48} style={{ color: "#c8c2b8" }} />
-              <p className="text-[14px] text-gray-400">Your cart is empty</p>
+              <p className="text-[15px] text-gray-400">Your cart is empty</p>
               <button
                 onClick={onClose}
-                className="text-[12px] font-bold tracking-wider border-2 px-5 py-2 rounded-sm transition-colors"
+                className="text-[13px] font-bold tracking-wider border-2 px-5 py-2 rounded-sm transition-colors"
                 style={{ borderColor: "#1B4332", color: "#1B4332" }}
                 onMouseEnter={e => { e.target.style.backgroundColor="#1B4332"; e.target.style.color="#fff"; }}
                 onMouseLeave={e => { e.target.style.backgroundColor="transparent"; e.target.style.color="#1B4332"; }}
@@ -71,11 +71,11 @@ export default function CartDrawer({ open, onClose }) {
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-semibold text-[#1a1a1a] truncate">{item.name}</p>
-                    <p className="text-[11px] text-gray-400 mt-0.5">
+                    <p className="text-[14px] font-semibold text-[#1a1a1a] truncate">{item.name}</p>
+                    <p className="text-[13px] text-gray-400 mt-0.5">
                       Size: {item.size} &nbsp;·&nbsp; {item.colorName}
                     </p>
-                    <p className="text-[14px] font-bold mt-1" style={{ color: "#1B4332" }}>{formatRWF(item.price)}</p>
+                    <p className="text-[15px] font-bold mt-1" style={{ color: "#1B4332" }}>{formatRWF(item.price)}</p>
 
                     {/* Qty + Remove */}
                     <div className="flex items-center justify-between mt-2">
@@ -84,7 +84,7 @@ export default function CartDrawer({ open, onClose }) {
                           onClick={() => updateQty(item.key, item.quantity - 1)}
                           className="w-7 h-7 flex items-center justify-center text-[#1a1a1a] hover:bg-black/5 transition-colors"
                         ><Minus size={11} /></button>
-                        <span className="w-8 text-center text-[13px] font-medium">{item.quantity}</span>
+                        <span className="w-8 text-center text-[14px] font-medium">{item.quantity}</span>
                         <button
                           onClick={() => updateQty(item.key, item.quantity + 1)}
                           className="w-7 h-7 flex items-center justify-center text-[#1a1a1a] hover:bg-black/5 transition-colors"
@@ -98,7 +98,7 @@ export default function CartDrawer({ open, onClose }) {
 
                   {/* Subtotal */}
                   <div className="text-right shrink-0">
-                    <p className="text-[13px] font-bold text-[#1a1a1a]">{formatRWF(item.price * item.quantity)}</p>
+                    <p className="text-[14px] font-bold text-[#1a1a1a]">{formatRWF(item.price * item.quantity)}</p>
                   </div>
                 </div>
               ))}
@@ -110,15 +110,15 @@ export default function CartDrawer({ open, onClose }) {
         {cart.length > 0 && (
           <div className="px-6 py-5 border-t space-y-4" style={{ borderColor: "#e5e0d8" }}>
             <div className="flex items-center justify-between">
-              <span className="text-[13px] text-gray-500 tracking-wider uppercase">Subtotal</span>
-              <span className="text-[18px] font-bold" style={{ color: "#1B4332" }}>{formatRWF(cartTotal)}</span>
+              <span className="text-[14px] text-gray-500 tracking-wider uppercase">Subtotal</span>
+              <span className="text-[20px] font-bold" style={{ color: "#1B4332" }}>{formatRWF(cartTotal)}</span>
             </div>
-            <p className="text-[11px] text-gray-400">Shipping calculated on contact. Prices in Rwandan Francs.</p>
+            <p className="text-[13px] text-gray-400">Shipping calculated on contact. Prices in Rwandan Francs.</p>
 
             {/* WhatsApp Order */}
             <button
               onClick={orderWhatsApp}
-              className="w-full h-12 flex items-center justify-center gap-2.5 text-[13px] font-bold tracking-wider text-white rounded-sm transition-colors"
+              className="w-full h-12 flex items-center justify-center gap-2.5 text-[14px] font-bold tracking-wider text-white rounded-sm transition-colors"
               style={{ backgroundColor: "#25D366" }}
               onMouseEnter={e => e.currentTarget.style.backgroundColor="#1eab52"}
               onMouseLeave={e => e.currentTarget.style.backgroundColor="#25D366"}
@@ -130,7 +130,7 @@ export default function CartDrawer({ open, onClose }) {
             {/* Continue shopping */}
             <button
               onClick={onClose}
-              className="w-full h-10 text-[12px] font-bold tracking-wider border-2 rounded-sm transition-colors"
+              className="w-full h-10 text-[13px] font-bold tracking-wider border-2 rounded-sm transition-colors"
               style={{ borderColor: "#1B4332", color: "#1B4332" }}
               onMouseEnter={e => { e.currentTarget.style.backgroundColor="#1B4332"; e.currentTarget.style.color="#fff"; }}
               onMouseLeave={e => { e.currentTarget.style.backgroundColor="transparent"; e.currentTarget.style.color="#1B4332"; }}

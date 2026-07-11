@@ -82,13 +82,13 @@ export default function ProfitLoss() {
       <div className="flex border-b border-border mb-6">
         <button 
           onClick={() => { setViewMode("monthly"); }}
-          className={`py-2.5 px-4 font-semibold text-[13px] border-b-2 transition-colors ${viewMode === "monthly" ? "border-primary text-primary" : "border-transparent text-text-secondary hover:text-text-primary"}`}
+          className={`py-2.5 px-4 font-semibold text-[14px] border-b-2 transition-colors ${viewMode === "monthly" ? "border-primary text-primary" : "border-transparent text-text-secondary hover:text-text-primary"}`}
         >
           {translate("monthly_summary")}
         </button>
         <button 
           onClick={() => { setViewMode("daily"); }}
-          className={`py-2.5 px-4 font-semibold text-[13px] border-b-2 transition-colors ${viewMode === "daily" ? "border-primary text-primary" : "border-transparent text-text-secondary hover:text-text-primary"}`}
+          className={`py-2.5 px-4 font-semibold text-[14px] border-b-2 transition-colors ${viewMode === "daily" ? "border-primary text-primary" : "border-transparent text-text-secondary hover:text-text-primary"}`}
         >
           Daily Breakdown
         </button>
@@ -97,11 +97,11 @@ export default function ProfitLoss() {
       {/* Filters Bar */}
       <div className="flex flex-wrap gap-3 mb-6 items-center">
         {viewMode === "daily" && (
-          <select value={month} onChange={e=>setMonth(parseInt(e.target.value))} className="h-9 px-3 border border-border rounded-card text-[13px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary font-medium">
+          <select value={month} onChange={e=>setMonth(parseInt(e.target.value))} className="h-9 px-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary font-medium">
             {MONTHS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
           </select>
         )}
-        <select value={year} onChange={e=>setYear(parseInt(e.target.value))} className="h-9 px-3 border border-border rounded-card text-[13px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary font-medium">
+        <select value={year} onChange={e=>setYear(parseInt(e.target.value))} className="h-9 px-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary font-medium">
           {[2024,2025,2026].map(y=><option key={y} value={y}>{y}</option>)}
         </select>
       </div>
@@ -127,17 +127,17 @@ export default function ProfitLoss() {
               {/* Monthly P&L Statement */}
               <div className="lg:col-span-5">
                 <Card title={translate("profit_loss")} subtitle={`${translate("date")} ${year}`}>
-                  <table className="w-full text-[13px]">
+                  <table className="w-full text-[14px]">
                     <tbody>
                       <tr className="bg-background">
-                        <td className="py-2 px-3 font-semibold text-text-secondary uppercase text-[10px] tracking-wide">{translate("revenue")}</td>
+                        <td className="py-2 px-3 font-semibold text-text-secondary uppercase text-[12px] tracking-wide">{translate("revenue")}</td>
                         <td />
                       </tr>
                       <tr className="border-b border-border">
                         <td className="py-2 px-3 text-text-primary">{translate("revenue")}</td>
                         <td className="py-2 px-3 text-right font-medium text-text-primary">{formatRWF(t.revenue||0)}</td>
                       </tr>
-                      <tr className="bg-background"><td className="py-2 px-3 font-semibold text-text-secondary uppercase text-[10px] tracking-wide">{translate("cogs")}</td><td /></tr>
+                      <tr className="bg-background"><td className="py-2 px-3 font-semibold text-text-secondary uppercase text-[12px] tracking-wide">{translate("cogs")}</td><td /></tr>
                       <tr className="border-b border-border">
                         <td className="py-2 px-3 text-text-secondary">{translate("cogs")}</td>
                         <td className="py-2 px-3 text-right text-danger">({formatRWF(t.cogs||0)})</td>
@@ -146,7 +146,7 @@ export default function ProfitLoss() {
                         <td className="py-2.5 px-3 font-bold text-text-primary">{translate("gross_profit")}</td>
                         <td className="py-2.5 px-3 text-right font-bold text-success">{formatRWF(grossProfit)}</td>
                       </tr>
-                      <tr className="bg-background"><td className="py-2 px-3 font-semibold text-text-secondary uppercase text-[10px] tracking-wide">{translate("operating_expenses")}</td><td /></tr>
+                      <tr className="bg-background"><td className="py-2 px-3 font-semibold text-text-secondary uppercase text-[12px] tracking-wide">{translate("operating_expenses")}</td><td /></tr>
                       <tr className="border-b border-border">
                         <td className="py-2 px-3 text-text-secondary">{translate("operating_expenses")}</td>
                         <td className="py-2 px-3 text-right text-danger">({formatRWF(t.expenses||0)})</td>
@@ -183,9 +183,9 @@ export default function ProfitLoss() {
               <div className="lg:col-span-12">
                 <Card title="Monthly Linked Business Activity" subtitle={`Summary of linked transactions for ${year}`}>
                   <div className="overflow-x-auto">
-                    <table className="w-full text-[12px] text-left">
+                    <table className="w-full text-[13px] text-left">
                       <thead>
-                        <tr className="border-b border-border text-text-secondary uppercase text-[10px] tracking-wide bg-background">
+                        <tr className="border-b border-border text-text-secondary uppercase text-[12px] tracking-wide bg-background">
                           <th className="py-2.5 px-3">Month</th>
                           <th className="py-2.5 px-3 text-right">Revenue</th>
                           <th className="py-2.5 px-3 text-right font-medium">COGS</th>
@@ -208,10 +208,10 @@ export default function ProfitLoss() {
                             </td>
                             <td className="py-2.5 px-3 text-center">
                               <div className="flex justify-center gap-2">
-                                <span className="px-2 py-0.5 bg-green-50 border border-green-200 text-green-700 rounded-btn text-[10px] font-medium">
+                                <span className="px-2 py-0.5 bg-green-50 border border-green-200 text-green-700 rounded-btn text-[12px] font-medium">
                                   {m.sales_count} Sales • {m.customers_count} Customers
                                 </span>
-                                <span className="px-2 py-0.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-btn text-[10px] font-medium">
+                                <span className="px-2 py-0.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-btn text-[12px] font-medium">
                                   {m.procurements_count} Procurements • {m.suppliers_count} Suppliers
                                 </span>
                               </div>
@@ -247,9 +247,9 @@ export default function ProfitLoss() {
               <div className="lg:col-span-12">
                 <Card title="Everyday Profit & Loss Statement" subtitle={`Daily performance for ${getMonthName(month)} ${year}`}>
                   <div className="overflow-x-auto">
-                    <table className="w-full text-[12px] text-left">
+                    <table className="w-full text-[13px] text-left">
                       <thead>
-                        <tr className="border-b border-border text-text-secondary uppercase text-[10px] tracking-wide bg-background">
+                        <tr className="border-b border-border text-text-secondary uppercase text-[12px] tracking-wide bg-background">
                           <th className="py-2.5 px-3">Date</th>
                           <th className="py-2.5 px-3 text-right">Revenue</th>
                           <th className="py-2.5 px-3 text-right">COGS (Stock Cost)</th>
@@ -273,12 +273,12 @@ export default function ProfitLoss() {
                               <td className="py-2.5 px-3 text-right text-text-secondary">({formatRWF(r.cogs)})</td>
                               <td className="py-2.5 px-3 text-right font-medium text-text-primary">{formatRWF(gross)}</td>
                               <td className="py-2.5 px-3 text-right text-danger">({formatRWF(r.expenses)})</td>
-                              <td className="py-2.5 px-3 text-right text-amber-600 font-mono text-[11px]">{formatRWF(r.procurement)}</td>
+                              <td className="py-2.5 px-3 text-right text-amber-600 font-mono text-[13px]">{formatRWF(r.procurement)}</td>
                               <td className={`py-2.5 px-3 text-right font-bold ${net >= 0 ? "text-success" : "text-danger"}`}>
                                 {formatRWF(net)}
                               </td>
                               <td className="py-2.5 px-3 text-center">
-                                <div className="flex justify-center gap-1.5 text-[10px]">
+                                <div className="flex justify-center gap-1.5 text-[12px]">
                                   {r.sales_count > 0 && (
                                     <span className="px-1.5 py-0.5 bg-green-50 border border-green-200 rounded text-green-700 font-medium">
                                       {r.sales_count} Sales ({r.customers_count} Cust)

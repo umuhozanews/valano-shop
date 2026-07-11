@@ -23,13 +23,13 @@ export default function LenderSmeDetail() {
   }, [id]);
 
   if (loading) return (
-    <div className="flex h-64 items-center justify-center text-text-secondary text-[13px]">Loading…</div>
+    <div className="flex h-64 items-center justify-center text-text-secondary text-[14px]">Loading…</div>
   );
   if (!client) return (
     <div className="flex h-64 flex-col items-center justify-center gap-3">
       <AlertTriangle size={32} className="text-danger" />
-      <p className="text-[14px] text-text-primary">SME not found in your portfolio</p>
-      <button onClick={() => navigate("/app/lender")} className="text-[13px] text-primary hover:underline">← Back to portfolio</button>
+      <p className="text-[15px] text-text-primary">SME not found in your portfolio</p>
+      <button onClick={() => navigate("/app/lender")} className="text-[14px] text-primary hover:underline">← Back to portfolio</button>
     </div>
   );
 
@@ -45,7 +45,7 @@ export default function LenderSmeDetail() {
       ]}
       action={
         <button onClick={() => navigate("/app/lender")}
-          className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-[6px] text-[13px] text-text-secondary hover:text-text-primary">
+          className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-[6px] text-[14px] text-text-secondary hover:text-text-primary">
           <ArrowLeft size={14} /> Back
         </button>
       }
@@ -59,13 +59,13 @@ export default function LenderSmeDetail() {
               <div className="mt-2">
                 <Badge status={BAND_BADGE[client.band]||"neutral"} label={client.band?.toUpperCase() || "—"} />
               </div>
-              <p className="text-[11px] text-text-secondary mt-3">
+              <p className="text-[13px] text-text-secondary mt-3">
                 Last scored: {client.calculated_at ? new Date(client.calculated_at).toLocaleDateString() : "—"}
               </p>
             </div>
           ) : (
             <div className="text-center py-8">
-              <p className="text-[14px] text-text-secondary">Not yet scored</p>
+              <p className="text-[15px] text-text-secondary">Not yet scored</p>
             </div>
           )}
         </Card>
@@ -82,16 +82,16 @@ export default function LenderSmeDetail() {
               { label:"Referral Status", value: client.referral_status || "—" },
             ].map(({ label, value }) => (
               <div key={label}>
-                <p className="text-[11px] text-text-secondary">{label}</p>
-                <p className="text-[13px] text-text-primary font-medium mt-0.5">{value}</p>
+                <p className="text-[13px] text-text-secondary">{label}</p>
+                <p className="text-[14px] text-text-primary font-medium mt-0.5">{value}</p>
               </div>
             ))}
           </div>
 
           {client.notes && (
             <div className="mt-4 p-3 bg-background rounded-[6px]">
-              <p className="text-[11px] text-text-secondary mb-1">Notes</p>
-              <p className="text-[13px] text-text-primary">{client.notes}</p>
+              <p className="text-[13px] text-text-secondary mb-1">Notes</p>
+              <p className="text-[14px] text-text-primary">{client.notes}</p>
             </div>
           )}
 
@@ -99,7 +99,7 @@ export default function LenderSmeDetail() {
             <div className="mt-4">
               <button
                 onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/advisory/${client.advisory_token}`); toast.success("Advisory link copied"); }}
-                className="text-[12px] text-primary hover:underline">
+                className="text-[13px] text-primary hover:underline">
                 Copy advisory share link →
               </button>
             </div>
@@ -115,12 +115,12 @@ export default function LenderSmeDetail() {
                 const color = h.band === "green" ? "bg-success" : h.band === "amber" ? "bg-warning" : "bg-danger";
                 return (
                   <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                    <span className="text-[11px] text-text-primary font-medium">{pct}</span>
+                    <span className="text-[13px] text-text-primary font-medium">{pct}</span>
                     <div className="w-full bg-border rounded-t-[4px] relative" style={{ height: "80px" }}>
                       <div className={`absolute bottom-0 w-full ${color} rounded-t-[4px] transition-all`}
                         style={{ height: `${pct}%` }} />
                     </div>
-                    <span className="text-[10px] text-text-secondary">{h.created_at ? new Date(h.created_at).toLocaleDateString("en-RW", { month:"short", day:"numeric" }) : "—"}</span>
+                    <span className="text-[12px] text-text-secondary">{h.created_at ? new Date(h.created_at).toLocaleDateString("en-RW", { month:"short", day:"numeric" }) : "—"}</span>
                   </div>
                 );
               })}

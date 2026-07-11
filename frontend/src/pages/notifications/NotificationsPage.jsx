@@ -54,7 +54,7 @@ export default function NotificationsPage() {
         <div className="flex gap-2 overflow-x-auto pb-1">
           {tabs.map(t => (
             <button key={t.key} onClick={() => setFilter(t.key)}
-              className={`shrink-0 px-3 py-1.5 rounded-badge text-[12px] font-medium border transition-colors ${filter === t.key ? "bg-primary text-white border-primary" : "border-border text-text-secondary hover:border-primary/50"}`}>
+              className={`shrink-0 px-3 py-1.5 rounded-badge text-[13px] font-medium border transition-colors ${filter === t.key ? "bg-primary text-white border-primary" : "border-border text-text-secondary hover:border-primary/50"}`}>
               {t.label}
             </button>
           ))}
@@ -83,7 +83,7 @@ export default function NotificationsPage() {
         ) : filtered.length === 0 ? (
           <div className="text-center py-12">
             <Bell size={40} className="text-border mx-auto mb-3" />
-            <p className="text-[14px] text-text-secondary">No notifications</p>
+            <p className="text-[15px] text-text-secondary">No notifications</p>
           </div>
         ) : (
           <div className="divide-y divide-border">
@@ -98,15 +98,15 @@ export default function NotificationsPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <p className={`text-[13px] font-semibold ${!notif.is_read ? "text-text-primary" : "text-text-secondary"}`}>
+                      <p className={`text-[14px] font-semibold ${!notif.is_read ? "text-text-primary" : "text-text-secondary"}`}>
                         {notif.title}
                       </p>
                       {!notif.is_read && (
                         <span className="w-2 h-2 rounded-full bg-primary shrink-0" />
                       )}
                     </div>
-                    <p className="text-[13px] text-text-secondary leading-relaxed">{notif.message}</p>
-                    <p className="text-[11px] text-text-secondary mt-1">{formatRelative(notif.created_at)}</p>
+                    <p className="text-[14px] text-text-secondary leading-relaxed">{notif.message}</p>
+                    <p className="text-[13px] text-text-secondary mt-1">{formatRelative(notif.created_at)}</p>
                   </div>
                   {!notif.is_read && (
                     <button onClick={() => markRead(notif.id)}

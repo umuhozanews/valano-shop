@@ -11,9 +11,9 @@ const variants = {
 };
 
 const sizes = {
-  sm: "h-7 px-3 text-[13px]",
-  md: "h-9 px-4 text-[14px]",
-  lg: "h-11 px-6 text-[15px]",
+  sm: "h-7 px-3 text-[14px]",
+  md: "h-9 px-4 text-[15px]",
+  lg: "h-11 px-6 text-[16px]",
 };
 
 export default function Button({

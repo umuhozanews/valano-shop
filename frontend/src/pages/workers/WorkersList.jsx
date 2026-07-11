@@ -75,9 +75,9 @@ export default function WorkersList() {
     { key:"name", label: t("name"), render:(v,r) => (
       <div className="flex items-center gap-2.5">
         <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
-          <span className="text-[12px] font-bold text-primary">{v?.charAt(0)}</span>
+          <span className="text-[13px] font-bold text-primary">{v?.charAt(0)}</span>
         </div>
-        <div><p className="font-medium text-text-primary">{v}</p><p className="text-[11px] text-text-secondary">{r.email}</p></div>
+        <div><p className="font-medium text-text-primary">{v}</p><p className="text-[13px] text-text-secondary">{r.email}</p></div>
       </div>
     )},
     { key:"role", label: "Role", render:v => <Badge status={v==="manager"?"warning":"neutral"} label={v} /> },
@@ -102,7 +102,7 @@ export default function WorkersList() {
           <div className="relative">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder={`${t("search")}…`}
-              className="h-8 pl-8 pr-3 border border-border rounded-card text-[12px] focus:outline-none focus:ring-1 focus:ring-primary w-40" />
+              className="h-8 pl-8 pr-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-1 focus:ring-primary w-40" />
           </div>
           <Button icon={Plus} size="sm" onClick={() => { setEditW(null); setForm(EMPTY); setShowModal(true); }}>{t("add")}</Button>
         </div>
@@ -117,8 +117,8 @@ export default function WorkersList() {
           <Input label="Email" type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} />
           <Input label={t("phone")} value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} />
           <div>
-            <label className="block text-[13px] font-medium text-text-primary mb-1">Branch</label>
-            <select value={form.branch_id} onChange={e=>setForm(f=>({...f,branch_id:e.target.value}))} className="w-full h-9 px-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface">
+            <label className="block text-[14px] font-medium text-text-primary mb-1">Branch</label>
+            <select value={form.branch_id} onChange={e=>setForm(f=>({...f,branch_id:e.target.value}))} className="w-full h-9 px-3 border border-border rounded-card text-[14px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface">
               <option value="">None (Global)</option>
               {branches.map(b => (
                 <option key={b.id} value={b.id}>{b.name}</option>
@@ -126,8 +126,8 @@ export default function WorkersList() {
             </select>
           </div>
           <div>
-            <label className="block text-[13px] font-medium text-text-primary mb-1">Role</label>
-            <select value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value}))} className="w-full h-9 px-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface">
+            <label className="block text-[14px] font-medium text-text-primary mb-1">Role</label>
+            <select value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value}))} className="w-full h-9 px-3 border border-border rounded-card text-[14px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface">
               <option value="worker">Worker</option><option value="manager">Manager</option>
             </select>
           </div>

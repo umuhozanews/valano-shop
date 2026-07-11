@@ -98,7 +98,7 @@ export function PricingSection() {
           </Link>
 
           <div className="mt-7">
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest" style={{ color: "#9090a8" }}>
+            <p className="mb-3 text-[12px] font-semibold uppercase tracking-widest" style={{ color: "#9090a8" }}>
               Get Started With
             </p>
             <ul className="space-y-3">
@@ -145,7 +145,7 @@ export function PricingSection() {
           </Link>
 
           <div className="mt-7">
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest" style={{ color: "#9090a8" }}>
+            <p className="mb-3 text-[12px] font-semibold uppercase tracking-widest" style={{ color: "#9090a8" }}>
               Everything In Starter
             </p>
             <ul className="space-y-3">
@@ -188,7 +188,7 @@ export function PricingSection() {
           </Link>
 
           <div className="mt-7">
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest" style={{ color: "#9090a8" }}>
+            <p className="mb-3 text-[12px] font-semibold uppercase tracking-widest" style={{ color: "#9090a8" }}>
               Includes Per Month
             </p>
             <ul className="space-y-3">
