@@ -127,7 +127,7 @@ export default function AdvisoryPublic() {
               {recs.map((rec, i) => (
                 <div key={i} className="flex gap-3 p-3 bg-blue-50 rounded-lg">
                   <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[12px] font-bold flex items-center justify-center shrink-0">{i+1}</span>
-                  <p className="text-[12.5px] text-gray-700">{rec.text_en || rec}</p>
+                  <p className="text-[12.5px] text-gray-700">{rec.en || rec.text_en || (typeof rec === 'string' ? rec : '')}</p>
                 </div>
               ))}
             </div>
