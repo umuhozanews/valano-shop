@@ -9,6 +9,7 @@ import PageWrapper from "../../components/layout/PageWrapper";
 import Card from "../../components/ui/Card";
 import api from "../../utils/api";
 import { useAuth } from "../../context/AuthContext";
+import { useLanguage } from "../../context/LanguageContext";
 import toast from "react-hot-toast";
 
 // ─── Half-circle gauge ────────────────────────────────────────────────────────
@@ -72,6 +73,7 @@ function Factor({ label, direction, value }) {
 
 export default function HealthScore() {
   const { user } = useAuth();
+  const { lang } = useLanguage();
   const navigate = useNavigate();
   const [score,    setScore]    = useState(null);
   const [history,  setHistory]  = useState([]);
@@ -89,7 +91,7 @@ export default function HealthScore() {
         api.get(`/v2/score/${userId}/history?limit=12`).catch(() => null),
       ]);
       if (latestRes?.data) setScore(latestRes.data);
-      if (histRes?.data)   setHistory(Array.isArray(histRes.data) ? histRes.data : []);
+      if (histRes?.data?.history) setHistory(Array.isArray(histRes.data.history) ? histRes.data.history : []);
     } catch {
       // fail silently — show empty state
     } finally {
@@ -192,7 +194,7 @@ export default function HealthScore() {
                   {recs.map((rec, i) => (
                     <div key={i} className="flex gap-3 p-3 bg-primary/5 border border-primary/20 rounded-[8px]">
                       <span className="w-5 h-5 rounded-full bg-primary text-white text-[12px] font-bold flex items-center justify-center shrink-0">{i+1}</span>
-                      <p className="text-[12.5px] text-text-primary">{rec.text_en || rec}</p>
+                      <p className="text-[12.5px] text-text-primary">{rec[lang] || rec.en || rec.text_en || (typeof rec === 'string' ? rec : '')}</p>
                     </div>
                   ))}
                 </div>
@@ -232,19 +234,19 @@ export default function HealthScore() {
                 {positive.length ? (
                   <div className="space-y-2">
                     {positive.map((f, i) => (
-                      <Factor key={i} label={f.label_en || f.key} direction="positive" value={f.value !== undefined ? `Score: +${f.value}` : undefined} />
+                      <Factor key={i} label={f[`label_${lang}`] || f.label_en || f.key} direction="positive" value={f.value !== undefined ? `Score: +${f.value}` : undefined} />
                     ))}
                   </div>
                 ) : (
                   <p className="text-[14px] text-text-secondary py-4 text-center">No positive factors identified yet</p>
                 )}
               </Card>
-
+ 
               <Card title="Negative Factors">
                 {negative.length ? (
                   <div className="space-y-2">
                     {negative.map((f, i) => (
-                      <Factor key={i} label={f.label_en || f.key} direction="negative" value={f.value !== undefined ? `Impact: ${f.value}` : undefined} />
+                      <Factor key={i} label={f[`label_${lang}`] || f.label_en || f.key} direction="negative" value={f.value !== undefined ? `Impact: ${f.value}` : undefined} />
                     ))}
                   </div>
                 ) : (
