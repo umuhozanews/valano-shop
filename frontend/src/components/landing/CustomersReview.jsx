@@ -44,7 +44,7 @@ const reviews = [
     company: "Gacondo Tech",
     role: "Technology",
     title: "Excellent System",
-    quote: "KNOTY made sales and delivery tracking simple.",
+    quote: "INZIRA made sales and delivery tracking simple.",
     stars: 5,
   },
   {
@@ -121,7 +121,7 @@ export function CustomersReview() {
           Customers Review
         </h2>
         <p className="mt-2 text-sm" style={{ color: "#888" }}>
-          What our clients say about KNOTY
+          What our clients say about INZIRA
         </p>
       </MotionReveal>
 

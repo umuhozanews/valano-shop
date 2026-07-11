@@ -78,7 +78,7 @@ export function PricingSection() {
               Basic Plan
             </h3>
             <p className="mt-1 text-xs leading-relaxed" style={{ color: "#6b6b80" }}>
-              Full access to KNOTY system. Manage your business operations with ease and full control.
+              Full access to INZIRA system. Manage your business operations with ease and full control.
             </p>
             <p
               className="mt-4 text-2xl font-extrabold"
@@ -123,7 +123,7 @@ export function PricingSection() {
               Extended Plan
             </h3>
             <p className="mt-1 text-xs leading-relaxed" style={{ color: "#6b6b80" }}>
-              KNOTY connected with EBM (tax machine). Best for companies requiring full fiscal compliance.
+              INZIRA connected with EBM (tax machine). Best for companies requiring full fiscal compliance.
             </p>
             <div className="mt-4 flex items-baseline gap-1">
               <span
@@ -166,7 +166,7 @@ export function PricingSection() {
               Daily Maintenance
             </h3>
             <p className="mt-1 text-xs leading-relaxed" style={{ color: "#6b6b80" }}>
-              Keep your KNOTY system running smoothly with our daily monitoring and maintenance service.
+              Keep your INZIRA system running smoothly with our daily monitoring and maintenance service.
             </p>
             <div className="mt-4 flex items-baseline gap-1">
               <span

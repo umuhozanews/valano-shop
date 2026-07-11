@@ -43,7 +43,7 @@ function TmusicLogo() {
     <div className="flex items-center gap-2">
       <div
         className="flex h-8 w-8 items-center justify-center rounded-full"
-        style={{ backgroundColor: "#d44d0f" }}
+        style={{ backgroundColor: "#006C49" }}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
           <path d="M9 18V5l12-2v13" />
@@ -52,7 +52,7 @@ function TmusicLogo() {
         </svg>
       </div>
       <span className="text-lg font-bold tracking-tight" style={{ color: "#1a1a1a", fontFamily: "Manrope, sans-serif" }}>
-        KNOTY
+        INZIRA
       </span>
     </div>
   );
@@ -73,14 +73,14 @@ export function TmusicFooter() {
           className="relative w-full overflow-hidden rounded-2xl px-8 py-16 text-center"
           style={{
             background:
-              "radial-gradient(ellipse at 30% 50%, #e8600a 0%, #c44208 40%, #9e2f02 75%, #7a1e00 100%)",
+              "radial-gradient(ellipse at 30% 50%, #009362 0%, #006C49 40%, #004d33 75%, #003020 100%)",
           }}
         >
           <div
             className="pointer-events-none absolute inset-0"
             style={{
               background:
-                "conic-gradient(from 200deg at 70% 60%, transparent 0deg, rgba(255,120,30,0.25) 60deg, transparent 120deg, rgba(200,60,0,0.2) 200deg, transparent 280deg)",
+                "conic-gradient(from 200deg at 70% 60%, transparent 0deg, rgba(0,180,120,0.25) 60deg, transparent 120deg, rgba(0,100,70,0.2) 200deg, transparent 280deg)",
               mixBlendMode: "overlay",
             }}
           />
@@ -88,17 +88,17 @@ export function TmusicFooter() {
             className="pointer-events-none absolute inset-0"
             style={{
               background:
-                "radial-gradient(ellipse at 80% 30%, rgba(255,140,60,0.35) 0%, transparent 60%)",
+                "radial-gradient(ellipse at 80% 30%, rgba(0,220,150,0.35) 0%, transparent 60%)",
               mixBlendMode: "overlay",
             }}
           />
-
+ 
           <MotionReveal className="reveal-up relative z-10">
             <h2
               className="mx-auto max-w-2xl font-extrabold leading-tight text-white"
               style={{ fontFamily: "Manrope, sans-serif", fontSize: "clamp(1.75rem, 4vw, 2.75rem)" }}
             >
-              Let KNOTY take the busywork out of running your business
+              Let INZIRA take the busywork out of running your business
             </h2>
             <p className="mx-auto mt-4 max-w-lg text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.82)" }}>
               From tracking sales to managing invoices and workers — automate the tasks you shouldn't be doing manually.
@@ -179,7 +179,7 @@ export function TmusicFooter() {
               />
               <button
                 className="flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
-                style={{ backgroundColor: "#d44d0f", whiteSpace: "nowrap" }}
+                style={{ backgroundColor: "#006C49", whiteSpace: "nowrap" }}
               >
                 Subscribe <span>→</span>
               </button>

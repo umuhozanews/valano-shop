@@ -1,7 +1,5 @@
 import { Link } from "react-router-dom";
 import { Users, Handshake, ChevronDown } from "lucide-react";
-import bizcoreLogo from "../assets/bizcore-logo.png";
-import heroImg from "../assets/bizcore-hero.png";
 import { PricingSection } from "../components/landing/PricingSection";
 import { HowItWorksSection } from "../components/landing/HowItWorksSection";
 import { TmusicFooter } from "../components/landing/TmusicFooter";
@@ -23,22 +21,23 @@ export default function Landing() {
     <div className="min-h-screen p-2 sm:p-3 motion-gradient-bg">
       <div
         className="relative min-h-[calc(100vh-1rem)] overflow-hidden rounded-lg px-6 py-6 sm:px-12 sm:py-8 lg:px-16"
-        style={{ backgroundColor: "#eaf4ff", fontFamily: "Inter, sans-serif" }}
+        style={{ backgroundColor: "#e8f5e9", fontFamily: "Inter, sans-serif" }}
       >
         {/* Nav */}
         <header className="flex items-center justify-between reveal-up active">
-          <div
-            className="flex items-center px-4 py-2 rounded-2xl"
-            style={{ backgroundColor: "#1a1a1a" }}
-          >
+          <div className="flex items-center gap-3">
             <img
-              src={bizcoreLogo}
-              alt="BizCore Solutions"
-              className="h-20 w-auto object-contain"
+              src="/inzira-logo.jpg"
+              alt="Inzira Logo"
+              className="h-12 w-12 rounded-full object-cover border-2 border-[#006C49]/20"
             />
+            <div>
+              <span className="text-[20px] font-extrabold tracking-tight block leading-tight text-[#006C49]">INZIRA</span>
+              <span className="text-[12px] text-gray-500 block leading-tight tracking-wider uppercase font-semibold">Insight</span>
+            </div>
           </div>
 
-          <nav className="hidden items-center gap-6 text-sm font-medium md:flex" style={{ color: "#0b1c30" }}>
+          <nav className="hidden items-center gap-6 text-sm font-medium md:flex" style={{ color: "#006C49" }}>
             {navLinks.map((l, i) => (
               <span key={l} className="flex items-center gap-6">
                 <a href="#" className="hover:opacity-70 transition-opacity">{l}</a>
@@ -49,8 +48,8 @@ export default function Landing() {
 
           <Link
             to="/app/login"
-            className="rounded-full border px-5 py-2 text-sm font-semibold transition hover:bg-[#0b1c30] hover:text-white"
-            style={{ borderColor: "#0b1c30", color: "#0b1c30" }}
+            className="rounded-full border px-5 py-2 text-sm font-semibold transition hover:bg-[#006C49] hover:text-white"
+            style={{ borderColor: "#006C49", color: "#006C49" }}
           >
             Staff Login
           </Link>
@@ -65,30 +64,30 @@ export default function Landing() {
               style={{ fontFamily: "Manrope, sans-serif", fontSize: "clamp(2.5rem, 6vw, 5rem)" }}
               activeOnMount
             >
-              <span className="word" style={{ color: "#7a9a9c" }}>Manage Your</span>
+              <span className="word" style={{ color: "#5f9a80" }}>Manage Your</span>
               <br />
-              <span className="word" style={{ color: "#0b1c30" }}>Business</span>
+              <span className="word" style={{ color: "#006C49" }}>Business</span>
               <br />
-              <span className="word" style={{ color: "#0b1c30" }}>with KNOTY</span>
+              <span className="word" style={{ color: "#006C49" }}>with INZIRA</span>
             </MotionReveal>
 
             <MotionReveal className="reveal-up active" activeOnMount>
-              <p className="mt-6 max-w-md text-sm leading-relaxed" style={{ color: "#0b1c30" }}>
-                KNOTY is a complete business management system — track sales, procurement, debts, deliveries, expenses, bills, workers and invoices all in one place.
+              <p className="mt-6 max-w-md text-sm leading-relaxed" style={{ color: "#003a25" }}>
+                INZIRA Insight is a complete business intelligence & management platform — track sales, stock, expenses, workers, and generate AI-powered Health Scores for Rwanda's growing retail and wholesale markets.
               </p>
 
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <Link
                   to="/app/login"
-                  className="rounded-full px-7 py-3 text-sm font-semibold hover:bg-[#b0c0c8] transition-colors"
-                  style={{ backgroundColor: "#c5d6dd", color: "#0b1c30" }}
+                  className="rounded-full px-7 py-3 text-sm font-semibold hover:bg-emerald-50 transition-colors border border-[#006C49]"
+                  style={{ color: "#006C49" }}
                 >
                   See Features
                 </Link>
                 <Link
                   to="/app/login"
                   className="rounded-full px-7 py-3 text-sm font-semibold text-white hover:bg-opacity-90 transition-opacity"
-                  style={{ backgroundColor: "#0b1c30" }}
+                  style={{ backgroundColor: "#006C49" }}
                 >
                   Get Started
                 </Link>
@@ -103,9 +102,9 @@ export default function Landing() {
 
           <MotionReveal className="reveal-up flex items-center justify-center active" activeOnMount>
             <img
-              src={heroImg}
-              alt="KNOTY Business Management"
-              className="w-full max-w-[520px] h-auto object-contain rounded-3xl opacity-85"
+              src="/inzira-hero.jpg"
+              alt="INZIRA Business Management Mockup"
+              className="w-full max-w-[520px] h-auto object-contain rounded-3xl opacity-90 shadow-xl shadow-[#006C49]/10"
             />
           </MotionReveal>
         </main>
@@ -115,10 +114,10 @@ export default function Landing() {
           <MotionReveal className="stagger-children grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6 lg:items-end active" activeOnMount>
             {filters.map((f) => (
               <div key={f.value}>
-                <div className="mb-2 text-sm font-medium" style={{ color: "#0b1c30" }}>{f.label}</div>
+                <div className="mb-2 text-sm font-medium" style={{ color: "#006C49" }}>{f.label}</div>
                 <button
                   className="flex w-full items-center justify-between rounded-full border bg-white px-4 py-2.5 text-sm"
-                  style={{ borderColor: "#0b1c30", color: "#0b1c30" }}
+                  style={{ borderColor: "#006C49", color: "#006C49" }}
                 >
                   {f.value}
                   <ChevronDown size={16} />
@@ -127,8 +126,8 @@ export default function Landing() {
             ))}
             <Link
               to="/app/login"
-              className="rounded-full px-7 py-2.5 text-sm font-semibold text-center hover:bg-[#b0c0c8] transition-colors"
-              style={{ backgroundColor: "#c5d6dd", color: "#0b1c30" }}
+              className="rounded-full px-7 py-2.5 text-sm font-semibold text-center hover:bg-opacity-90 transition-opacity text-white"
+              style={{ backgroundColor: "#006C49" }}
             >
               Explore
             </Link>

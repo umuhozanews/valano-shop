@@ -62,7 +62,7 @@ function SlackMock() {
     >
       <div className="w-28 flex-shrink-0 border-r border-gray-700 pt-3 px-2">
         <div className="flex items-center gap-1.5 mb-3">
-          <span className="text-white text-xs font-bold">KNOTY</span>
+          <span className="text-white text-xs font-bold">INZIRA</span>
         </div>
         {["Threads", "Huddles", "Drafts & sent", "Directories"].map((item) => (
           <p key={item} className="text-[10px] text-gray-400 py-0.5 px-1">{item}</p>
@@ -90,7 +90,7 @@ function SlackMock() {
         </div>
         <div className="space-y-2 flex-1">
           <Message name="Robert Hayes" time="10:35 AM" text="Joined #onboarding" />
-          <Message name="KNOTY" time="10:36 AM" text="Hey! Welcome to KNOTY 🔥" highlight />
+          <Message name="INZIRA" time="10:36 AM" text="Hey! Welcome to INZIRA 🔥" highlight />
         </div>
         <div className="mt-2 rounded-lg border border-gray-600 px-3 py-1.5 flex items-center justify-between">
           <span className="text-[10px] text-gray-500">Message #onboarding</span>
@@ -131,7 +131,7 @@ function DesignMock() {
         <div className="w-1.5 h-1.5 rounded-full bg-red-400" />
         <div className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
         <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
-          <span className="ml-3 text-[10px] text-gray-400 font-medium">knoty.rw</span>
+          <span className="ml-3 text-[10px] text-gray-400 font-medium">hippotech.rw</span>
         <div className="ml-auto flex gap-1">
           {["Home", "About", "Pricing", "Team"].map((t) => (
             <span key={t} className="text-[9px] text-gray-500">{t}</span>
@@ -236,7 +236,7 @@ const steps = [
     mock: <CalendarMock />,
     step: "Step 1",
     title: "Book an intro call",
-    desc: "We discuss your business needs and show you how KNOTY fits your operations.",
+    desc: "We discuss your business needs and show you how INZIRA fits your operations.",
   },
   {
     mock: <SlackMock />,
