@@ -78,9 +78,10 @@ export const NAV_ITEMS = [
   {
     section: "FINANCE", tKey: "nav_finance",
     items: [
-      { label: "Expenses",      tKey: "expenses",     icon: "CreditCard", path: "/app/expenses",     roles: ["pulse_admin","sme_owner","admin","manager","accountant"] },
-      { label: "Invoices",      tKey: "invoices",     icon: "FileText",   path: "/app/invoices",     roles: ["pulse_admin","sme_owner","admin","manager","accountant"] },
-      { label: "Profit & Loss", tKey: "profit_loss",  icon: "TrendingUp", path: "/app/finance/pnl",  roles: ["pulse_admin","sme_owner","admin","accountant"] },
+      { label: "Expenses",         tKey: "expenses",         icon: "CreditCard", path: "/app/expenses",     roles: ["pulse_admin","sme_owner","admin","manager","accountant"] },
+      { label: "Invoices",         tKey: "invoices",         icon: "FileText",   path: "/app/invoices",     roles: ["pulse_admin","sme_owner","admin","manager","accountant"] },
+      { label: "Profit & Loss",    tKey: "profit_loss",      icon: "TrendingUp", path: "/app/finance/pnl",  roles: ["pulse_admin","sme_owner","admin","accountant"] },
+      { label: "Financial Books",  tKey: "financial_books",  icon: "BookOpen",   path: "/app/books",        roles: ["pulse_admin","sme_owner","admin","accountant"] },
     ],
   },
   {

@@ -13,7 +13,7 @@ function createInvoicePDF(res, { invoice, sale, items, settings, branch, custome
   // Header bar
   doc.rect(0, 0, doc.page.width, 80).fill(emerald);
   doc.fillColor("white").fontSize(22).font("Helvetica-Bold")
-     .text(settings?.shop_name || "VALANO SHOP", 50, 25);
+     .text(settings?.shop_name || "INZIRA INSIGHTS", 50, 25);
   doc.fontSize(10).font("Helvetica")
      .text(settings?.shop_address || "Kigali, Rwanda", 50, 52)
      .text(settings?.shop_phone || "", 50, 64);
@@ -95,7 +95,9 @@ function createInvoicePDF(res, { invoice, sale, items, settings, branch, custome
 
   // Footer
   doc.fillColor(gray).font("Helvetica").fontSize(9)
-     .text(settings?.invoice_footer_text || "Thank you for your business!", 50, rowY + 50, { align: "center" });
+     .text(settings?.invoice_footer_text || "Thank you for your business!", 50, rowY + 40, { align: "center" });
+  doc.fillColor("#9CA3AF").fontSize(8)
+     .text(`Powered by INZIRA Insights · inzira-insights.rw`, 50, rowY + 58, { align: "center" });
 
   doc.end();
 }
@@ -104,7 +106,7 @@ function fmt(n) {
   return new Intl.NumberFormat("en-RW").format(n || 0) + " RWF";
 }
 
-function createReportPDF(res, { title, dateRange, columns, rows, totalsRow }) {
+function createReportPDF(res, { title, dateRange, columns, rows, totalsRow, shopName }) {
   const doc = new PDFDocument({ margin: 40, size: "A4", layout: "landscape" });
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `attachment; filename="report.pdf"`);
@@ -113,9 +115,10 @@ function createReportPDF(res, { title, dateRange, columns, rows, totalsRow }) {
   const emerald = "#10B981";
 
   doc.rect(0, 0, doc.page.width, 60).fill(emerald);
-  doc.fillColor("white").fontSize(16).font("Helvetica-Bold").text("VALANO SHOP", 40, 12);
-  doc.fontSize(11).font("Helvetica").text(title, 40, 32);
-  if (dateRange) doc.fontSize(9).text(dateRange, 40, 46);
+  doc.fillColor("white").fontSize(16).font("Helvetica-Bold").text(shopName || "INZIRA INSIGHTS", 40, 12);
+  doc.fontSize(9).font("Helvetica").fillColor("rgba(255,255,255,0.7)").text("Powered by INZIRA Insights", 40, 32);
+  doc.fontSize(11).font("Helvetica").fillColor("white").text(title, 40, 44);
+  if (dateRange) doc.fontSize(9).fillColor("rgba(255,255,255,0.8)").text(dateRange, doc.page.width - 200, 44);
 
   let y = 75;
   const colW = Math.floor((doc.page.width - 80) / columns.length);

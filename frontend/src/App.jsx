@@ -43,6 +43,7 @@ const Payables          = L(() => import("./pages/finance/Payables"));
 const InvoicesList      = L(() => import("./pages/finance/InvoicesList"));
 const ExpensesList      = L(() => import("./pages/finance/ExpensesList"));
 const ProfitLoss        = L(() => import("./pages/finance/ProfitLoss"));
+const FinancialBooks    = L(() => import("./pages/finance/FinancialBooks"));
 
 // Reports
 const SalesReport       = L(() => import("./pages/reports/SalesReport"));
@@ -120,6 +121,7 @@ export default function App() {
           <Route path="/app/expenses"         element={<P roles={STAFF}><ExpensesList /></P>} />
           <Route path="/app/invoices"         element={<P roles={STAFF}><InvoicesList /></P>} />
           <Route path="/app/finance/pnl"      element={<P roles={FIN}><ProfitLoss /></P>} />
+          <Route path="/app/books"            element={<P roles={FIN}><FinancialBooks /></P>} />
 
           {/* Reports */}
           <Route path="/app/reports/sales"    element={<P roles={STAFF}><SalesReport /></P>} />

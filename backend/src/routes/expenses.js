@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require("../config/db");
 const { verifyToken, requireRole } = require("../middleware/auth");
 const { logAudit, paginate, notifyAdminsAndManagers } = require("../utils/helpers");
+const { journalForExpense } = require("../utils/journal");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
@@ -101,7 +102,11 @@ router.post("/", async (req, res, next) => {
 
     // Check for expense spike (150% of prior month average)
     await checkExpenseSpike(req.user.id);
-
+    journalForExpense({
+      expenseId: exp.id, amount, category,
+      description: description || category,
+      createdBy: req.user.id, expenseDate: expense_date,
+    });
     await logAudit(req.user.id, "EXPENSE_ADDED", "expenses", exp.id, null, exp, req.ip);
     res.status(201).json(exp);
   } catch (err) { next(err); }

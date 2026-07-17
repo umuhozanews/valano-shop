@@ -12,9 +12,9 @@ function styleHeader(ws, headers, rowNum = 1) {
   row.alignment = { vertical: "middle" };
 }
 
-async function exportToExcel(res, sheets) {
+async function exportToExcel(res, sheets, { shopName } = {}) {
   const wb = new ExcelJS.Workbook();
-  wb.creator = "VALANO SHOP";
+  wb.creator = shopName || "INZIRA Insights";
   wb.created = new Date();
 
   for (const { name, headers, rows, totals } of sheets) {
