@@ -4,6 +4,7 @@ const pool = require("../config/db");
 const { verifyToken, requireRole } = require("../middleware/auth");
 const { logAudit, paginate, notifyAdminsAndManagers } = require("../utils/helpers");
 const { generateBarcodeBuffer } = require("../utils/barcode");
+const { ensureTenantColumns, addOwnerFilter } = require("../utils/tenant");
 const multer = require("multer");
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -11,9 +12,12 @@ router.use(verifyToken);
 
 router.get("/", async (req, res, next) => {
   try {
+    await ensureTenantColumns();
     const { category, unit, status, search, page, limit } = req.query;
     const { limit: lim, offset } = paginate(page, limit);
     const conds = ["si.is_active=true"]; const params = [];
+
+    addOwnerFilter(conds, params, req.ownerId, 'si');
 
     if (category) { params.push(category); conds.push(`si.category=$${params.length}`); }
     if (unit) { params.push(unit); conds.push(`si.unit=$${params.length}`); }
@@ -51,8 +55,12 @@ router.get("/", async (req, res, next) => {
 
 router.get("/categories", async (req, res, next) => {
   try {
+    await ensureTenantColumns();
+    const conds = ["is_active=true", "category IS NOT NULL"]; const params = [];
+    addOwnerFilter(conds, params, req.ownerId);
     const { rows } = await pool.query(
-      "SELECT DISTINCT category FROM stock_items WHERE is_active=true AND category IS NOT NULL ORDER BY category"
+      `SELECT DISTINCT category FROM stock_items WHERE ${conds.join(" AND ")} ORDER BY category`,
+      params
     );
     res.json(rows.map(r => r.category));
   } catch (err) { next(err); }
@@ -60,6 +68,10 @@ router.get("/categories", async (req, res, next) => {
 
 router.get("/valuation", requireRole("admin", "sme_owner", "accountant", "pulse_admin"), async (req, res, next) => {
   try {
+    await ensureTenantColumns();
+    const vConds = ["is_active=true"]; const vParams = [];
+    addOwnerFilter(vConds, vParams, req.ownerId);
+    const vWhere = vConds.join(" AND ");
     // AVCO stock valuation
     const { rows } = await pool.query(
       `SELECT
@@ -69,15 +81,19 @@ router.get("/valuation", requireRole("admin", "sme_owner", "accountant", "pulse_
         COUNT(*) FILTER (WHERE quantity=0) as out_of_stock,
         COUNT(*) FILTER (WHERE quantity>0 AND quantity<=low_stock_threshold) as low_stock,
         COUNT(*) FILTER (WHERE quantity>low_stock_threshold) as in_stock
-       FROM stock_items WHERE is_active=true`
+       FROM stock_items WHERE ${vWhere}`,
+      vParams
     );
+    const bConds = ["is_active=true", "category IS NOT NULL"]; const bParams = [];
+    addOwnerFilter(bConds, bParams, req.ownerId);
     const byCategory = await pool.query(
       `SELECT category,
         COALESCE(SUM(quantity*cost_price_rwf),0) as cost_value,
         COALESCE(SUM(quantity*sell_price_rwf),0) as sell_value,
         SUM(quantity) as total_qty
-       FROM stock_items WHERE is_active=true AND category IS NOT NULL
-       GROUP BY category ORDER BY cost_value DESC`
+       FROM stock_items WHERE ${bConds.join(" AND ")}
+       GROUP BY category ORDER BY cost_value DESC`,
+      bParams
     );
     res.json({ summary: rows[0], byCategory: byCategory.rows });
   } catch (err) { next(err); }
@@ -161,14 +177,15 @@ router.get("/print-labels", async (req, res, next) => {
 
 router.post("/", requireRole("admin", "sme_owner", "manager", "pulse_admin"), async (req, res, next) => {
   try {
+    await ensureTenantColumns();
     const { name, name_rw, category, unit, quantity, cost_price_rwf, sell_price_rwf, low_stock_threshold, image_url } = req.body;
     if (!name) return res.status(400).json({ error: "Product name required" });
 
     const barcode = `INZ${Date.now()}${Math.floor(Math.random() * 1000)}`;
 
     const { rows: [item] } = await pool.query(
-      `INSERT INTO stock_items (name, name_rw, category, unit, barcode, image_url, quantity, cost_price_rwf, sell_price_rwf, low_stock_threshold)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      `INSERT INTO stock_items (name, name_rw, category, unit, barcode, image_url, quantity, cost_price_rwf, sell_price_rwf, low_stock_threshold, owner_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
       [
         name, name_rw || null, category || null, unit || "pcs",
         barcode, image_url || null,
@@ -176,6 +193,7 @@ router.post("/", requireRole("admin", "sme_owner", "manager", "pulse_admin"), as
         parseInt(cost_price_rwf) || 0,
         parseInt(sell_price_rwf) || 0,
         parseInt(low_stock_threshold) || 5,
+        req.ownerId,
       ]
     );
     await logAudit(req.user.id, "STOCK_CREATED", "stock_items", item.id, null, item, req.ip);

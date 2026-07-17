@@ -4,6 +4,7 @@ const pool = require("../config/db");
 const { verifyToken, requireRole } = require("../middleware/auth");
 const { logAudit, paginate, notifyAdminsAndManagers } = require("../utils/helpers");
 const { journalForExpense } = require("../utils/journal");
+const { ensureTenantColumns, addOwnerFilter } = require("../utils/tenant");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
@@ -28,9 +29,12 @@ router.use(verifyToken, requireRole("admin", "sme_owner", "manager", "accountant
 
 router.get("/", async (req, res, next) => {
   try {
+    await ensureTenantColumns();
     const { start_date, end_date, category, page, limit } = req.query;
     const { limit: lim, offset } = paginate(page, limit);
     const conds = ["1=1"]; const params = [];
+
+    addOwnerFilter(conds, params, req.ownerId, 'e');
 
     if (category) { params.push(category); conds.push(`e.category=$${params.length}`); }
     if (start_date) { params.push(start_date); conds.push(`e.expense_date>=$${params.length}`); }
@@ -69,11 +73,15 @@ router.get("/", async (req, res, next) => {
 
 router.get("/summary", async (req, res, next) => {
   try {
+    await ensureTenantColumns();
+    const oid = req.ownerId;
+    const oWhere = oid !== null && oid !== undefined ? ` AND owner_id = $1` : '';
+    const oParam = oid !== null && oid !== undefined ? [oid] : [];
     // Monthly expense summary with % of revenue
     const { rows } = await pool.query(`
       WITH monthly_revenue AS (
         SELECT COALESCE(SUM(total_amount),0) as rev
-        FROM sales WHERE DATE_TRUNC('month',created_at)=DATE_TRUNC('month',NOW()) AND is_voided=false
+        FROM sales WHERE DATE_TRUNC('month',created_at)=DATE_TRUNC('month',NOW()) AND is_voided=false${oWhere}
       )
       SELECT e.category,
         SUM(CASE WHEN DATE_TRUNC('month',expense_date::timestamp)=DATE_TRUNC('month',NOW()) THEN e.amount ELSE 0 END) as this_month,
@@ -82,7 +90,8 @@ router.get("/summary", async (req, res, next) => {
           100.0 * SUM(CASE WHEN DATE_TRUNC('month',expense_date::timestamp)=DATE_TRUNC('month',NOW()) THEN e.amount ELSE 0 END)
           / NULLIF((SELECT rev FROM monthly_revenue), 0), 1
         ) as pct_of_revenue
-      FROM expenses e GROUP BY e.category ORDER BY this_month DESC`
+      FROM expenses e WHERE 1=1${oWhere} GROUP BY e.category ORDER BY this_month DESC`,
+      oParam
     );
     res.json(rows);
   } catch (err) { next(err); }
@@ -90,18 +99,19 @@ router.get("/summary", async (req, res, next) => {
 
 router.post("/", async (req, res, next) => {
   try {
+    await ensureTenantColumns();
     const { category, amount, description, expense_date, supplier_id } = req.body;
     if (!category || !amount || !expense_date)
       return res.status(400).json({ error: "category, amount and expense_date required" });
 
     const { rows: [exp] } = await pool.query(
-      `INSERT INTO expenses (category, amount, description, recorded_by, expense_date, supplier_id)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [category, amount, description || null, req.user.id, expense_date, supplier_id || null]
+      `INSERT INTO expenses (category, amount, description, recorded_by, expense_date, supplier_id, owner_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [category, amount, description || null, req.user.id, expense_date, supplier_id || null, req.ownerId]
     );
 
     // Check for expense spike (150% of prior month average)
-    await checkExpenseSpike(req.user.id);
+    await checkExpenseSpike(req.user.id, req.ownerId);
     journalForExpense({
       expenseId: exp.id, amount, category,
       description: description || category,
@@ -145,13 +155,16 @@ router.delete("/:id", requireRole("admin", "sme_owner", "accountant", "pulse_adm
   } catch (err) { next(err); }
 });
 
-async function checkExpenseSpike(userId) {
+async function checkExpenseSpike(userId, ownerId) {
   try {
+    const oWhere = ownerId !== null && ownerId !== undefined ? ` WHERE owner_id = $1` : '';
+    const oParam = ownerId !== null && ownerId !== undefined ? [ownerId] : [];
     const { rows } = await pool.query(`
       SELECT
         SUM(CASE WHEN DATE_TRUNC('month',expense_date::timestamp)=DATE_TRUNC('month',NOW()) THEN amount ELSE 0 END) as this_month,
         SUM(CASE WHEN DATE_TRUNC('month',expense_date::timestamp)=DATE_TRUNC('month',NOW()-INTERVAL '1 month') THEN amount ELSE 0 END) as last_month
-      FROM expenses`
+      FROM expenses${oWhere}`,
+      oParam
     );
     const thisMonth = parseFloat(rows[0].this_month || 0);
     const lastMonth = parseFloat(rows[0].last_month || 0);

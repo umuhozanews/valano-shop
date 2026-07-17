@@ -3,14 +3,17 @@ const router = express.Router();
 const pool = require("../config/db");
 const { verifyToken, requireRole } = require("../middleware/auth");
 const { paginate } = require("../utils/helpers");
+const { ensureTenantColumns, addOwnerFilter } = require("../utils/tenant");
 
 router.use(verifyToken);
 
 router.get("/", requireRole("admin", "sme_owner", "manager", "accountant", "pulse_admin"), async (req, res, next) => {
   try {
+    await ensureTenantColumns();
     const { search, type, segment, page, limit } = req.query;
     const { limit: lim, offset } = paginate(page, limit);
     const conds = ["1=1"]; const params = [];
+    addOwnerFilter(conds, params, req.ownerId, 'c');
     if (search) {
       params.push(`%${search}%`);
       conds.push(`(c.name ILIKE $${params.length} OR c.phone ILIKE $${params.length})`);
@@ -83,11 +86,12 @@ router.get("/:id", requireRole("admin", "sme_owner", "manager", "accountant", "p
 
 router.post("/", async (req, res, next) => {
   try {
+    await ensureTenantColumns();
     const { name, phone, location, type, notes, credit_limit } = req.body;
     if (!name) return res.status(400).json({ error: "Customer name required" });
     const { rows: [c] } = await pool.query(
-      "INSERT INTO customers (name, phone, location, type, notes, credit_limit) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *",
-      [name, phone || null, location || null, type || "retailer", notes || null, credit_limit || 0]
+      "INSERT INTO customers (name, phone, location, type, notes, credit_limit, owner_id) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *",
+      [name, phone || null, location || null, type || "retailer", notes || null, credit_limit || 0, req.ownerId]
     );
     res.status(201).json(c);
   } catch (err) { next(err); }

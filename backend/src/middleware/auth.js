@@ -24,6 +24,10 @@ function verifyToken(req, res, next) {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
+    // ownerId: null for pulse_admin/admin (sees all), actual ID for sme_owner, owner's ID for workers
+    req.ownerId = decoded.ownerId !== undefined
+      ? decoded.ownerId
+      : (['pulse_admin','admin'].includes(decoded.role) ? null : decoded.id);
     next();
   } catch (err) {
     if (err.name === "TokenExpiredError") {

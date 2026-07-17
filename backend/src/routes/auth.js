@@ -38,7 +38,11 @@ router.post("/login", async (req, res, next) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    const payload = { id: user.id, email: user.email, role: user.role };
+    // For sme_owner: ownerId = own id. For workers: ownerId = their owner_id. For admin/pulse_admin: null
+    const ownerId = ['pulse_admin','admin'].includes(user.role)
+      ? null
+      : (user.role === 'sme_owner' ? user.id : (user.owner_id || null));
+    const payload = { id: user.id, email: user.email, role: user.role, ownerId };
     const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: "15m" });
     const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, { expiresIn: "7d" });
 
@@ -66,7 +70,10 @@ router.post("/refresh", async (req, res, next) => {
     const user = rows[0];
     if (!user) return res.status(401).json({ error: "User not found" });
 
-    const payload = { id: user.id, email: user.email, role: user.role };
+    const refreshOwnerId = ['pulse_admin','admin'].includes(user.role)
+      ? null
+      : (user.role === 'sme_owner' ? user.id : (user.owner_id || null));
+    const payload = { id: user.id, email: user.email, role: user.role, ownerId: refreshOwnerId };
     const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: "15m" });
     res.json({ accessToken });
   } catch (err) {
@@ -188,7 +195,7 @@ router.post("/register", async (req, res, next) => {
       [user.id, businessName.trim(), language || 'en']
     );
 
-    const payload = { id: user.id, email: user.email, role: user.role };
+    const payload = { id: user.id, email: user.email, role: user.role, ownerId: user.id };
     const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: "15m" });
     const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, { expiresIn: "7d" });
 

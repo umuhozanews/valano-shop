@@ -5,14 +5,18 @@ const { verifyToken, requireRole } = require("../middleware/auth");
 const { logAudit, paginate, generateInvoiceNumber, createNotification, notifyAdminsAndManagers } = require("../utils/helpers");
 const { createInvoicePDF } = require("../utils/pdf");
 const { journalForSale, journalForSaleVoid } = require("../utils/journal");
+const { ensureTenantColumns, addOwnerFilter } = require("../utils/tenant");
 
 router.use(verifyToken);
 
 router.get("/", async (req, res, next) => {
   try {
+    await ensureTenantColumns();
     const { start_date, end_date, payment_method, search, page, limit } = req.query;
     const { limit: lim, offset } = paginate(page, limit);
     const conds = ["s.is_voided=false"]; const params = [];
+
+    addOwnerFilter(conds, params, req.ownerId, 's');
 
     if (payment_method) { params.push(payment_method); conds.push(`s.payment_method=$${params.length}`); }
     if (start_date) { params.push(start_date); conds.push(`DATE(s.created_at)>=$${params.length}`); }
@@ -82,6 +86,7 @@ router.get("/:id", async (req, res, next) => {
 
 router.post("/", async (req, res, next) => {
   try {
+    await ensureTenantColumns();
     const {
       customer_id, customer_name, payment_method, items,
       amount_paid, due_date,
@@ -112,19 +117,20 @@ router.post("/", async (req, res, next) => {
     let custId = customer_id;
     if (!custId && customer_name) {
       const { rows } = await pool.query(
-        "INSERT INTO customers (name) VALUES ($1) ON CONFLICT DO NOTHING RETURNING id",
-        [customer_name]
+        "INSERT INTO customers (name, owner_id) VALUES ($1,$2) ON CONFLICT DO NOTHING RETURNING id",
+        [customer_name, req.ownerId]
       );
       custId = rows[0]?.id;
     }
 
     const { rows: [sale] } = await pool.query(
-      `INSERT INTO sales (user_id, customer_id, payment_method, total_amount, is_offline, payment_reference, payment_status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      `INSERT INTO sales (user_id, customer_id, payment_method, total_amount, is_offline, payment_reference, payment_status, owner_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
       [
         req.user.id, custId, payment_method, total,
         !!is_offline, payment_reference || null,
         payment_method === "credit" ? "pending" : "completed",
+        req.ownerId,
       ]
     );
 
@@ -234,7 +240,7 @@ router.get("/:id/receipt-pdf", async (req, res, next) => {
          LEFT JOIN users u ON u.id=s.user_id
          LEFT JOIN customers c ON c.id=s.customer_id
          LEFT JOIN invoices i ON i.sale_id=s.id
-         CROSS JOIN settings st
+         LEFT JOIN settings st ON (st.owner_id = s.owner_id OR (s.owner_id IS NULL AND st.owner_id IS NULL))
          WHERE s.id=$1`,
         [req.params.id]
       ),

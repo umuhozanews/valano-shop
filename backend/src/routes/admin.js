@@ -365,4 +365,33 @@ router.post("/backfill-journal", async (req, res, next) => {
   }
 });
 
+// POST /v2/admin/backfill-owners — assigns all NULL owner_id rows to the first sme_owner
+router.post("/backfill-owners", async (req, res, next) => {
+  try {
+    await pool.query(`ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS owner_id INT`).catch(() => {});
+    await pool.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS owner_id INT`).catch(() => {});
+    await pool.query(`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS owner_id INT`).catch(() => {});
+    await pool.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS owner_id INT`).catch(() => {});
+    await pool.query(`ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS owner_id INT`).catch(() => {});
+    await pool.query(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS owner_id INT`).catch(() => {});
+    await pool.query(`ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS owner_id INT`).catch(() => {});
+
+    // Find the first/original sme_owner (lowest ID, excluding newly registered ones)
+    const { rows: [original] } = await pool.query(
+      `SELECT id FROM users WHERE role='sme_owner' ORDER BY id ASC LIMIT 1`
+    );
+    if (!original) return res.json({ ok: true, message: "No sme_owner found to assign to" });
+
+    const oid = original.id;
+    const results = {};
+    for (const t of ['stock_items','sales','expenses','customers','suppliers','invoices','journal_entries']) {
+      const { rowCount } = await pool.query(
+        `UPDATE ${t} SET owner_id=$1 WHERE owner_id IS NULL`, [oid]
+      );
+      results[t] = rowCount;
+    }
+    res.json({ ok: true, assignedTo: oid, updated: results });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
