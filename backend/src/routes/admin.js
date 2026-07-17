@@ -250,4 +250,70 @@ router.post("/seed-mock-data", async (req, res, next) => {
   }
 });
 
+// POST /v2/admin/backfill-journal — create journal entries for all existing sales + expenses
+router.post("/backfill-journal", async (req, res, next) => {
+  try {
+    const { ensureJournalTables, journalForSale, journalForExpense } = require("../utils/journal");
+    const pool = require("../config/db");
+    await ensureJournalTables();
+
+    // Skip sales that already have a journal entry
+    const { rows: sales } = await pool.query(`
+      SELECT s.id, s.total_amount, s.payment_method, s.created_at,
+             s.amount_paid, i.invoice_number
+      FROM sales s
+      LEFT JOIN invoices i ON i.sale_id = s.id
+      WHERE s.is_voided = false
+        AND NOT EXISTS (
+          SELECT 1 FROM journal_entries je
+          WHERE je.reference_type = 'sale' AND je.reference_id = s.id
+        )
+      ORDER BY s.created_at ASC
+      LIMIT 500
+    `);
+
+    const { rows: expenses } = await pool.query(`
+      SELECT id, amount, category, description, expense_date, recorded_by
+      FROM expenses
+      WHERE NOT EXISTS (
+        SELECT 1 FROM journal_entries je
+        WHERE je.reference_type = 'expense' AND je.reference_id = expenses.id
+      )
+      ORDER BY expense_date ASC
+      LIMIT 500
+    `);
+
+    let saleCount = 0, expenseCount = 0;
+
+    for (const s of sales) {
+      await journalForSale({
+        saleId: s.id,
+        total: parseFloat(s.total_amount),
+        amountPaid: parseFloat(s.amount_paid || s.total_amount),
+        paymentMethod: s.payment_method,
+        invoiceNumber: s.invoice_number,
+        createdBy: null,
+        saleDate: s.created_at,
+      });
+      saleCount++;
+    }
+
+    for (const e of expenses) {
+      await journalForExpense({
+        expenseId: e.id,
+        amount: e.amount,
+        category: e.category,
+        description: e.description,
+        createdBy: e.recorded_by,
+        expenseDate: e.expense_date,
+      });
+      expenseCount++;
+    }
+
+    res.json({ ok: true, sales: saleCount, expenses: expenseCount });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 module.exports = router;
