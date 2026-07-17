@@ -10,7 +10,9 @@ import toast from "react-hot-toast";
 import { ITEM_CATEGORIES } from "../../utils/constants";
 import { useLanguage } from "../../context/LanguageContext";
 
-function CartPanel({ cart, setCart, updateQty, customer, setCustomer, payment, setPayment, total, setShowConfirm, t, PAYMENTS }) {
+function CartPanel({ cart, setCart, updateQty, customer, setCustomer, payment, setPayment, total, setShowConfirm, t, PAYMENTS, isSplit, setIsSplit, split2Method, setSplit2Method, split1Amount, setSplit1Amount }) {
+  const split2Amount = isSplit ? Math.max(0, total - (parseFloat(split1Amount) || 0)) : 0;
+
   return (
     <div className="flex flex-col h-full">
       <h3 className="text-[17px] font-semibold text-text-primary mb-4">{t("current_sale")}</h3>
@@ -52,14 +54,55 @@ function CartPanel({ cart, setCart, updateQty, customer, setCustomer, payment, s
         <input value={customer} onChange={e => setCustomer(e.target.value)} placeholder={t("customer_name_optional")}
           className="w-full h-9 px-3 border border-border rounded-[6px] text-[14px] focus:outline-none focus:ring-1 focus:ring-primary" />
 
-        <div className="grid grid-cols-3 gap-1">
-          {PAYMENTS.map(p => (
-            <button key={p.key} onClick={() => setPayment(p.key)}
-              className={`py-1.5 rounded-[6px] text-[13px] font-medium border transition-colors ${payment===p.key?"bg-primary text-white border-primary":"border-border text-text-secondary hover:border-primary/50"}`}>
-              {p.label}
+        {/* Payment method(s) */}
+        {!isSplit ? (
+          <>
+            <div className="grid grid-cols-3 gap-1">
+              {PAYMENTS.map(p => (
+                <button key={p.key} onClick={() => setPayment(p.key)}
+                  className={`py-1.5 rounded-[6px] text-[13px] font-medium border transition-colors ${payment===p.key?"bg-primary text-white border-primary":"border-border text-text-secondary hover:border-primary/50"}`}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <button onClick={() => { setIsSplit(true); setSplit1Amount(String(Math.round(total/2))); setSplit2Method("mtn_momo"); }}
+              className="w-full py-1.5 border border-dashed border-primary/40 rounded-[6px] text-[12px] text-primary/70 hover:border-primary hover:text-primary transition-colors">
+              + Split between 2 payment methods
             </button>
-          ))}
-        </div>
+          </>
+        ) : (
+          <div className="border border-primary/30 rounded-[8px] p-3 space-y-2 bg-primary/3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[13px] font-semibold text-text-primary">Split Payment</span>
+              <button onClick={() => { setIsSplit(false); setSplit1Amount(""); setSplit2Method("mtn_momo"); }}
+                className="text-[12px] text-text-secondary hover:text-danger">Cancel</button>
+            </div>
+            {/* Method 1 */}
+            <div className="flex items-center gap-2">
+              <select value={payment} onChange={e => setPayment(e.target.value)}
+                className="flex-1 h-8 px-2 border border-border rounded text-[13px] bg-surface focus:outline-none focus:ring-1 focus:ring-primary">
+                {PAYMENTS.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
+              </select>
+              <input type="number" min="0" max={total} value={split1Amount}
+                onChange={e => setSplit1Amount(e.target.value)}
+                className="w-28 h-8 px-2 border border-border rounded text-[13px] text-right focus:outline-none focus:ring-1 focus:ring-primary"
+                placeholder="Amount" />
+            </div>
+            {/* Method 2 */}
+            <div className="flex items-center gap-2">
+              <select value={split2Method} onChange={e => setSplit2Method(e.target.value)}
+                className="flex-1 h-8 px-2 border border-border rounded text-[13px] bg-surface focus:outline-none focus:ring-1 focus:ring-primary">
+                {PAYMENTS.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
+              </select>
+              <div className={`w-28 h-8 px-2 border rounded text-[13px] text-right flex items-center justify-end font-semibold ${split2Amount < 0 ? "border-danger text-danger" : "border-border text-text-primary"}`}>
+                {formatRWF(Math.max(0, split2Amount))}
+              </div>
+            </div>
+            {split2Amount < 0 && (
+              <p className="text-[12px] text-danger">First amount exceeds total</p>
+            )}
+          </div>
+        )}
 
         <Button variant="primary" className="w-full" size="lg" disabled={!cart.length} onClick={() => setShowConfirm(true)}>
           {t("complete_sale")} — {formatRWF(total)}
@@ -93,9 +136,12 @@ export default function NewSale() {
   const [showCart,    setShowCart]    = useState(false);
   const [invoiceNum,  setInvoiceNum]  = useState(null);
   const [newSaleId,   setNewSaleId]   = useState(null);
-  const [isPartial,   setIsPartial]   = useState(false);
-  const [amountPaid,  setAmountPaid]  = useState("");
-  const [dueDate,     setDueDate]     = useState("");
+  const [isPartial,    setIsPartial]    = useState(false);
+  const [amountPaid,   setAmountPaid]   = useState("");
+  const [dueDate,      setDueDate]      = useState("");
+  const [isSplit,      setIsSplit]      = useState(false);
+  const [split1Amount, setSplit1Amount] = useState("");
+  const [split2Method, setSplit2Method] = useState("mtn_momo");
 
   const fetchStock = useCallback(() => {
     setLoading(true);
@@ -138,6 +184,11 @@ export default function NewSale() {
 
   async function confirmSale() {
     if (!cart.length) return toast.error(t("cart_empty"));
+    if (isSplit) {
+      const amt1 = parseFloat(split1Amount);
+      if (isNaN(amt1) || amt1 <= 0)  return toast.error("Enter valid first payment amount");
+      if (amt1 >= total)             return toast.error("First amount must be less than total");
+    }
     if (isPartial) {
       const paid = parseFloat(amountPaid);
       if (isNaN(paid) || paid < 0)  return toast.error("Enter a valid amount paid");
@@ -146,18 +197,29 @@ export default function NewSale() {
     }
     setSaving(true);
     try {
-      const { data } = await api.post("/sales", {
+      const body = {
         customer_name:  customer || "Walk-in",
         payment_method: payment,
         items:          cart.map(i => ({ stock_item_id: i.stock_item_id, quantity: i.quantity, unit_price: i.unit_price })),
         amount_paid:    isPartial ? parseFloat(amountPaid) : total,
         due_date:       isPartial ? dueDate : null,
-      });
+      };
+      if (isSplit) {
+        const amt1 = parseFloat(split1Amount);
+        body.split_payments = [
+          { method: payment,       amount: amt1 },
+          { method: split2Method,  amount: total - amt1 },
+        ];
+        body.payment_method = "split";
+      }
+      const { data } = await api.post("/sales", body);
       setInvoiceNum(data.invoice_number);
       setNewSaleId(data.id);
       setShowConfirm(false);
       toast.success(`Sale recorded — Invoice: ${data.invoice_number}`);
-      setCart([]); setCustomer(""); setPayment("cash"); setIsPartial(false); setAmountPaid(""); setDueDate("");
+      setCart([]); setCustomer(""); setPayment("cash");
+      setIsPartial(false); setAmountPaid(""); setDueDate("");
+      setIsSplit(false); setSplit1Amount(""); setSplit2Method("mtn_momo");
       fetchStock();
     } catch(e) { toast.error(e.response?.data?.error || "Failed to record sale"); }
     finally   { setSaving(false); }
@@ -228,7 +290,7 @@ export default function NewSale() {
 
         {/* Cart (desktop) */}
         <div className="hidden lg:flex flex-col w-80 bg-surface border border-border rounded-[8px] p-4">
-          <CartPanel cart={cart} setCart={setCart} updateQty={updateQty} customer={customer} setCustomer={setCustomer} payment={payment} setPayment={setPayment} total={total} setShowConfirm={setShowConfirm} t={t} PAYMENTS={PAYMENTS} />
+          <CartPanel cart={cart} setCart={setCart} updateQty={updateQty} customer={customer} setCustomer={setCustomer} payment={payment} setPayment={setPayment} total={total} setShowConfirm={setShowConfirm} t={t} PAYMENTS={PAYMENTS} isSplit={isSplit} setIsSplit={setIsSplit} split2Method={split2Method} setSplit2Method={setSplit2Method} split1Amount={split1Amount} setSplit1Amount={setSplit1Amount} />
         </div>
       </div>
 
@@ -247,7 +309,7 @@ export default function NewSale() {
           <div className="absolute inset-0 bg-black/30" />
           <div className="absolute bottom-0 left-0 right-0 bg-surface rounded-t-[16px] p-5 max-h-[85vh] overflow-y-auto"
                onClick={e => e.stopPropagation()}>
-            <CartPanel cart={cart} setCart={setCart} updateQty={updateQty} customer={customer} setCustomer={setCustomer} payment={payment} setPayment={setPayment} total={total} setShowConfirm={setShowConfirm} t={t} PAYMENTS={PAYMENTS} />
+            <CartPanel cart={cart} setCart={setCart} updateQty={updateQty} customer={customer} setCustomer={setCustomer} payment={payment} setPayment={setPayment} total={total} setShowConfirm={setShowConfirm} t={t} PAYMENTS={PAYMENTS} isSplit={isSplit} setIsSplit={setIsSplit} split2Method={split2Method} setSplit2Method={setSplit2Method} split1Amount={split1Amount} setSplit1Amount={setSplit1Amount} />
           </div>
         </div>
       )}
@@ -257,7 +319,15 @@ export default function NewSale() {
         footer={<><Button variant="secondary" onClick={() => setShowConfirm(false)}>{t("cancel")}</Button><Button loading={saving} onClick={confirmSale}>{t("record_sale")}</Button></>}>
         <div className="space-y-4">
           <p className="text-[14px] text-text-secondary">{t("customer")}: <strong>{customer || t("walk_in")}</strong></p>
-          <p className="text-[14px] text-text-secondary">{t("payment_label")}: <strong>{PAYMENTS.find(p=>p.key===payment)?.label}</strong></p>
+          {isSplit ? (
+            <div className="text-[14px] text-text-secondary space-y-1">
+              <p>{t("payment_label")}: <strong>Split</strong></p>
+              <p className="ml-3">• {PAYMENTS.find(p=>p.key===payment)?.label}: <strong>{formatRWF(parseFloat(split1Amount)||0)}</strong></p>
+              <p className="ml-3">• {PAYMENTS.find(p=>p.key===split2Method)?.label}: <strong>{formatRWF(Math.max(0,total-(parseFloat(split1Amount)||0)))}</strong></p>
+            </div>
+          ) : (
+            <p className="text-[14px] text-text-secondary">{t("payment_label")}: <strong>{PAYMENTS.find(p=>p.key===payment)?.label}</strong></p>
+          )}
           <div className="flex justify-between py-2 border-t border-b border-border">
             <span className="text-[14px] font-bold text-text-primary">{t("total")}:</span>
             <span className="text-[17px] font-black text-primary">{formatRWF(total)}</span>

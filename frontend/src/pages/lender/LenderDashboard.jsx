@@ -275,8 +275,8 @@ export default function LenderDashboard() {
           ) : (
             <>
               {/* Table header */}
-              <div className="hidden md:grid grid-cols-[1fr_120px_100px_140px_120px_80px] gap-3 px-4 py-2 bg-background border-b border-border">
-                {["Business", "Sector", "Score", "Referral", "Referred On", ""].map(h => (
+              <div className="hidden md:grid grid-cols-[1fr_120px_100px_120px_140px_120px_80px] gap-3 px-4 py-2 bg-background border-b border-border">
+                {["Business", "Sector", "Score", "Verdict", "Referral", "Referred On", ""].map(h => (
                   <p key={h} className="text-[13px] font-semibold uppercase tracking-wide text-text-secondary">{h}</p>
                 ))}
               </div>
@@ -284,9 +284,16 @@ export default function LenderDashboard() {
               <div className="divide-y divide-border">
                 {clients.map(c => {
                   const RefIcon = REF_ICON[c.referral_status] || Clock;
+                  const verdict = !c.score
+                    ? { label: "Pending", cls: "bg-gray-100 text-gray-500" }
+                    : c.band === "green"
+                    ? { label: "Recommended", cls: "bg-green-100 text-green-700" }
+                    : c.band === "amber"
+                    ? { label: "Review", cls: "bg-amber-100 text-amber-700" }
+                    : { label: "Declined", cls: "bg-red-100 text-red-700" };
                   return (
                     <div key={c.id}
-                      className="grid grid-cols-1 md:grid-cols-[1fr_120px_100px_140px_120px_80px] gap-2 md:gap-3 px-4 py-3 hover:bg-orange-50/30 transition-colors items-center cursor-pointer"
+                      className="grid grid-cols-1 md:grid-cols-[1fr_120px_100px_120px_140px_120px_80px] gap-2 md:gap-3 px-4 py-3 hover:bg-orange-50/30 transition-colors items-center cursor-pointer"
                       onClick={() => navigate(`/app/lender/sme/${c.sme_user_id}`)}>
                       {/* Name */}
                       <div className="min-w-0">
@@ -298,6 +305,12 @@ export default function LenderDashboard() {
                       {/* Score */}
                       <div className="hidden md:block">
                         <ScoreBadge score={c.score} band={c.band} />
+                      </div>
+                      {/* Loan Verdict */}
+                      <div className="hidden md:block">
+                        <span className={`text-[12px] font-semibold px-2 py-0.5 rounded-full ${verdict.cls}`}>
+                          {verdict.label}
+                        </span>
                       </div>
                       {/* Referral */}
                       <div className="hidden md:flex items-center gap-1.5">

@@ -74,9 +74,9 @@ const FIN    = ["pulse_admin","sme_owner","admin","accountant"];
 
 // Returns the home path for a given role — used for post-login redirect and fallback.
 export function roleHomePath(role) {
-  if (role === "pulse_admin")        return "/app/admin";
-  if (role === "lender")             return "/app/lender";
-  if (role === "cashier" || role === "viewer") return "/app/sales/new";
+  if (role === "pulse_admin")                           return "/app/admin";
+  if (role === "lender")                                return "/app/lender";
+  if (role === "cashier" || role === "manager" || role === "viewer") return "/app/sales/new";
   return "/app/dashboard";
 }
 
