@@ -11,8 +11,10 @@ router.use(verifyToken);
 router.get("/pnl", requireRole("admin", "sme_owner", "manager", "accountant", "pulse_admin"), async (req, res, next) => {
   try {
     const { year = new Date().getFullYear() } = req.query;
-    const bfSales = "";
-    const bfExpenses = "";
+    const oid = req.ownerId;
+    const bfSales    = oid != null ? "AND s.owner_id = $2"  : "";
+    const bfExpenses = oid != null ? "AND owner_id = $2"    : "";
+    const monthlyParams = oid != null ? [year, oid] : [year];
 
     const query = `
       WITH month_series AS (
@@ -80,7 +82,7 @@ router.get("/pnl", requireRole("admin", "sme_owner", "manager", "accountant", "p
       ORDER BY ms.month_start ASC;
     `;
 
-    const { rows: monthly } = await pool.query(query, [year]);
+    const { rows: monthly } = await pool.query(query, monthlyParams);
 
     const totals = monthly.reduce((acc, m) => ({
       revenue: acc.revenue + parseFloat(m.revenue),
@@ -110,8 +112,10 @@ router.get("/pnl/daily", requireRole("admin", "sme_owner", "manager", "accountan
     const lastDay = new Date(year, month, 0).getDate();
     const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
-    const bfSales = "";
-    const bfExpenses = "";
+    const oidD = req.ownerId;
+    const bfSales    = oidD != null ? "AND s.owner_id = $3"  : "";
+    const bfExpenses = oidD != null ? "AND owner_id = $3"    : "";
+    const dailyParams = oidD != null ? [startDate, endDate, oidD] : [startDate, endDate];
 
     const query = `
       WITH date_series AS (
@@ -178,7 +182,7 @@ router.get("/pnl/daily", requireRole("admin", "sme_owner", "manager", "accountan
       ORDER BY ds.day DESC;
     `;
 
-    const { rows: daily } = await pool.query(query, [startDate, endDate]);
+    const { rows: daily } = await pool.query(query, dailyParams);
 
     const totals = daily.reduce((acc, r) => ({
       revenue: acc.revenue + parseFloat(r.revenue),

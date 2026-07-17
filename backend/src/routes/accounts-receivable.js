@@ -3,18 +3,24 @@ const router = express.Router();
 const pool = require("../config/db");
 const { verifyToken, requireRole } = require("../middleware/auth");
 const { logAudit, paginate } = require("../utils/helpers");
+const { ensureTenantColumns, addOwnerFilter } = require("../utils/tenant");
 
 router.use(verifyToken, requireRole("admin", "sme_owner", "manager", "accountant", "pulse_admin"));
 
 // List receivables
 router.get("/", async (req, res, next) => {
   try {
+    await ensureTenantColumns();
     const { page, limit, status, customer_id } = req.query;
     const { limit: lim, offset } = paginate(page, limit);
     const conds = ["1=1"]; const params = [];
     if (status) { params.push(status); conds.push(`ar.status=$${params.length}`); }
     if (customer_id) { params.push(customer_id); conds.push(`ar.customer_id=$${params.length}`); }
+    addOwnerFilter(conds, params, req.ownerId, 'ar');
     params.push(lim); params.push(offset);
+
+    const sumConds = ["1=1"]; const sumParams = [];
+    addOwnerFilter(sumConds, sumParams, req.ownerId);
 
     const [data, cnt, summary] = await Promise.all([
       pool.query(
@@ -33,7 +39,9 @@ router.get("/", async (req, res, next) => {
           COALESCE(SUM(amount - amount_paid),0) as total_outstanding,
           COUNT(*) FILTER (WHERE status='overdue') as overdue_count,
           COUNT(*) FILTER (WHERE due_date <= NOW() + INTERVAL '7 days' AND status IN ('pending','partial')) as due_soon
-         FROM accounts_receivable`
+         FROM accounts_receivable
+         WHERE ${sumConds.join(" AND ")}`,
+        sumParams
       ),
     ]);
 
@@ -48,6 +56,8 @@ router.get("/", async (req, res, next) => {
 // Aged receivables report
 router.get("/aged", async (req, res, next) => {
   try {
+    const agedConds = ["ar.status IN ('pending','partial','overdue')"]; const agedParams = [];
+    addOwnerFilter(agedConds, agedParams, req.ownerId, 'ar');
     const { rows } = await pool.query(
       `SELECT
         c.name as customer_name, c.phone,
@@ -58,10 +68,11 @@ router.get("/aged", async (req, res, next) => {
         COALESCE(SUM(ar.amount-ar.amount_paid),0) as total
        FROM accounts_receivable ar
        JOIN customers c ON c.id=ar.customer_id
-       WHERE ar.status IN ('pending','partial','overdue')
+       WHERE ${agedConds.join(" AND ")}
        GROUP BY c.id, c.name, c.phone
        HAVING SUM(ar.amount-ar.amount_paid) > 0
-       ORDER BY total DESC`
+       ORDER BY total DESC`,
+      agedParams
     );
     res.json(rows);
   } catch (err) { next(err); }
@@ -88,9 +99,9 @@ router.post("/", async (req, res, next) => {
       return res.status(400).json({ error: "customer_id and amount required" });
 
     const { rows: [ar] } = await pool.query(
-      `INSERT INTO accounts_receivable (customer_id, sale_id, amount, due_date, notes)
-       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [customer_id, sale_id || null, amount, due_date || null, notes || null]
+      `INSERT INTO accounts_receivable (customer_id, sale_id, amount, due_date, notes, owner_id)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [customer_id, sale_id || null, amount, due_date || null, notes || null, req.ownerId]
     );
     await logAudit(req.user.id, "AR_CREATED", "accounts_receivable", ar.id, null, req.body, req.ip);
     res.status(201).json(ar);

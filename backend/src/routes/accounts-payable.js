@@ -3,18 +3,24 @@ const router = express.Router();
 const pool = require("../config/db");
 const { verifyToken, requireRole } = require("../middleware/auth");
 const { logAudit, paginate } = require("../utils/helpers");
+const { ensureTenantColumns, addOwnerFilter } = require("../utils/tenant");
 
 router.use(verifyToken, requireRole("admin", "sme_owner", "manager", "accountant", "pulse_admin"));
 
 // List payables
 router.get("/", async (req, res, next) => {
   try {
+    await ensureTenantColumns();
     const { page, limit, status, supplier_id } = req.query;
     const { limit: lim, offset } = paginate(page, limit);
     const conds = ["1=1"]; const params = [];
     if (status)      { params.push(status);      conds.push(`ap.status=$${params.length}`); }
     if (supplier_id) { params.push(supplier_id); conds.push(`ap.supplier_id=$${params.length}`); }
+    addOwnerFilter(conds, params, req.ownerId, 'ap');
     params.push(lim); params.push(offset);
+
+    const sumConds = ["1=1"]; const sumParams = [];
+    addOwnerFilter(sumConds, sumParams, req.ownerId);
 
     const [data, cnt, summary] = await Promise.all([
       pool.query(
@@ -33,7 +39,9 @@ router.get("/", async (req, res, next) => {
           COALESCE(SUM(amount - amount_paid),0) as total_outstanding,
           COUNT(*) FILTER (WHERE status='overdue') as overdue_count,
           COUNT(*) FILTER (WHERE due_date <= NOW() + INTERVAL '7 days' AND status IN ('pending','partial')) as due_soon
-         FROM accounts_payable`
+         FROM accounts_payable
+         WHERE ${sumConds.join(" AND ")}`,
+        sumParams
       ),
     ]);
 
@@ -52,9 +60,9 @@ router.post("/", async (req, res, next) => {
     if (!amount) return res.status(400).json({ error: "amount is required" });
 
     const { rows: [ap] } = await pool.query(
-      `INSERT INTO accounts_payable (supplier_id, amount, due_date, notes)
-       VALUES ($1,$2,$3,$4) RETURNING *`,
-      [supplier_id || null, amount, due_date || null, notes || null]
+      `INSERT INTO accounts_payable (supplier_id, amount, due_date, notes, owner_id)
+       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [supplier_id || null, amount, due_date || null, notes || null, req.ownerId]
     );
     await logAudit(req.user.id, "AP_CREATED", "accounts_payable", ap.id, null, req.body, req.ip);
     res.status(201).json(ap);
