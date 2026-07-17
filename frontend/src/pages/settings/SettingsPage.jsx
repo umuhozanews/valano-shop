@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Store, Shield, User, Check, Globe } from "lucide-react";
+import { Store, Shield, User, Check, Globe, Users, Plus, Trash2, Eye, EyeOff } from "lucide-react";
 import PageWrapper from "../../components/layout/PageWrapper";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
@@ -11,9 +11,16 @@ import { SECTORS, DISTRICTS } from "../../utils/constants";
 
 const SECTIONS = [
   { key: "business", label: "Business Info",     icon: Store,  desc: "Shop name, location, sector" },
+  { key: "team",     label: "Team & Workers",    icon: Users,  desc: "Add cashiers, managers, accountants" },
   { key: "consent",  label: "Data & Consent",    icon: Shield, desc: "Control how your data is used" },
   { key: "profile",  label: "User Profile",      icon: User,   desc: "Account details & password" },
   { key: "roles",    label: "Roles & Access",    icon: Shield, desc: "View system role permissions" },
+];
+
+const WORKER_ROLES = [
+  { value: "cashier",   label: "Cashier — POS only" },
+  { value: "manager",   label: "Manager — POS + stock + customers" },
+  { value: "accountant",label: "Accountant — Finance + reports" },
 ];
 
 const ROLE_DEFS = [
@@ -55,6 +62,14 @@ export default function SettingsPage() {
   const [profile,  setProfile]  = useState({ name: "", email: "", phone: "" });
   const [pwForm,   setPwForm]   = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [consent,  setConsent]  = useState({ scoring: false, lender_sharing: false });
+
+  // Team management
+  const [team,        setTeam]        = useState([]);
+  const [teamLoading, setTeamLoading] = useState(false);
+  const [showNewWorker, setShowNewWorker] = useState(false);
+  const [showWorkerPass, setShowWorkerPass] = useState(false);
+  const [workerSaving,  setWorkerSaving]   = useState(false);
+  const [newWorker, setNewWorker] = useState({ name: "", email: "", phone: "", role: "cashier", password: "" });
 
   const loadAll = useCallback(() => {
     setLoading(true);
@@ -137,6 +152,42 @@ export default function SettingsPage() {
       toast.success("Consent preferences saved");
     } catch (err) { toast.error(err.response?.data?.error || "Failed to save consent"); }
     finally { setSaving(false); }
+  }
+
+  async function loadTeam() {
+    setTeamLoading(true);
+    try {
+      const { data } = await api.get("/auth/team");
+      setTeam(data || []);
+    } catch { toast.error("Failed to load team"); }
+    finally { setTeamLoading(false); }
+  }
+
+  useEffect(() => {
+    if (activeSection === "team") loadTeam();
+  }, [activeSection]);
+
+  async function createWorker(e) {
+    e.preventDefault();
+    if (!newWorker.name || !newWorker.email || !newWorker.password || !newWorker.role)
+      return toast.error("Name, email, role and password are required");
+    setWorkerSaving(true);
+    try {
+      await api.post("/auth/users", newWorker);
+      toast.success(`${newWorker.name} added to your team`);
+      setNewWorker({ name: "", email: "", phone: "", role: "cashier", password: "" });
+      setShowNewWorker(false);
+      loadTeam();
+    } catch (err) { toast.error(err.response?.data?.error || "Failed to create worker"); }
+    finally { setWorkerSaving(false); }
+  }
+
+  async function toggleWorkerActive(w) {
+    try {
+      await api.put(`/auth/users/${w.id}`, { is_active: !w.is_active });
+      toast.success(`${w.name} ${!w.is_active ? "activated" : "deactivated"}`);
+      loadTeam();
+    } catch { toast.error("Failed to update"); }
   }
 
   return (
@@ -242,6 +293,125 @@ export default function SettingsPage() {
 
                   <Button loading={saving} onClick={saveBusiness}>Save Business Info</Button>
                 </Card>
+              )}
+
+              {/* ── Team & Workers ─────────────────────────────────────── */}
+              {activeSection === "team" && (
+                <div className="space-y-4">
+                  <Card title="Your Team" subtitle="Workers who have access to your business account">
+                    <div className="mb-4">
+                      <button onClick={() => setShowNewWorker(o => !o)}
+                        className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-btn text-[14px] font-medium hover:bg-primary/90 transition-colors">
+                        <Plus size={14} /> Add Worker
+                      </button>
+                    </div>
+
+                    {showNewWorker && (
+                      <form onSubmit={createWorker}
+                        className="mb-5 p-4 border border-primary/20 bg-primary/5 rounded-[8px] space-y-3">
+                        <p className="text-[14px] font-semibold text-primary">New Worker Account</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[13px] font-medium text-text-primary mb-1">Full Name</label>
+                            <input required value={newWorker.name}
+                              onChange={e => setNewWorker(w => ({ ...w, name: e.target.value }))}
+                              placeholder="Jean Muneza"
+                              className="w-full h-9 px-3 border border-border rounded-[6px] text-[14px] bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
+                          </div>
+                          <div>
+                            <label className="block text-[13px] font-medium text-text-primary mb-1">Email</label>
+                            <input required type="email" value={newWorker.email}
+                              onChange={e => setNewWorker(w => ({ ...w, email: e.target.value }))}
+                              placeholder="jean@yourbusiness.rw"
+                              className="w-full h-9 px-3 border border-border rounded-[6px] text-[14px] bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
+                          </div>
+                          <div>
+                            <label className="block text-[13px] font-medium text-text-primary mb-1">Role</label>
+                            <select required value={newWorker.role}
+                              onChange={e => setNewWorker(w => ({ ...w, role: e.target.value }))}
+                              className="w-full h-9 px-3 border border-border rounded-[6px] text-[14px] bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
+                              {WORKER_ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[13px] font-medium text-text-primary mb-1">Phone (optional)</label>
+                            <input value={newWorker.phone}
+                              onChange={e => setNewWorker(w => ({ ...w, phone: e.target.value }))}
+                              placeholder="+250 7XX XXX XXX"
+                              className="w-full h-9 px-3 border border-border rounded-[6px] text-[14px] bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-[13px] font-medium text-text-primary mb-1">Password</label>
+                          <div className="relative max-w-xs">
+                            <input required type={showWorkerPass ? "text" : "password"} value={newWorker.password}
+                              onChange={e => setNewWorker(w => ({ ...w, password: e.target.value }))}
+                              placeholder="Temporary password for them"
+                              className="w-full h-9 px-3 pr-9 border border-border rounded-[6px] text-[14px] bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
+                            <button type="button" onClick={() => setShowWorkerPass(s => !s)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text-primary">
+                              {showWorkerPass ? <EyeOff size={13} /> : <Eye size={13} />}
+                            </button>
+                          </div>
+                          <p className="text-[12px] text-text-secondary mt-1">Share this with them — they can change it after signing in.</p>
+                        </div>
+                        <div className="flex gap-2 pt-1">
+                          <button type="submit" disabled={workerSaving}
+                            className="px-4 py-2 bg-primary text-white rounded-btn text-[14px] font-medium disabled:opacity-60 hover:bg-primary/90">
+                            {workerSaving ? "Adding…" : "Add to Team"}
+                          </button>
+                          <button type="button" onClick={() => setShowNewWorker(false)}
+                            className="px-4 py-2 border border-border rounded-btn text-[14px] text-text-secondary hover:bg-background">
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    )}
+
+                    {teamLoading ? (
+                      <p className="text-[14px] text-text-secondary py-6 text-center">Loading team…</p>
+                    ) : team.length === 0 ? (
+                      <div className="py-10 text-center border border-dashed border-border rounded-[8px]">
+                        <Users size={32} className="mx-auto text-border mb-3" />
+                        <p className="text-[15px] font-semibold text-text-primary">No workers yet</p>
+                        <p className="text-[14px] text-text-secondary mt-1">Add cashiers, managers, or accountants to your team.</p>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-border border border-border rounded-[8px] overflow-hidden">
+                        {team.map(w => {
+                          const roleColor = {
+                            cashier: "bg-gray-100 text-gray-600",
+                            manager: "bg-amber-100 text-amber-700",
+                            accountant: "bg-green-100 text-green-700",
+                          }[w.role] || "bg-blue-100 text-blue-700";
+                          return (
+                            <div key={w.id} className={`flex items-center gap-3 px-4 py-3 ${w.is_active ? "" : "opacity-50"}`}>
+                              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                <span className="text-[14px] font-bold text-primary">
+                                  {w.name?.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[14px] font-semibold text-text-primary truncate">{w.name}</p>
+                                <p className="text-[13px] text-text-secondary truncate">{w.email}</p>
+                              </div>
+                              <span className={`text-[12px] font-semibold px-2 py-0.5 rounded-full capitalize hidden sm:inline ${roleColor}`}>
+                                {w.role}
+                              </span>
+                              <span className={`text-[12px] px-2 py-0.5 rounded-full ${w.is_active ? "bg-green-50 text-green-600" : "bg-gray-100 text-gray-500"}`}>
+                                {w.is_active ? "Active" : "Inactive"}
+                              </span>
+                              <button onClick={() => toggleWorkerActive(w)}
+                                className="text-[12px] px-3 py-1 border border-border rounded-[6px] text-text-secondary hover:bg-background transition-colors shrink-0">
+                                {w.is_active ? "Deactivate" : "Activate"}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </Card>
+                </div>
               )}
 
               {/* ── Data & Consent ─────────────────────────────────────── */}

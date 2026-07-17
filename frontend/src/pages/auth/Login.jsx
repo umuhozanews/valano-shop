@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, Link } from "react-router-dom";
 import { roleHomePath } from "../../App";
 import { Mail, Eye, EyeOff, Loader2, Globe } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -145,6 +145,13 @@ export default function Login() {
               {loading ? <><Loader2 size={15} className="animate-spin" /> {t("signing_in")}</> : t("sign_in")}
             </button>
           </form>
+
+          <p className="text-center text-[14px] text-text-secondary mt-6">
+            Don't have an account?{" "}
+            <Link to="/app/register" className="text-primary font-semibold hover:underline">
+              Create one free →
+            </Link>
+          </p>
         </div>
       </div>
     </div>

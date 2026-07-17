@@ -19,6 +19,7 @@ const L = (imp) => lazy(() =>
 
 // ── Pages ─────────────────────────────────────────────────────────────────────
 const Login             = L(() => import("./pages/auth/Login"));
+const Register          = L(() => import("./pages/auth/Register"));
 const Dashboard         = L(() => import("./pages/dashboard/Dashboard"));
 
 // Inventory
@@ -93,8 +94,9 @@ export default function App() {
     <ErrorBoundary>
       <Suspense fallback={<Loading />}>
         <Routes>
-          <Route path="/"           element={<Navigate to="/app/login" replace />} />
-          <Route path="/app/login"  element={<Login />} />
+          <Route path="/"              element={<Navigate to="/app/login" replace />} />
+          <Route path="/app/login"   element={<Login />} />
+          <Route path="/app/register" element={<Register />} />
 
           {/* Dashboard */}
           <Route path="/app/dashboard" element={<P roles={STAFF}><Dashboard /></P>} />

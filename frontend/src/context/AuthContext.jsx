@@ -74,10 +74,20 @@ export function AuthProvider({ children }) {
     return () => { if (refreshTimer.current) clearTimeout(refreshTimer.current); };
   }, [scheduleRefresh, logout]);
 
+  const register = useCallback(async (fields) => {
+    const { data } = await api.post("/auth/register", fields);
+    localStorage.setItem("inzira_token", data.accessToken);
+    if (data.refreshToken) localStorage.setItem("inzira_refresh", data.refreshToken);
+    localStorage.setItem("inzira_user", JSON.stringify(data.user));
+    setUser(data.user);
+    scheduleRefresh(data.accessToken);
+    return data.user;
+  }, [scheduleRefresh]);
+
   const hasRole = useCallback((...roles) => user && roles.includes(user.role), [user]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, hasRole }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, register, hasRole }}>
       {children}
     </AuthContext.Provider>
   );

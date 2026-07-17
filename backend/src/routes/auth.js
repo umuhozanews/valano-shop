@@ -137,12 +137,13 @@ router.put("/me/profile", verifyToken, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ─── Register (SME onboarding) ────────────────────────────────────────────────
+// ─── Register (SME self-service onboarding) ───────────────────────────────────
 router.post("/register", async (req, res, next) => {
   try {
-    const { name, email, phone, password, language, sector, district } = req.body;
-    if (!name || !email || !password)
-      return res.status(400).json({ error: "Name, email and password required" });
+    const { firstName, lastName, businessName, sectors, district, phone, email, password, language } = req.body;
+
+    if (!firstName || !lastName || !email || !password || !businessName)
+      return res.status(400).json({ error: "First name, last name, business name, email and password required" });
 
     if (!isValidEmail(email))
       return res.status(400).json({ error: "Invalid email format" });
@@ -157,22 +158,44 @@ router.post("/register", async (req, res, next) => {
     if (existing.length)
       return res.status(409).json({ error: "Email already registered" });
 
+    // Lazy migration: add owner_id to settings and owner_id to users
+    await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS owner_id INT`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS owner_id INT`);
+    await pool.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE tablename='settings' AND indexname='settings_owner_id_idx') THEN
+          CREATE UNIQUE INDEX settings_owner_id_idx ON settings(owner_id) WHERE owner_id IS NOT NULL;
+        END IF;
+      END $$
+    `);
+
+    const fullName = `${firstName.trim()} ${lastName.trim()}`;
+    const sectorStr = Array.isArray(sectors) && sectors.length ? sectors.join(", ") : (sectors || null);
+
     const hash = await bcrypt.hash(password, 10);
     const { rows: [user] } = await pool.query(
       `INSERT INTO users (name, email, password_hash, role, phone, language, sector, district, consent_status)
        VALUES ($1,$2,$3,'sme_owner',$4,$5,$6,$7,'pending')
        RETURNING *`,
-      [name, email.toLowerCase().trim(), hash, phone || null, language || 'en', sector || null, district || null]
+      [fullName, email.toLowerCase().trim(), hash, phone || null, language || 'en', sectorStr, district || null]
+    );
+
+    // Create user-scoped settings row so their business name shows up immediately
+    await pool.query(
+      `INSERT INTO settings (owner_id, shop_name, language)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (owner_id) DO UPDATE SET shop_name=EXCLUDED.shop_name`,
+      [user.id, businessName.trim(), language || 'en']
     );
 
     const payload = { id: user.id, email: user.email, role: user.role };
     const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: "15m" });
     const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, { expiresIn: "7d" });
 
-    await logAudit(user.id, "REGISTER", "users", user.id, null, { email }, req.ip);
+    await logAudit(user.id, "REGISTER", "users", user.id, null, { email, businessName }, req.ip);
 
     const { password_hash, otp_code, otp_expires_at, ...safe } = user;
-    res.status(201).json({ accessToken, refreshToken, user: safe });
+    res.status(201).json({ accessToken, refreshToken, user: safe, businessName: businessName.trim() });
   } catch (err) { next(err); }
 });
 
@@ -259,6 +282,27 @@ router.put("/consent", verifyToken, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ─── SME owner: list their own team ───────────────────────────────────────────
+router.get("/team", verifyToken, async (req, res, next) => {
+  try {
+    if (!['sme_owner','admin','pulse_admin'].includes(req.user.role))
+      return res.status(403).json({ error: "Insufficient permissions" });
+
+    const ownerId = ['pulse_admin','admin'].includes(req.user.role)
+      ? (req.query.owner_id || null)
+      : req.user.id;
+
+    const { rows } = await pool.query(
+      `SELECT id, name, email, role, phone, is_active, created_at
+       FROM users
+       WHERE owner_id=$1
+       ORDER BY created_at DESC`,
+      [ownerId]
+    );
+    res.json(rows);
+  } catch (err) { next(err); }
+});
+
 // ─── Admin: list users ────────────────────────────────────────────────────────
 router.get("/users", verifyToken, async (req, res, next) => {
   try {
@@ -299,9 +343,11 @@ router.post("/users", verifyToken, async (req, res, next) => {
     if (existing.length) return res.status(409).json({ error: "Email already in use" });
 
     const hash = await bcrypt.hash(password, 10);
+    // owner_id links this worker back to the SME owner who created them
+    const ownerId = ['pulse_admin','admin'].includes(req.user.role) ? null : req.user.id;
     const { rows: [user] } = await pool.query(
-      "INSERT INTO users (name, email, password_hash, role, phone) VALUES ($1,$2,$3,$4,$5) RETURNING *",
-      [name, email.toLowerCase().trim(), hash, role, phone || null]
+      "INSERT INTO users (name, email, password_hash, role, phone, owner_id) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *",
+      [name, email.toLowerCase().trim(), hash, role, phone || null, ownerId]
     );
 
     await logAudit(req.user.id, "USER_CREATED", "users", user.id, null, { name, email, role }, req.ip);

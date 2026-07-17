@@ -27,7 +27,20 @@ router.use(verifyToken);
 
 router.get("/", async (req, res, next) => {
   try {
-    const { rows: [settings] } = await pool.query("SELECT * FROM settings LIMIT 1");
+    let settings = null;
+    if (req.user.role === 'sme_owner') {
+      // Try user-scoped row first (column may not exist yet before first registration)
+      const result = await pool.query(
+        "SELECT * FROM settings WHERE owner_id=$1 LIMIT 1", [req.user.id]
+      ).catch(() => ({ rows: [] }));
+      settings = result.rows[0] || null;
+    }
+    if (!settings) {
+      const { rows: [global] } = await pool.query(
+        "SELECT * FROM settings WHERE id=1 LIMIT 1"
+      ).catch(() => pool.query("SELECT * FROM settings LIMIT 1"));
+      settings = global || null;
+    }
     const { rows: rates } = await pool.query("SELECT * FROM exchange_rates ORDER BY from_currency");
     res.json({ settings, exchangeRates: rates });
   } catch (err) { next(err); }
@@ -41,19 +54,36 @@ router.put("/", requireRole("admin", "sme_owner", "pulse_admin"), async (req, re
       language, sector_default, district_default,
     } = req.body;
 
-    const { rows: [s] } = await pool.query(
-      `UPDATE settings SET
-        shop_name=$1, shop_address=$2, shop_phone=$3,
-        default_low_stock_threshold=$4, invoice_footer_text=$5,
-        language=$6, sector_default=$7, district_default=$8
-       WHERE id=1 RETURNING *`,
-      [
-        shop_name, shop_address, shop_phone,
-        default_low_stock_threshold, invoice_footer_text,
-        language || 'en', sector_default || null, district_default || null,
-      ]
-    );
-    await logAudit(req.user.id, "SETTINGS_UPDATED", "settings", 1, null, req.body, req.ip);
+    let s;
+    if (req.user.role === 'sme_owner') {
+      // Upsert user-scoped settings row
+      const { rows: [row] } = await pool.query(
+        `INSERT INTO settings (owner_id, shop_name, shop_address, shop_phone,
+           default_low_stock_threshold, invoice_footer_text, language, sector_default, district_default)
+         VALUES ($9,$1,$2,$3,$4,$5,$6,$7,$8)
+         ON CONFLICT (owner_id) DO UPDATE SET
+           shop_name=$1, shop_address=$2, shop_phone=$3,
+           default_low_stock_threshold=$4, invoice_footer_text=$5,
+           language=$6, sector_default=$7, district_default=$8
+         RETURNING *`,
+        [shop_name, shop_address, shop_phone, default_low_stock_threshold, invoice_footer_text,
+         language || 'en', sector_default || null, district_default || null, req.user.id]
+      );
+      s = row;
+    } else {
+      // Admin/pulse_admin update global row
+      const { rows: [row] } = await pool.query(
+        `UPDATE settings SET
+          shop_name=$1, shop_address=$2, shop_phone=$3,
+          default_low_stock_threshold=$4, invoice_footer_text=$5,
+          language=$6, sector_default=$7, district_default=$8
+         WHERE id=1 RETURNING *`,
+        [shop_name, shop_address, shop_phone, default_low_stock_threshold, invoice_footer_text,
+         language || 'en', sector_default || null, district_default || null]
+      );
+      s = row;
+    }
+    await logAudit(req.user.id, "SETTINGS_UPDATED", "settings", s?.id, null, req.body, req.ip);
     res.json(s);
   } catch (err) { next(err); }
 });
