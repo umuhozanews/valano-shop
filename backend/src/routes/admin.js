@@ -250,14 +250,25 @@ router.post("/seed-mock-data", async (req, res, next) => {
   }
 });
 
-// POST /v2/admin/backfill-journal — create journal entries for all existing sales + expenses
+// POST /v2/admin/backfill-journal — bulk-create journal entries for existing sales + expenses
 router.post("/backfill-journal", async (req, res, next) => {
   try {
-    const { ensureJournalTables, journalForSale, journalForExpense } = require("../utils/journal");
+    const { ensureJournalTables } = require("../utils/journal");
     const pool = require("../config/db");
     await ensureJournalTables();
 
-    // Skip sales that already have a journal entry
+    // Map payment method to account code
+    const pmToCode = { cash:"1000", mtn_momo:"1010", airtel:"1010", card:"1010", bank_transfer:"1010", credit:"1100" };
+
+    // Get account IDs we'll need
+    const { rows: accounts } = await pool.query(
+      "SELECT id, code FROM chart_of_accounts WHERE code IN ('1000','1010','1100','4000','5000','6000','6001','6002','6003','6004','6005','6006','6007','6008')"
+    );
+    const accId = Object.fromEntries(accounts.map(a => [a.code, a.id]));
+
+    const EXPENSE_MAP = { Rent:"6001", Utilities:"6002", Salaries:"6003", Transport:"6004", Marketing:"6005", Maintenance:"6006", "Loan Repayment":"6007", Supplies:"6008" };
+
+    // --- SALES (bulk) ---
     const { rows: sales } = await pool.query(`
       SELECT s.id, s.total_amount, s.payment_method, s.created_at,
              i.invoice_number,
@@ -266,50 +277,86 @@ router.post("/backfill-journal", async (req, res, next) => {
       LEFT JOIN invoices i ON i.sale_id = s.id
       LEFT JOIN accounts_receivable ar ON ar.sale_id = s.id AND ar.status != 'paid'
       WHERE s.is_voided = false
-        AND NOT EXISTS (
-          SELECT 1 FROM journal_entries je
-          WHERE je.reference_type = 'sale' AND je.reference_id = s.id
-        )
-      ORDER BY s.created_at ASC
-      LIMIT 500
+        AND NOT EXISTS (SELECT 1 FROM journal_entries je WHERE je.reference_type='sale' AND je.reference_id=s.id)
+      LIMIT 200
     `);
 
-    const { rows: expenses } = await pool.query(`
-      SELECT id, amount, category, description, expense_date, recorded_by
-      FROM expenses
-      WHERE NOT EXISTS (
-        SELECT 1 FROM journal_entries je
-        WHERE je.reference_type = 'expense' AND je.reference_id = expenses.id
-      )
-      ORDER BY expense_date ASC
-      LIMIT 500
-    `);
-
-    let saleCount = 0, expenseCount = 0;
-
-    for (const s of sales) {
-      await journalForSale({
-        saleId: s.id,
-        total: parseFloat(s.total_amount),
-        amountPaid: parseFloat(s.amount_paid || s.total_amount),
-        paymentMethod: s.payment_method,
-        invoiceNumber: s.invoice_number,
-        createdBy: null,
-        saleDate: s.created_at,
+    let saleCount = 0;
+    if (sales.length) {
+      // Bulk insert journal_entries for all sales
+      const entryValues = sales.map((s, i) => {
+        const label = `Sale ${s.invoice_number || '#' + s.id} — ${(s.payment_method || 'cash').replace(/_/g,' ')}`;
+        return `($${i*5+1},$${i*5+2},'sale',$${i*5+3},$${i*5+4},$${i*5+5})`;
       });
-      saleCount++;
+      const entryParams = sales.flatMap(s => [
+        s.created_at, `Sale ${s.invoice_number || '#' + s.id} — ${(s.payment_method || 'cash').replace(/_/g,' ')}`,
+        s.id, null, s.created_at,
+      ]);
+      const { rows: entries } = await pool.query(
+        `INSERT INTO journal_entries (entry_date, description, reference_type, reference_id, created_at) VALUES ${entryValues.join(",")} RETURNING id, reference_id`,
+        entryParams
+      );
+      saleCount = entries.length;
+
+      // Build journal_lines for each entry
+      const lineValues = []; const lineParams = [];
+      for (const entry of entries) {
+        const sale = sales.find(s => s.id === entry.reference_id);
+        if (!sale) continue;
+        const total  = parseFloat(sale.total_amount);
+        const paid   = parseFloat(sale.amount_paid ?? total);
+        const unpaid = Math.max(0, total - paid);
+        const cashCode = pmToCode[sale.payment_method] || "1000";
+        const lines = [];
+        if (paid > 0) lines.push([entry.id, accId[cashCode], paid, 0]);
+        if (unpaid > 0.01) lines.push([entry.id, accId["1100"], unpaid, 0]);
+        lines.push([entry.id, accId["4000"], 0, total]);
+        for (const [eid, aid, dr, cr] of lines) {
+          const base = lineParams.length;
+          lineValues.push(`($${base+1},$${base+2},$${base+3},$${base+4})`);
+          lineParams.push(eid, aid, dr, cr);
+        }
+      }
+      if (lineValues.length) {
+        await pool.query(
+          `INSERT INTO journal_lines (entry_id, account_id, debit, credit) VALUES ${lineValues.join(",")}`,
+          lineParams
+        );
+      }
     }
 
-    for (const e of expenses) {
-      await journalForExpense({
-        expenseId: e.id,
-        amount: e.amount,
-        category: e.category,
-        description: e.description,
-        createdBy: e.recorded_by,
-        expenseDate: e.expense_date,
-      });
-      expenseCount++;
+    // --- EXPENSES (bulk) ---
+    const { rows: expenses } = await pool.query(`
+      SELECT id, amount, category, description, expense_date, recorded_by FROM expenses
+      WHERE NOT EXISTS (SELECT 1 FROM journal_entries je WHERE je.reference_type='expense' AND je.reference_id=expenses.id)
+      LIMIT 200
+    `);
+
+    let expenseCount = 0;
+    if (expenses.length) {
+      const eValues = expenses.map((e, i) => `($${i*4+1},$${i*4+2},'expense',$${i*4+3},$${i*4+4})`);
+      const eParams = expenses.flatMap(e => [e.expense_date, `Expense: ${e.description || e.category}`, e.id, e.recorded_by]);
+      const { rows: eEntries } = await pool.query(
+        `INSERT INTO journal_entries (entry_date, description, reference_type, reference_id, created_by) VALUES ${eValues.join(",")} RETURNING id, reference_id`,
+        eParams
+      );
+      expenseCount = eEntries.length;
+
+      const lValues = []; const lParams = [];
+      for (const entry of eEntries) {
+        const exp = expenses.find(e => e.id === entry.reference_id);
+        if (!exp) continue;
+        const expCode = EXPENSE_MAP[exp.category] || "6000";
+        const amt = parseFloat(exp.amount);
+        [[entry.id, accId[expCode], amt, 0],[entry.id, accId["1000"], 0, amt]].forEach(([eid,aid,dr,cr]) => {
+          const base = lParams.length;
+          lValues.push(`($${base+1},$${base+2},$${base+3},$${base+4})`);
+          lParams.push(eid, aid, dr, cr);
+        });
+      }
+      if (lValues.length) {
+        await pool.query(`INSERT INTO journal_lines (entry_id, account_id, debit, credit) VALUES ${lValues.join(",")}`, lParams);
+      }
     }
 
     res.json({ ok: true, sales: saleCount, expenses: expenseCount });
