@@ -5,6 +5,7 @@ import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import api from "../../utils/api";
 import { formatRWF } from "../../utils/formatters";
+import { useLanguage } from "../../context/LanguageContext";
 
 const STATUS_BADGE = {
   ordered:    "warning",
@@ -14,6 +15,7 @@ const STATUS_BADGE = {
 };
 
 export default function PurchaseOrders() {
+  const { t } = useLanguage();
   const [orders, setOrders]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -52,48 +54,48 @@ export default function PurchaseOrders() {
 
   return (
     <PageWrapper
-      title="Purchase Orders"
-      subtitle="Track stock orders from suppliers"
-      breadcrumbs={[{ label: "Purchase Orders", path: "/app/purchase-orders" }]}
+      title={t("purchase_orders")}
+      subtitle={t("track_stock_orders")}
+      breadcrumbs={[{ label: t("purchase_orders"), path: "/app/purchase-orders" }]}
       action={
         <button onClick={() => setShowForm(true)}
           className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-[6px] text-[14px] font-medium hover:bg-primary/90">
-          <Plus size={15} /> New Order
+          <Plus size={15} /> {t("new_order")}
         </button>
       }
     >
       {showForm && (
-        <Card title="New Purchase Order" className="mb-4">
+        <Card title={t("new_purchase_order")} className="mb-4">
           <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="text-[13px] text-text-secondary mb-1 block">Supplier</label>
+              <label className="text-[13px] text-text-secondary mb-1 block">{t("supplier_label")}</label>
               <select className="w-full border border-border rounded-[6px] px-3 py-2 text-[14px] bg-background"
                 value={form.supplier_id} onChange={e => setForm(p => ({ ...p, supplier_id: e.target.value }))} required>
-                <option value="">Select supplier...</option>
+                <option value="">{t("select_supplier")}</option>
                 {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-[13px] text-text-secondary mb-1 block">Order Date</label>
+              <label className="text-[13px] text-text-secondary mb-1 block">{t("order_date")}</label>
               <input type="date" className="w-full border border-border rounded-[6px] px-3 py-2 text-[14px] bg-background"
                 value={form.order_date} onChange={e => setForm(p => ({ ...p, order_date: e.target.value }))} />
             </div>
             <div>
-              <label className="text-[13px] text-text-secondary mb-1 block">Expected Arrival</label>
+              <label className="text-[13px] text-text-secondary mb-1 block">{t("expected_arrival")}</label>
               <input type="date" className="w-full border border-border rounded-[6px] px-3 py-2 text-[14px] bg-background"
                 value={form.arrival_date} onChange={e => setForm(p => ({ ...p, arrival_date: e.target.value }))} />
             </div>
             <div>
-              <label className="text-[13px] text-text-secondary mb-1 block">Notes</label>
+              <label className="text-[13px] text-text-secondary mb-1 block">{t("notes")}</label>
               <input type="text" className="w-full border border-border rounded-[6px] px-3 py-2 text-[14px] bg-background"
-                placeholder="Optional notes..." value={form.notes}
+                placeholder={t("optional_notes")} value={form.notes}
                 onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} />
             </div>
             <div className="sm:col-span-3 flex gap-2 justify-end">
               <button type="button" onClick={() => setShowForm(false)}
-                className="px-4 py-2 border border-border rounded-[6px] text-[14px]">Cancel</button>
+                className="px-4 py-2 border border-border rounded-[6px] text-[14px]">{t("cancel")}</button>
               <button type="submit"
-                className="px-4 py-2 bg-primary text-white rounded-[6px] text-[14px] font-medium">Create Order</button>
+                className="px-4 py-2 bg-primary text-white rounded-[6px] text-[14px] font-medium">{t("create_order")}</button>
             </div>
           </form>
         </Card>
@@ -101,12 +103,12 @@ export default function PurchaseOrders() {
 
       <Card>
         {loading ? (
-          <div className="text-center py-12 text-text-secondary text-[14px]">Loading orders...</div>
+          <div className="text-center py-12 text-text-secondary text-[14px]">{t("loading_orders")}</div>
         ) : !orders.length ? (
           <div className="text-center py-12">
             <Truck size={36} className="mx-auto text-text-secondary/30 mb-3" />
-            <p className="text-[15px] font-medium text-text-primary">No purchase orders yet</p>
-            <p className="text-[14px] text-text-secondary mt-1">Create an order to start tracking stock from suppliers</p>
+            <p className="text-[15px] font-medium text-text-primary">{t("no_orders_yet")}</p>
+            <p className="text-[14px] text-text-secondary mt-1">{t("no_orders_desc")}</p>
           </div>
         ) : (
           <div className="divide-y divide-border">
@@ -116,7 +118,7 @@ export default function PurchaseOrders() {
                   <p className="text-[14px] font-medium text-text-primary">{o.supplier_name || `Supplier #${o.supplier_id}`}</p>
                   <p className="text-[13px] text-text-secondary mt-0.5">
                     {new Date(o.order_date || o.created_at).toLocaleDateString("en-RW")}
-                    {o.expected_arrival && ` · Expected ${new Date(o.expected_arrival).toLocaleDateString("en-RW")}`}
+                    {o.expected_arrival && ` · ${t("expected_prefix")} ${new Date(o.expected_arrival).toLocaleDateString("en-RW")}`}
                   </p>
                   {o.notes && <p className="text-[13px] text-text-secondary">{o.notes}</p>}
                 </div>
@@ -125,7 +127,7 @@ export default function PurchaseOrders() {
                   {o.status !== "stocked" && (
                     <button onClick={() => advanceStatus(o.id, o.status)}
                       className="flex items-center gap-1 text-[13px] text-primary hover:underline">
-                      Advance <ChevronRight size={12} />
+                      {t("advance")} <ChevronRight size={12} />
                     </button>
                   )}
                 </div>

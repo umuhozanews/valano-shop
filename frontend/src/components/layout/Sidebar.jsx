@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { NAV_ITEMS } from "../../utils/constants";
 import { useAuth } from "../../context/AuthContext";
-import { useLanguage } from "../../context/LanguageContext";
+import { useLanguage, LANGUAGES } from "../../context/LanguageContext";
 
 const ICONS = {
   LayoutDashboard, Package, ShoppingCart, Truck, Globe, UserCheck,
@@ -14,7 +14,7 @@ const ICONS = {
   Bell, Settings, Activity, Scale, Receipt,
 };
 
-function NavItem({ item, onClose }) {
+function NavItem({ item, t, onClose }) {
   const Icon = ICONS[item.icon] || Package;
   return (
     <NavLink
@@ -31,7 +31,7 @@ function NavItem({ item, onClose }) {
       {({ isActive }) => (
         <>
           <Icon size={15} className={isActive ? "text-white" : "text-white/60"} />
-          <span>{item.label}</span>
+          <span>{t(item.tKey) || item.label}</span>
         </>
       )}
     </NavLink>
@@ -40,7 +40,7 @@ function NavItem({ item, onClose }) {
 
 export default function Sidebar({ open, onClose }) {
   const { user } = useAuth();
-  const { lang, switchLanguage } = useLanguage();
+  const { lang, t, switchLanguage } = useLanguage();
 
   return (
     <>
@@ -82,11 +82,11 @@ export default function Sidebar({ open, onClose }) {
             return (
               <div key={section.section}>
                 <p className="text-[12px] font-bold uppercase tracking-[0.08em] text-white/40 px-3 mb-1">
-                  {section.section}
+                  {t(section.tKey) || section.section}
                 </p>
                 <div className="space-y-0.5">
                   {visible.map(item => (
-                    <NavItem key={item.path} item={item} onClose={onClose} />
+                    <NavItem key={item.path} item={item} t={t} onClose={onClose} />
                   ))}
                 </div>
               </div>
@@ -102,12 +102,14 @@ export default function Sidebar({ open, onClose }) {
               <p className="text-[13px] text-white/60 capitalize">{user.role?.replace(/_/g, " ")}</p>
             </div>
           )}
-          <button
-            onClick={() => switchLanguage(lang === "en" ? "rw" : "en")}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white/10 border border-white/10 rounded-[6px] text-[13px] font-medium text-white/80 hover:text-white transition-colors"
-          >
-            🌐 {lang === "en" ? "Kinyarwanda" : "English"}
-          </button>
+          <div className="flex gap-1">
+            {LANGUAGES.map(l => (
+              <button key={l.code} onClick={() => switchLanguage(l.code)}
+                className={`flex-1 py-1.5 rounded-[6px] text-[12px] font-medium transition-colors ${lang === l.code ? "bg-white text-primary" : "bg-white/10 text-white/70 hover:text-white"}`}>
+                {l.label}
+              </button>
+            ))}
+          </div>
         </div>
       </aside>
     </>

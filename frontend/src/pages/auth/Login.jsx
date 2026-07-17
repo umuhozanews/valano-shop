@@ -3,7 +3,7 @@ import { Navigate } from "react-router-dom";
 import { roleHomePath } from "../../App";
 import { Mail, Eye, EyeOff, Loader2, Globe } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
-import { useLanguage } from "../../context/LanguageContext";
+import { useLanguage, LANGUAGES } from "../../context/LanguageContext";
 import toast from "react-hot-toast";
 
 export default function Login() {
@@ -36,14 +36,13 @@ export default function Login() {
   return (
     <div className="min-h-screen flex relative">
       {/* Language Switcher */}
-      <div className="absolute top-6 right-6 z-50">
-        <button 
-          onClick={() => switchLanguage(lang === "en" ? "rw" : "en")}
-          className="flex items-center gap-2 px-3 py-1.5 bg-surface border border-border rounded-badge text-[14px] font-medium text-text-primary hover:bg-background transition-colors"
-        >
-          <Globe size={14} />
-          {lang === "en" ? "Kinyarwanda" : "English"}
-        </button>
+      <div className="absolute top-6 right-6 z-50 flex items-center gap-1 bg-surface border border-border rounded-badge px-2 py-1">
+        {LANGUAGES.map(l => (
+          <button key={l.code} onClick={() => switchLanguage(l.code)}
+            className={`px-2 py-0.5 rounded text-[13px] font-medium transition-colors ${lang === l.code ? "bg-primary text-white" : "text-text-secondary hover:text-text-primary"}`}>
+            {l.label}
+          </button>
+        ))}
       </div>
 
       {/* Left panel */}
@@ -98,9 +97,7 @@ export default function Login() {
           </div>
 
           <h2 className="text-[26px] font-bold text-text-primary mb-1">{t("welcome_back")}</h2>
-          <p className="text-[15px] text-text-secondary mb-2">{t("sign_in_account")}</p>
-          <p className="text-[12px] text-text-secondary/50 mb-8 italic">System active for: rukundojosephtuyishime@gmail.com</p>
-
+          <p className="text-[15px] text-text-secondary mb-8">{t("sign_in_account")}</p>
           {error && (
             <div className="mb-4 px-3 py-2.5 bg-danger/10 border border-danger/20 rounded-card flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-danger shrink-0" />

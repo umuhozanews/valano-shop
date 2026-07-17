@@ -77,9 +77,9 @@ export default function ExpensesList() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <StatCard title={t("total")} value={formatRWF(totals.total)} icon={Receipt} color="danger" />
-        <StatCard title={t("all")} value={totals.count} />
+        <StatCard title={t("expenses")} value={totals.count} />
         <Button variant="primary" size="lg" icon={Plus} onClick={() => setShowModal(true)} className="!h-auto flex-col gap-1 py-4">
-          <span className="text-[16px]">{t("add")}</span>
+          <span className="text-[16px]">{t("add_expense")}</span>
         </Button>
       </div>
 
@@ -96,7 +96,7 @@ export default function ExpensesList() {
         <Table columns={columns} data={expenses} loading={loading} />
       </Card>
 
-      <Modal open={showModal} onClose={() => setShowModal(false)} title={t("add")}
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={t("add_expense")}
         footer={<><Button variant="secondary" onClick={() => setShowModal(false)}>{t("cancel")}</Button><Button loading={saving} onClick={handleAdd}>{t("save")}</Button></>}>
         <div className="space-y-3">
           <div>

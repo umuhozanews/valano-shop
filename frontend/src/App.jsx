@@ -37,6 +37,7 @@ const CustomersList     = L(() => import("./pages/customers/CustomersList"));
 const CustomerProfile   = L(() => import("./pages/customers/CustomerProfile"));
 const SuppliersList     = L(() => import("./pages/suppliers/SuppliersList"));
 const Receivables       = L(() => import("./pages/finance/Receivables"));
+const Payables          = L(() => import("./pages/finance/Payables"));
 
 // Finance
 const InvoicesList      = L(() => import("./pages/finance/InvoicesList"));
@@ -113,6 +114,7 @@ export default function App() {
           <Route path="/app/customers"        element={<P roles={STAFF}><CustomersList /></P>} />
           <Route path="/app/customers/:id"    element={<P roles={STAFF}><CustomerProfile /></P>} />
           <Route path="/app/receivables"      element={<P roles={STAFF}><Receivables /></P>} />
+          <Route path="/app/payables"         element={<P roles={STAFF}><Payables /></P>} />
 
           {/* Finance */}
           <Route path="/app/expenses"         element={<P roles={STAFF}><ExpensesList /></P>} />

@@ -6,7 +6,7 @@ import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
 import api from "../../utils/api";
 import toast from "react-hot-toast";
-import { useLanguage } from "../../context/LanguageContext";
+import { useLanguage, LANGUAGES } from "../../context/LanguageContext";
 import { SECTORS, DISTRICTS } from "../../utils/constants";
 
 const SECTIONS = [
@@ -222,18 +222,22 @@ export default function SettingsPage() {
                   </div>
 
                   {/* Language toggle */}
-                  <div className="mb-4 p-3 bg-background rounded-[6px] border border-border flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                  <div className="mb-4 p-3 bg-background rounded-[6px] border border-border">
+                    <div className="flex items-center gap-2 mb-3">
                       <Globe size={15} className="text-primary" />
                       <div>
                         <p className="text-[14px] font-medium text-text-primary">Interface Language</p>
-                        <p className="text-[13px] text-text-secondary">Currently: {lang === "en" ? "English" : "Kinyarwanda"}</p>
+                        <p className="text-[13px] text-text-secondary">Currently: {LANGUAGES.find(l => l.code === lang)?.label}</p>
                       </div>
                     </div>
-                    <button onClick={() => switchLanguage(lang === "en" ? "rw" : "en")}
-                      className="px-3 py-1.5 bg-primary/10 text-primary text-[13px] font-medium rounded-[6px] hover:bg-primary/20">
-                      Switch to {lang === "en" ? "Kinyarwanda" : "English"}
-                    </button>
+                    <div className="flex gap-2">
+                      {LANGUAGES.map(l => (
+                        <button key={l.code} onClick={() => switchLanguage(l.code)}
+                          className={`flex-1 py-2 rounded-[6px] text-[13px] font-medium transition-colors border ${lang === l.code ? "bg-primary text-white border-primary" : "bg-surface text-text-secondary border-border hover:border-primary/50"}`}>
+                          {l.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <Button loading={saving} onClick={saveBusiness}>Save Business Info</Button>

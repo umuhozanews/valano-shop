@@ -17,6 +17,7 @@ router.use("/audit",              require("./audit"));
 router.use("/settings",           require("./settings"));
 router.use("/purchase-orders",    require("./purchase-orders"));
 router.use("/accounts-receivable",require("./accounts-receivable"));
+router.use("/accounts-payable",   require("./accounts-payable"));
 router.use("/payments",           require("./payments"));
 
 // ── v2: Health Score, Lender, Pulse Admin ────────────────────────────────────

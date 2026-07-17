@@ -9,10 +9,12 @@ import Input from "../../components/ui/Input";
 import api from "../../utils/api";
 import { formatRWF } from "../../utils/formatters";
 import toast from "react-hot-toast";
+import { useLanguage } from "../../context/LanguageContext";
 
 const EMPTY = { name:"", wechat:"", whatsapp:"", city:"", country:"China", specialty:"", notes:"" };
 
 export default function SuppliersList() {
+  const { t } = useLanguage();
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -34,25 +36,25 @@ export default function SuppliersList() {
     try {
       if (editS) await api.put(`/suppliers/${editS.id}`, form);
       else await api.post("/suppliers", form);
-      toast.success("Saved"); setShowModal(false); fetchData();
-    } catch(e){ toast.error(e.response?.data?.error||"Failed"); }
+      toast.success(t("success")); setShowModal(false); fetchData();
+    } catch(e){ toast.error(e.response?.data?.error || t("error")); }
     finally { setSaving(false); }
   }
 
   async function handleDelete(id) {
-    if (!confirm("Delete this supplier?")) return;
-    try { await api.delete(`/suppliers/${id}`); toast.success("Deleted"); fetchData(); }
+    if (!confirm(t("delete_supplier_confirm"))) return;
+    try { await api.delete(`/suppliers/${id}`); toast.success(t("success")); fetchData(); }
     catch { toast.error("Cannot delete — supplier has orders"); }
   }
 
   const columns = [
-    { key:"name", label:"Supplier" },
-    { key:"city", label:"City / Country", render:(v,r) => `${v||"—"}, ${r.country||"China"}` },
-    { key:"specialty", label:"Specialty" },
-    { key:"wechat", label:"WeChat" },
-    { key:"orders_count", label:"Orders", render:v => parseInt(v)||0 },
-    { key:"total_purchased_rwf", label:"Total Invested", render:v => formatRWF(Math.round(v||0)) },
-    { key:"reliability_pct", label:"Reliability", render:v => (
+    { key:"name", label: t("supplier_col") },
+    { key:"city", label: t("city_country"), render:(v,r) => `${v||"—"}, ${r.country||"China"}` },
+    { key:"specialty", label: t("specialty") },
+    { key:"wechat", label: t("wechat") },
+    { key:"orders_count", label: t("orders_count"), render:v => parseInt(v)||0 },
+    { key:"total_purchased_rwf", label: t("total_invested"), render:v => formatRWF(Math.round(v||0)) },
+    { key:"reliability_pct", label: t("reliability"), render:v => (
       <div className="flex items-center gap-2">
         <div className="w-16 h-1.5 bg-border rounded-full overflow-hidden">
           <div className="h-full bg-primary rounded-full" style={{ width:`${v||0}%` }} />
@@ -70,30 +72,30 @@ export default function SuppliersList() {
   ];
 
   return (
-    <PageWrapper title="Suppliers" subtitle="China supplier contacts" breadcrumbs={[{label:"Suppliers",path:"/app/suppliers"}]}>
+    <PageWrapper title={t("suppliers")} subtitle={t("suppliers_subtitle")} breadcrumbs={[{label: t("suppliers"), path:"/app/suppliers"}]}>
       <Card action={
         <div className="flex gap-3">
           <div className="relative">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
-            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search…"
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder={`${t("search")}…`}
               className="h-8 pl-8 pr-3 border border-border rounded-card text-[13px] focus:outline-none focus:ring-1 focus:ring-primary w-40" />
           </div>
-          <Button icon={Plus} size="sm" onClick={() => { setEditS(null); setForm(EMPTY); setShowModal(true); }}>Add Supplier</Button>
+          <Button icon={Plus} size="sm" onClick={() => { setEditS(null); setForm(EMPTY); setShowModal(true); }}>{t("add_supplier")}</Button>
         </div>
       }>
-        <Table columns={columns} data={suppliers} loading={loading} emptyMessage="No suppliers found" />
+        <Table columns={columns} data={suppliers} loading={loading} emptyMessage={t("no_suppliers_found")} />
       </Card>
 
-      <Modal open={showModal} onClose={() => setShowModal(false)} title={editS ? "Edit Supplier" : "Add Supplier"}
-        footer={<><Button variant="secondary" onClick={() => setShowModal(false)}>Cancel</Button><Button loading={saving} onClick={handleSave}>Save</Button></>}>
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={editS ? t("edit_supplier") : t("add_supplier")}
+        footer={<><Button variant="secondary" onClick={() => setShowModal(false)}>{t("cancel")}</Button><Button loading={saving} onClick={handleSave}>{t("save")}</Button></>}>
         <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2"><Input label="Supplier Name" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} /></div>
-          <Input label="WeChat ID" value={form.wechat} onChange={e=>setForm(f=>({...f,wechat:e.target.value}))} />
-          <Input label="WhatsApp" value={form.whatsapp} onChange={e=>setForm(f=>({...f,whatsapp:e.target.value}))} />
-          <Input label="City" value={form.city} onChange={e=>setForm(f=>({...f,city:e.target.value}))} />
-          <Input label="Country" value={form.country} onChange={e=>setForm(f=>({...f,country:e.target.value}))} />
-          <div className="col-span-2"><Input label="Specialty" value={form.specialty} onChange={e=>setForm(f=>({...f,specialty:e.target.value}))} /></div>
-          <div className="col-span-2"><Input label="Notes" value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} /></div>
+          <div className="col-span-2"><Input label={t("supplier_name")} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} /></div>
+          <Input label={t("wechat_id")} value={form.wechat} onChange={e=>setForm(f=>({...f,wechat:e.target.value}))} />
+          <Input label={t("whatsapp")} value={form.whatsapp} onChange={e=>setForm(f=>({...f,whatsapp:e.target.value}))} />
+          <Input label={t("city")} value={form.city} onChange={e=>setForm(f=>({...f,city:e.target.value}))} />
+          <Input label={t("country")} value={form.country} onChange={e=>setForm(f=>({...f,country:e.target.value}))} />
+          <div className="col-span-2"><Input label={t("specialty")} value={form.specialty} onChange={e=>setForm(f=>({...f,specialty:e.target.value}))} /></div>
+          <div className="col-span-2"><Input label={t("notes")} value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} /></div>
         </div>
       </Modal>
     </PageWrapper>

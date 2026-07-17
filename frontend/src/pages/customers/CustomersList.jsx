@@ -68,14 +68,14 @@ export default function CustomersList() {
         <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
           <span className="text-[13px] font-bold text-primary">{v?.charAt(0)}</span>
         </div>
-        <div><p className="font-medium text-text-primary">{v}</p><p className="text-[13px] text-text-secondary">{r.phone||"No phone"}</p></div>
+        <div><p className="font-medium text-text-primary">{v}</p><p className="text-[13px] text-text-secondary">{r.phone||t("no_phone")}</p></div>
       </div>
     )},
-    { key:"type", label:"Type", render:v => <Badge status={v==="wholesaler"?"warning":"neutral"} label={v} /> },
-    { key:"segment", label:"Segment", render:v => <Badge status={SEG_MAP[v]||"neutral"} label={v} /> },
-    { key:"total_orders", label:"Orders", render:v => parseInt(v)||0 },
-    { key:"total_spent", label:"Total Spent", render:v => <span className="font-medium text-primary">{formatRWF(v||0)}</span> },
-    { key:"last_purchase", label:"Last Purchase", render:v => v ? formatDate(v) : "—" },
+    { key:"type", label: t("type"), render:v => <Badge status={v==="wholesaler"?"warning":"neutral"} label={v} /> },
+    { key:"segment", label: t("segment"), render:v => <Badge status={SEG_MAP[v]||"neutral"} label={v} /> },
+    { key:"total_orders", label: t("orders"), render:v => parseInt(v)||0 },
+    { key:"total_spent", label: t("total_spent"), render:v => <span className="font-medium text-primary">{formatRWF(v||0)}</span> },
+    { key:"last_purchase", label: t("last_purchase"), render:v => v ? formatDate(v) : "—" },
     { key:"id", label:"", render:(v,r) => (
       <div className="flex gap-1 items-center">
         <Button variant="ghost" size="sm" onClick={() => navigate(`/app/customers/${v}`)}>{t("view")}</Button>
@@ -96,9 +96,9 @@ export default function CustomersList() {
     <PageWrapper title={t("customers")} subtitle={t("management")} breadcrumbs={[{label: t("customers"), path:"/app/customers"}]}>
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
         <StatCard title={t("total")} value={total} />
-        <StatCard title="VIP" value={getSegCount("vip")} />
-        <StatCard title="Regular" value={getSegCount("regular")} />
-        <StatCard title="New" value={getSegCount("new")} />
+        <StatCard title={t("vip")} value={getSegCount("vip")} />
+        <StatCard title={t("regular")} value={getSegCount("regular")} />
+        <StatCard title={t("new_label")} value={getSegCount("new")} />
       </div>
 
       <Card action={<Button icon={Plus} size="sm" onClick={() => setShowModal(true)}>{t("add")}</Button>}>
@@ -110,16 +110,16 @@ export default function CustomersList() {
           </div>
           <select value={filters.type} onChange={e=>setFilters(f=>({...f,type:e.target.value}))}
             className="h-9 px-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary">
-            <option value="">All Types</option><option value="retailer">Retailer</option><option value="wholesaler">Wholesaler</option>
+            <option value="">{t("all_types")}</option><option value="retailer">{t("retailer")}</option><option value="wholesaler">{t("wholesaler")}</option>
           </select>
         </div>
         <Table columns={columns} data={customers} loading={loading} emptyMessage={t("loading")} />
         {total > 20 && (
           <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
-            <p className="text-[14px] text-text-secondary">Showing {(page-1)*20+1}–{Math.min(page*20,total)} of {total}</p>
+            <p className="text-[14px] text-text-secondary">{t("showing")} {(page-1)*20+1}–{Math.min(page*20,total)} {t("of")} {total}</p>
             <div className="flex gap-2">
-              <Button variant="secondary" size="sm" disabled={page===1} onClick={() => setPage(p=>p-1)}>Previous</Button>
-              <Button variant="secondary" size="sm" disabled={page*20>=total} onClick={() => setPage(p=>p+1)}>Next</Button>
+              <Button variant="secondary" size="sm" disabled={page===1} onClick={() => setPage(p=>p-1)}>{t("previous")}</Button>
+              <Button variant="secondary" size="sm" disabled={page*20>=total} onClick={() => setPage(p=>p+1)}>{t("next")}</Button>
             </div>
           </div>
         )}
@@ -130,14 +130,14 @@ export default function CustomersList() {
         <div className="space-y-3">
           <Input label={t("name")} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} />
           <Input label={t("phone")} value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} />
-          <Input label="Location" value={form.location} onChange={e=>setForm(f=>({...f,location:e.target.value}))} />
+          <Input label={t("location")} value={form.location} onChange={e=>setForm(f=>({...f,location:e.target.value}))} />
           <div>
-            <label className="block text-[14px] font-medium text-text-primary mb-1">Type</label>
+            <label className="block text-[14px] font-medium text-text-primary mb-1">{t("type")}</label>
             <select value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))} className="w-full h-9 px-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary">
-              <option value="retailer">Retailer</option><option value="wholesaler">Wholesaler</option>
+              <option value="retailer">{t("retailer")}</option><option value="wholesaler">{t("wholesaler")}</option>
             </select>
           </div>
-          <Input label="Notes" value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} />
+          <Input label={t("notes")} value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} />
         </div>
       </Modal>
     </PageWrapper>

@@ -7,6 +7,7 @@ import Card from "../../components/ui/Card";
 import api from "../../utils/api";
 import { formatRWF } from "../../utils/formatters";
 import { useAuth } from "../../context/AuthContext";
+import { useLanguage } from "../../context/LanguageContext";
 
 // ─── Health Score Gauge ───────────────────────────────────────────────────────
 function HealthGauge({ score, band }) {
@@ -59,9 +60,12 @@ function AlertBanner({ alerts }) {
 }
 
 // ─── KPI Card ─────────────────────────────────────────────────────────────────
-function KPI({ label, value, sub, icon: Icon, color = "text-primary" }) {
+function KPI({ label, value, sub, icon: Icon, color = "text-primary", onClick }) {
   return (
-    <div className="bg-surface border border-border rounded-[8px] p-4">
+    <div
+      onClick={onClick}
+      className={`bg-surface border border-border rounded-[8px] p-4 ${onClick ? "cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors" : ""}`}
+    >
       <div className="flex items-center justify-between mb-2">
         <p className="text-[13px] text-text-secondary">{label}</p>
         {Icon && <Icon size={16} className={color} />}
@@ -75,6 +79,7 @@ function KPI({ label, value, sub, icon: Icon, color = "text-primary" }) {
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user }  = useAuth();
+  const { t }     = useLanguage();
 
   const [stats,    setStats]    = useState(null);
   const [trend,    setTrend]    = useState([]);
@@ -103,9 +108,9 @@ export default function Dashboard() {
 
   return (
     <PageWrapper
-      title={`Welcome, ${user?.name?.split(" ")[0] || "there"}`}
-      subtitle="Here's your business snapshot for today"
-      breadcrumbs={[{ label: "Dashboard", path: "/app/dashboard" }]}
+      title={`${t("welcome_back")}, ${user?.name?.split(" ")[0] || ""}`}
+      subtitle={t("dashboard_subtitle")}
+      breadcrumbs={[{ label: t("dashboard"), path: "/app/dashboard" }]}
     >
       {/* Alert banners */}
       {!loading && <AlertBanner alerts={stats?.alerts} />}
@@ -115,17 +120,17 @@ export default function Dashboard() {
         <button onClick={() => navigate("/app/sales/new")}
           className="flex flex-col items-center gap-1.5 py-4 bg-primary text-white rounded-[8px] hover:bg-primary/90 transition-colors">
           <ShoppingCart size={20} />
-          <span className="text-[13px] font-semibold">New Sale</span>
+          <span className="text-[13px] font-semibold">{t("new_sale")}</span>
         </button>
         <button onClick={() => navigate("/app/expenses")}
           className="flex flex-col items-center gap-1.5 py-4 bg-surface border border-border rounded-[8px] hover:bg-background transition-colors">
           <PlusCircle size={20} className="text-text-primary" />
-          <span className="text-[13px] font-semibold text-text-primary">Add Expense</span>
+          <span className="text-[13px] font-semibold text-text-primary">{t("add_expense")}</span>
         </button>
         <button onClick={() => navigate("/app/stock")}
           className="flex flex-col items-center gap-1.5 py-4 bg-surface border border-border rounded-[8px] hover:bg-background transition-colors">
           <Package size={20} className="text-text-primary" />
-          <span className="text-[13px] font-semibold text-text-primary">Receive Stock</span>
+          <span className="text-[13px] font-semibold text-text-primary">{t("receive_stock")}</span>
         </button>
       </div>
 
@@ -135,16 +140,16 @@ export default function Dashboard() {
           {loading ? Array(4).fill(0).map((_,i) => (
             <div key={i} className="bg-surface border border-border rounded-[8px] p-4 animate-pulse h-24" />
           )) : <>
-            <KPI label="Revenue Today"      value={formatRWF(stats?.todayRevenue)}   sub={`${stats?.todayTransactions ?? 0} transactions`} icon={ShoppingCart} />
-            <KPI label="Net Cash Today"     value={formatRWF(stats?.netCashToday)}   sub="Sales minus expenses" icon={TrendingUp} color={stats?.netCashToday >= 0 ? "text-success" : "text-danger"} />
-            <KPI label="Monthly Revenue"    value={formatRWF(stats?.monthlyRevenue)} sub={salesChange !== null ? `${salesChange > 0 ? "+" : ""}${salesChange}% vs last month` : undefined}
-              icon={salesChange > 0 ? TrendingUp : TrendingDown} color={salesChange >= 0 ? "text-success" : "text-danger"} />
-            <KPI label="Monthly Profit"     value={formatRWF(stats?.monthlyProfit)}  sub="Revenue minus expenses & COGS" icon={Activity} />
+            <KPI label={t("revenue_today")}   value={formatRWF(stats?.todayRevenue)}   sub={`${stats?.todayTransactions ?? 0} ${t("transactions")}`} icon={ShoppingCart} onClick={() => navigate("/app/sales")} />
+            <KPI label={t("net_cash_today")}  value={formatRWF(stats?.netCashToday)}   sub={t("sales_minus_expenses")} icon={TrendingUp} color={stats?.netCashToday >= 0 ? "text-success" : "text-danger"} onClick={() => navigate("/app/finance/pnl")} />
+            <KPI label={t("monthly_revenue")} value={formatRWF(stats?.monthlyRevenue)} sub={salesChange !== null ? `${salesChange > 0 ? "+" : ""}${salesChange}% ${t("vs_last_month")}` : undefined}
+              icon={salesChange > 0 ? TrendingUp : TrendingDown} color={salesChange >= 0 ? "text-success" : "text-danger"} onClick={() => navigate("/app/reports/sales")} />
+            <KPI label={t("monthly_profit")}  value={formatRWF(stats?.monthlyProfit)}  sub={t("revenue_minus_cogs")} icon={Activity} onClick={() => navigate("/app/finance/pnl")} />
           </>}
         </div>
 
         {/* Health Score Gauge */}
-        <Card title="Business Health Score" subtitle="Calculated from your data">
+        <Card title={t("business_health_score")} subtitle={t("health_score_subtitle")}>
           {loading ? (
             <div className="h-28 animate-pulse bg-border rounded" />
           ) : (
@@ -153,12 +158,12 @@ export default function Dashboard() {
               {score?.score < 50 && (
                 <button onClick={() => navigate("/app/health-score")}
                   className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 text-[13px] text-primary font-medium hover:underline">
-                  Get advisory help <ArrowRight size={13} />
+                  {t("get_advisory_help")} <ArrowRight size={13} />
                 </button>
               )}
               {!score && (
                 <p className="text-center text-[13px] text-text-secondary mt-2">
-                  No score yet — add sales and expenses to get scored
+                  {t("no_score_yet")}
                 </p>
               )}
             </>
@@ -168,26 +173,26 @@ export default function Dashboard() {
 
       {/* Row 2 — Sales Trend + Low Stock */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-        <Card title="7-Day Sales Trend" className="lg:col-span-2">
+        <Card title={t("sales_trend_7day")} className="lg:col-span-2">
           {loading ? <div className="h-48 animate-pulse bg-border rounded" /> : (
             trend.length ? (
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={trend}>
                   <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={v => v?.slice(5)} />
                   <YAxis tick={{ fontSize: 11 }} tickFormatter={v => (v/1000).toFixed(0) + "k"} />
-                  <Tooltip formatter={v => [formatRWF(v), "Revenue"]} />
+                  <Tooltip formatter={v => [formatRWF(v), t("revenue")]} />
                   <Line type="monotone" dataKey="revenue" stroke="#10B981" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
               <div className="h-48 flex items-center justify-center text-[14px] text-text-secondary">
-                No sales data yet — make your first sale to see the trend
+                {t("no_sales_data")}
               </div>
             )
           )}
         </Card>
 
-        <Card title="Low Stock Alerts" subtitle={`${lowStock.length} items need attention`}>
+        <Card title={t("low_stock_alerts")} subtitle={`${lowStock.length} ${t("items_need_attention")}`}>
           <div className="space-y-2 max-h-48 overflow-y-auto">
             {lowStock.length ? lowStock.map(item => (
               <div key={item.id} className="flex items-center justify-between py-1">
@@ -197,20 +202,20 @@ export default function Dashboard() {
                 </span>
               </div>
             )) : (
-              <p className="text-[14px] text-success py-4 text-center">✓ All stock levels OK</p>
+              <p className="text-[14px] text-success py-4 text-center">{t("all_stock_ok")}</p>
             )}
           </div>
           {lowStock.length > 0 && (
             <button onClick={() => navigate("/app/stock")}
               className="mt-3 w-full text-[13px] text-primary font-medium hover:underline text-center">
-              View all stock →
+              {t("view_all_stock")}
             </button>
           )}
         </Card>
       </div>
 
       {/* Row 3 — Recent Activity */}
-      <Card title="Recent Activity">
+      <Card title={t("recent_activity")}>
         <div className="divide-y divide-border">
           {activity.slice(0, 8).map(a => (
             <div key={a.id} className="flex items-center gap-3 py-2.5">
@@ -228,7 +233,7 @@ export default function Dashboard() {
             </div>
           ))}
           {!activity.length && (
-            <p className="text-[14px] text-text-secondary py-6 text-center">No recent activity</p>
+            <p className="text-[14px] text-text-secondary py-6 text-center">{t("no_recent_activity")}</p>
           )}
         </div>
       </Card>

@@ -24,7 +24,7 @@ const MONTHS = [
 ];
 
 export default function ProfitLoss() {
-  const { t: translate } = useLanguage();
+  const { t } = useLanguage();
   const [viewMode, setViewMode] = useState("monthly"); // "monthly" | "daily"
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
@@ -45,16 +45,16 @@ export default function ProfitLoss() {
            setDailyData(d.data);
          }
        })
-       .catch(() => toast.error(translate("error")))
+       .catch(() => toast.error(t("error")))
        .finally(() => setLoading(false));
-  }, [viewMode, year, month, translate]);
+  }, [viewMode, year, month, t]);
 
   const activeData = viewMode === "monthly" ? monthlyData : dailyData;
-  const t = activeData?.totals || {};
-  
+  const totals = activeData?.totals || {};
+
   // Calculate P&L Totals
-  const grossProfit = (t.revenue || 0) - (t.cogs || 0);
-  const netProfit = grossProfit - (t.expenses || 0);
+  const grossProfit = (totals.revenue || 0) - (totals.cogs || 0);
+  const netProfit = grossProfit - (totals.expenses || 0);
 
   // Monthly list mappings
   const byMonth = (monthlyData?.byMonth || []).map(m => ({
@@ -75,22 +75,22 @@ export default function ProfitLoss() {
   const getMonthName = (m) => MONTHS.find(x => x.value === parseInt(m))?.label || "";
 
   return (
-    <PageWrapper title={translate("profit_loss")} subtitle={viewMode === "monthly" ? translate("monthly_summary") : "Daily P&L Performance"}
-      breadcrumbs={[{label: translate("finance"), path:"/app/invoices"},{label: translate("profit_loss"), path:"/app/finance/pnl"}]}>
+    <PageWrapper title={t("profit_loss")} subtitle={viewMode === "monthly" ? t("monthly_summary") : t("daily_pnl_subtitle")}
+      breadcrumbs={[{label: t("finance"), path:"/app/invoices"},{label: t("profit_loss"), path:"/app/finance/pnl"}]}>
 
       {/* Tabs Selector */}
       <div className="flex border-b border-border mb-6">
-        <button 
+        <button
           onClick={() => { setViewMode("monthly"); }}
           className={`py-2.5 px-4 font-semibold text-[14px] border-b-2 transition-colors ${viewMode === "monthly" ? "border-primary text-primary" : "border-transparent text-text-secondary hover:text-text-primary"}`}
         >
-          {translate("monthly_summary")}
+          {t("monthly_summary")}
         </button>
-        <button 
+        <button
           onClick={() => { setViewMode("daily"); }}
           className={`py-2.5 px-4 font-semibold text-[14px] border-b-2 transition-colors ${viewMode === "daily" ? "border-primary text-primary" : "border-transparent text-text-secondary hover:text-text-primary"}`}
         >
-          Daily Breakdown
+          {t("daily_breakdown")}
         </button>
       </div>
 
@@ -108,11 +108,11 @@ export default function ProfitLoss() {
 
       {/* Summary KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 mb-6">
-        <StatCard title={translate("revenue")} value={formatRWF(t.revenue||0)} />
-        <StatCard title={translate("gross_profit")} value={formatRWF(grossProfit)} />
-        <StatCard title={translate("operating_expenses")} value={formatRWF(t.expenses||0)} />
-        <StatCard title="Procurement Costs" value={formatRWF(t.procurement||0)} />
-        <StatCard title={translate("net_profit")} value={formatRWF(netProfit)} />
+        <StatCard title={t("revenue")} value={formatRWF(totals.revenue||0)} />
+        <StatCard title={t("gross_profit")} value={formatRWF(grossProfit)} />
+        <StatCard title={t("operating_expenses")} value={formatRWF(totals.expenses||0)} />
+        <StatCard title={t("procurement_costs")} value={formatRWF(totals.procurement||0)} />
+        <StatCard title={t("net_profit")} value={formatRWF(netProfit)} />
       </div>
 
       {loading ? (
@@ -126,33 +126,33 @@ export default function ProfitLoss() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               {/* Monthly P&L Statement */}
               <div className="lg:col-span-5">
-                <Card title={translate("profit_loss")} subtitle={`${translate("date")} ${year}`}>
+                <Card title={t("profit_loss")} subtitle={`${t("date")} ${year}`}>
                   <table className="w-full text-[14px]">
                     <tbody>
                       <tr className="bg-background">
-                        <td className="py-2 px-3 font-semibold text-text-secondary uppercase text-[12px] tracking-wide">{translate("revenue")}</td>
+                        <td className="py-2 px-3 font-semibold text-text-secondary uppercase text-[12px] tracking-wide">{t("revenue")}</td>
                         <td />
                       </tr>
                       <tr className="border-b border-border">
-                        <td className="py-2 px-3 text-text-primary">{translate("revenue")}</td>
-                        <td className="py-2 px-3 text-right font-medium text-text-primary">{formatRWF(t.revenue||0)}</td>
+                        <td className="py-2 px-3 text-text-primary">{t("revenue")}</td>
+                        <td className="py-2 px-3 text-right font-medium text-text-primary">{formatRWF(totals.revenue||0)}</td>
                       </tr>
-                      <tr className="bg-background"><td className="py-2 px-3 font-semibold text-text-secondary uppercase text-[12px] tracking-wide">{translate("cogs")}</td><td /></tr>
+                      <tr className="bg-background"><td className="py-2 px-3 font-semibold text-text-secondary uppercase text-[12px] tracking-wide">{t("cogs")}</td><td /></tr>
                       <tr className="border-b border-border">
-                        <td className="py-2 px-3 text-text-secondary">{translate("cogs")}</td>
-                        <td className="py-2 px-3 text-right text-danger">({formatRWF(t.cogs||0)})</td>
+                        <td className="py-2 px-3 text-text-secondary">{t("cogs")}</td>
+                        <td className="py-2 px-3 text-right text-danger">({formatRWF(totals.cogs||0)})</td>
                       </tr>
                       <tr className="border-b-2 border-border bg-success/5">
-                        <td className="py-2.5 px-3 font-bold text-text-primary">{translate("gross_profit")}</td>
+                        <td className="py-2.5 px-3 font-bold text-text-primary">{t("gross_profit")}</td>
                         <td className="py-2.5 px-3 text-right font-bold text-success">{formatRWF(grossProfit)}</td>
                       </tr>
-                      <tr className="bg-background"><td className="py-2 px-3 font-semibold text-text-secondary uppercase text-[12px] tracking-wide">{translate("operating_expenses")}</td><td /></tr>
+                      <tr className="bg-background"><td className="py-2 px-3 font-semibold text-text-secondary uppercase text-[12px] tracking-wide">{t("operating_expenses")}</td><td /></tr>
                       <tr className="border-b border-border">
-                        <td className="py-2 px-3 text-text-secondary">{translate("operating_expenses")}</td>
-                        <td className="py-2 px-3 text-right text-danger">({formatRWF(t.expenses||0)})</td>
+                        <td className="py-2 px-3 text-text-secondary">{t("operating_expenses")}</td>
+                        <td className="py-2 px-3 text-right text-danger">({formatRWF(totals.expenses||0)})</td>
                       </tr>
                       <tr className={`border-t-2 border-border ${netProfit >= 0 ? "bg-success/5":"bg-danger/5"}`}>
-                        <td className="py-2.5 px-3 font-bold text-text-primary">{translate("net_profit")}</td>
+                        <td className="py-2.5 px-3 font-bold text-text-primary">{t("net_profit")}</td>
                         <td className={`py-2.5 px-3 text-right font-bold ${netProfit >= 0 ? "text-success":"text-danger"}`}>
                           {formatRWF(netProfit)}
                         </td>
@@ -164,16 +164,16 @@ export default function ProfitLoss() {
 
               {/* Monthly Trend Chart */}
               <div className="lg:col-span-7">
-                <Card title={translate("sales_trend")}>
+                <Card title={t("sales_trend")}>
                   <ResponsiveContainer width="100%" height={280}>
                     <AreaChart data={byMonth}>
                       <XAxis dataKey="month" tick={{fontSize:10}} />
                       <YAxis tick={{fontSize:10}} tickFormatter={v=>v >= 100000 ? (v/1000).toFixed(0)+"k" : v} />
                       <Tooltip formatter={v=>formatRWF(v)} />
                       <Legend />
-                      <Area type="monotone" dataKey="revenue" stroke="#10B981" fill="#D1FAE5" name={translate("revenue")} />
-                      <Area type="monotone" dataKey="cogs" stroke="#F59E0B" fill="#FEF3C7" name={translate("cogs")} />
-                      <Area type="monotone" dataKey="netProfit" stroke="#3B82F6" fill="#DBEAFE" name={translate("net_profit")} />
+                      <Area type="monotone" dataKey="revenue" stroke="#10B981" fill="#D1FAE5" name={t("revenue")} />
+                      <Area type="monotone" dataKey="cogs" stroke="#F59E0B" fill="#FEF3C7" name={t("cogs")} />
+                      <Area type="monotone" dataKey="netProfit" stroke="#3B82F6" fill="#DBEAFE" name={t("net_profit")} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </Card>
@@ -181,18 +181,18 @@ export default function ProfitLoss() {
 
               {/* Monthly Linked Audit Records */}
               <div className="lg:col-span-12">
-                <Card title="Monthly Linked Business Activity" subtitle={`Summary of linked transactions for ${year}`}>
+                <Card title={t("monthly_linked_activity")} subtitle={`${t("summary_linked")} ${year}`}>
                   <div className="overflow-x-auto">
                     <table className="w-full text-[13px] text-left">
                       <thead>
                         <tr className="border-b border-border text-text-secondary uppercase text-[12px] tracking-wide bg-background">
-                          <th className="py-2.5 px-3">Month</th>
-                          <th className="py-2.5 px-3 text-right">Revenue</th>
-                          <th className="py-2.5 px-3 text-right font-medium">COGS</th>
-                          <th className="py-2.5 px-3 text-right">Expenses</th>
-                          <th className="py-2.5 px-3 text-right">Procurements</th>
-                          <th className="py-2.5 px-3 text-right">Net Profit</th>
-                          <th className="py-2.5 px-3 text-center">Linked Activity Metrics</th>
+                          <th className="py-2.5 px-3">{t("month_col")}</th>
+                          <th className="py-2.5 px-3 text-right">{t("revenue")}</th>
+                          <th className="py-2.5 px-3 text-right font-medium">{t("cogs")}</th>
+                          <th className="py-2.5 px-3 text-right">{t("expenses")}</th>
+                          <th className="py-2.5 px-3 text-right">{t("procurements")}</th>
+                          <th className="py-2.5 px-3 text-right">{t("net_profit_col")}</th>
+                          <th className="py-2.5 px-3 text-center">{t("linked_activity_metrics")}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
@@ -209,10 +209,10 @@ export default function ProfitLoss() {
                             <td className="py-2.5 px-3 text-center">
                               <div className="flex justify-center gap-2">
                                 <span className="px-2 py-0.5 bg-green-50 border border-green-200 text-green-700 rounded-btn text-[12px] font-medium">
-                                  {m.sales_count} Sales • {m.customers_count} Customers
+                                  {m.sales_count} {t("sales_count_label")} • {m.customers_count} {t("cust_label")}
                                 </span>
                                 <span className="px-2 py-0.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-btn text-[12px] font-medium">
-                                  {m.procurements_count} Procurements • {m.suppliers_count} Suppliers
+                                  {m.procurements_count} {t("proc_label")} • {m.suppliers_count} {t("supp_label")}
                                 </span>
                               </div>
                             </td>
@@ -228,16 +228,16 @@ export default function ProfitLoss() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               {/* Daily Trend Chart */}
               <div className="lg:col-span-12">
-                <Card title={`Daily Profit & Loss Trend — ${getMonthName(month)} ${year}`}>
+                <Card title={`${t("daily_pnl_trend")} — ${getMonthName(month)} ${year}`}>
                   <ResponsiveContainer width="100%" height={260}>
                     <AreaChart data={byDay}>
                       <XAxis dataKey="shortDate" tick={{fontSize:10}} />
                       <YAxis tick={{fontSize:10}} tickFormatter={v=>v >= 100000 ? (v/1000).toFixed(0)+"k" : v} />
                       <Tooltip formatter={v=>formatRWF(v)} />
                       <Legend />
-                      <Area type="monotone" dataKey="revenue" stroke="#10B981" fill="#D1FAE5" name={translate("revenue")} />
-                      <Area type="monotone" dataKey="expenses" stroke="#EF4444" fill="#FEE2E2" name={translate("operating_expenses")} />
-                      <Area type="monotone" dataKey="netProfit" stroke="#3B82F6" fill="#DBEAFE" name={translate("net_profit")} />
+                      <Area type="monotone" dataKey="revenue" stroke="#10B981" fill="#D1FAE5" name={t("revenue")} />
+                      <Area type="monotone" dataKey="expenses" stroke="#EF4444" fill="#FEE2E2" name={t("operating_expenses")} />
+                      <Area type="monotone" dataKey="netProfit" stroke="#3B82F6" fill="#DBEAFE" name={t("net_profit")} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </Card>
@@ -245,19 +245,19 @@ export default function ProfitLoss() {
 
               {/* Daily Everyday Breakdown Table */}
               <div className="lg:col-span-12">
-                <Card title="Everyday Profit & Loss Statement" subtitle={`Daily performance for ${getMonthName(month)} ${year}`}>
+                <Card title={t("everyday_pnl")} subtitle={`${t("daily_performance_for")} ${getMonthName(month)} ${year}`}>
                   <div className="overflow-x-auto">
                     <table className="w-full text-[13px] text-left">
                       <thead>
                         <tr className="border-b border-border text-text-secondary uppercase text-[12px] tracking-wide bg-background">
-                          <th className="py-2.5 px-3">Date</th>
-                          <th className="py-2.5 px-3 text-right">Revenue</th>
-                          <th className="py-2.5 px-3 text-right">COGS (Stock Cost)</th>
-                          <th className="py-2.5 px-3 text-right">Gross Profit</th>
-                          <th className="py-2.5 px-3 text-right">Expenses</th>
-                          <th className="py-2.5 px-3 text-right">Procurements</th>
-                          <th className="py-2.5 px-3 text-right">Net Profit</th>
-                          <th className="py-2.5 px-3 text-center">Linked Activity</th>
+                          <th className="py-2.5 px-3">{t("date")}</th>
+                          <th className="py-2.5 px-3 text-right">{t("revenue")}</th>
+                          <th className="py-2.5 px-3 text-right">{t("cogs_stock_cost")}</th>
+                          <th className="py-2.5 px-3 text-right">{t("gross_profit")}</th>
+                          <th className="py-2.5 px-3 text-right">{t("expenses")}</th>
+                          <th className="py-2.5 px-3 text-right">{t("procurements")}</th>
+                          <th className="py-2.5 px-3 text-right">{t("net_profit_col")}</th>
+                          <th className="py-2.5 px-3 text-center">{t("linked_activity_metrics")}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
@@ -281,16 +281,16 @@ export default function ProfitLoss() {
                                 <div className="flex justify-center gap-1.5 text-[12px]">
                                   {r.sales_count > 0 && (
                                     <span className="px-1.5 py-0.5 bg-green-50 border border-green-200 rounded text-green-700 font-medium">
-                                      {r.sales_count} Sales ({r.customers_count} Cust)
+                                      {r.sales_count} {t("sales_count_label")} ({r.customers_count} {t("cust_label")})
                                     </span>
                                   )}
                                   {r.procurements_count > 0 && (
                                     <span className="px-1.5 py-0.5 bg-amber-50 border border-amber-200 rounded text-amber-700 font-medium">
-                                      {r.procurements_count} Proc ({r.suppliers_count} Supp)
+                                      {r.procurements_count} {t("proc_label")} ({r.suppliers_count} {t("supp_label")})
                                     </span>
                                   )}
                                   {r.sales_count === 0 && r.procurements_count === 0 && (
-                                    <span className="text-text-secondary font-light">No activity</span>
+                                    <span className="text-text-secondary font-light">{t("no_activity")}</span>
                                   )}
                                 </div>
                               </td>
