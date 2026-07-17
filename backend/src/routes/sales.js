@@ -212,7 +212,7 @@ router.post("/:id/void", requireRole("admin", "sme_owner", "manager", "accountan
     await pool.query("COMMIT");
     journalForSaleVoid({
       saleId: sale.id, total: parseFloat(sale.total_amount),
-      amountPaid: parseFloat(sale.amount_paid || sale.total_amount),
+      amountPaid: parseFloat(sale.total_amount),
       paymentMethod: sale.payment_method, createdBy: req.user.id,
     });
     await notifyAdminsAndManagers("SALE_VOIDED", "Sale Voided", `Sale #${sale.id} voided: ${void_reason}`);

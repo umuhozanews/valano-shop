@@ -260,9 +260,11 @@ router.post("/backfill-journal", async (req, res, next) => {
     // Skip sales that already have a journal entry
     const { rows: sales } = await pool.query(`
       SELECT s.id, s.total_amount, s.payment_method, s.created_at,
-             s.amount_paid, i.invoice_number
+             i.invoice_number,
+             s.total_amount - COALESCE(ar.amount, 0) as amount_paid
       FROM sales s
       LEFT JOIN invoices i ON i.sale_id = s.id
+      LEFT JOIN accounts_receivable ar ON ar.sale_id = s.id AND ar.status != 'paid'
       WHERE s.is_voided = false
         AND NOT EXISTS (
           SELECT 1 FROM journal_entries je
