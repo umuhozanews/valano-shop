@@ -4,6 +4,7 @@ const pool = require("../config/db");
 const { verifyToken, requireRole } = require("../middleware/auth");
 const { createReportPDF } = require("../utils/pdf");
 const { exportToExcel } = require("../utils/excel");
+const { addOwnerFilter } = require("../utils/tenant");
 
 router.use(verifyToken, requireRole("admin", "sme_owner", "manager", "accountant", "pulse_admin"));
 
@@ -19,27 +20,29 @@ router.get("/sales", async (req, res, next) => {
     const conds = ["s.is_voided=false"]; const params = [];
     if (payment_method) { params.push(payment_method); conds.push(`s.payment_method=$${params.length}`); }
     addDateFilter(params, conds, { start_date, end_date, col: "s.created_at" });
+    addOwnerFilter(conds, params, req.ownerId, 's');
+    const where = conds.join(" AND ");
 
     const [sales, daily, byPayment, totals] = await Promise.all([
       pool.query(
         `SELECT s.*, u.name as cashier_name, c.name as customer_name, i.invoice_number
          FROM sales s LEFT JOIN users u ON u.id=s.user_id LEFT JOIN customers c ON c.id=s.customer_id
-         LEFT JOIN invoices i ON i.sale_id=s.id WHERE ${conds.join(" AND ")} ORDER BY s.created_at DESC`,
+         LEFT JOIN invoices i ON i.sale_id=s.id WHERE ${where} ORDER BY s.created_at DESC`,
         params
       ),
       pool.query(
         `SELECT DATE(s.created_at) as date, COUNT(*) as count, SUM(s.total_amount) as revenue
-         FROM sales s WHERE ${conds.join(" AND ")} GROUP BY DATE(s.created_at) ORDER BY date`,
+         FROM sales s WHERE ${where} GROUP BY DATE(s.created_at) ORDER BY date`,
         params
       ),
       pool.query(
         `SELECT payment_method, COUNT(*) as count, SUM(total_amount) as revenue
-         FROM sales s WHERE ${conds.join(" AND ")} GROUP BY payment_method`,
+         FROM sales s WHERE ${where} GROUP BY payment_method`,
         params
       ),
       pool.query(
         `SELECT COUNT(*) as total_sales, COALESCE(SUM(total_amount),0) as total_revenue,
-          COALESCE(AVG(total_amount),0) as avg_sale FROM sales s WHERE ${conds.join(" AND ")}`,
+          COALESCE(AVG(total_amount),0) as avg_sale FROM sales s WHERE ${where}`,
         params
       ),
     ]);
@@ -69,13 +72,18 @@ router.get("/sales", async (req, res, next) => {
 router.get("/stock", async (req, res, next) => {
   try {
     const { export: exp } = req.query;
+    const conds = ["si.is_active=true"]; const params = [];
+    addOwnerFilter(conds, params, req.ownerId, 'si');
+    const where = conds.join(" AND ");
+
     const { rows } = await pool.query(
       `SELECT si.*,
         si.quantity * si.cost_price_rwf as total_cost_value,
         CASE WHEN si.quantity=0 THEN 'out_of_stock'
              WHEN si.quantity<=si.low_stock_threshold THEN 'low_stock'
              ELSE 'in_stock' END as stock_status
-       FROM stock_items si WHERE si.is_active=true ORDER BY si.category, si.name`
+       FROM stock_items si WHERE ${where} ORDER BY si.category, si.name`,
+      params
     );
     const totals = rows.reduce((a, r) => ({
       items: a.items + 1,
@@ -102,9 +110,11 @@ router.get("/financial", async (req, res, next) => {
     const { start_date, end_date } = req.query;
     const conds = ["s.is_voided=false"]; const params = [];
     addDateFilter(params, conds, { start_date, end_date, col: "s.created_at" });
+    addOwnerFilter(conds, params, req.ownerId, 's');
 
     const expConds = ["1=1"]; const expParams = [];
     addDateFilter(expParams, expConds, { start_date, end_date, col: "e.expense_date" });
+    addOwnerFilter(expConds, expParams, req.ownerId, 'e');
 
     const [revenue, cogs, expenses] = await Promise.all([
       pool.query(`SELECT COALESCE(SUM(total_amount),0) as v FROM sales s WHERE ${conds.join(" AND ")}`, params),
@@ -128,13 +138,9 @@ router.get("/financial", async (req, res, next) => {
     const netProfit = grossProfit - totalExpenses;
 
     res.json({
-      revenue: rev,
-      costOfGoods,
-      grossProfit,
+      revenue: rev, costOfGoods, grossProfit,
       grossMargin: rev > 0 ? Math.round((grossProfit / rev) * 100) : 0,
-      expenses: expenses.rows,
-      totalExpenses,
-      netProfit,
+      expenses: expenses.rows, totalExpenses, netProfit,
       netMargin: rev > 0 ? Math.round((netProfit / rev) * 100) : 0,
     });
   } catch (err) { next(err); }
@@ -144,40 +150,49 @@ router.get("/financial", async (req, res, next) => {
 router.get("/daily", async (req, res, next) => {
   try {
     const date = req.query.date || new Date().toISOString().split("T")[0];
+    const oid = req.ownerId;
+
+    const salesParams  = oid != null ? [date, oid] : [date];
+    const salesOwner   = oid != null ? ` AND owner_id = $2` : '';
+    const sOwner       = oid != null ? ` AND s.owner_id = $2` : '';
+    const stockParams  = oid != null ? [oid] : [];
+    const stockOwner   = oid != null ? ` AND owner_id = $1` : '';
 
     const [sales, expenses, topItems, stockAlerts] = await Promise.all([
       pool.query(
         `SELECT COUNT(*) as tx_count, COALESCE(SUM(total_amount),0) as revenue,
           payment_method, COUNT(*) as method_count
-         FROM sales WHERE DATE(created_at)=$1 AND is_voided=false
+         FROM sales WHERE DATE(created_at)=$1 AND is_voided=false${salesOwner}
          GROUP BY payment_method`,
-        [date]
+        salesParams
       ),
       pool.query(
-        "SELECT category, COALESCE(SUM(amount),0) as total FROM expenses WHERE expense_date=$1 GROUP BY category",
-        [date]
+        `SELECT category, COALESCE(SUM(amount),0) as total FROM expenses
+         WHERE expense_date=$1${salesOwner} GROUP BY category`,
+        salesParams
       ),
       pool.query(
         `SELECT stk.name, SUM(si.quantity) as qty, SUM(si.subtotal) as revenue
          FROM sale_items si JOIN sales s ON s.id=si.sale_id JOIN stock_items stk ON stk.id=si.stock_item_id
-         WHERE DATE(s.created_at)=$1 AND s.is_voided=false GROUP BY stk.id, stk.name ORDER BY revenue DESC LIMIT 5`,
-        [date]
+         WHERE DATE(s.created_at)=$1 AND s.is_voided=false${sOwner}
+         GROUP BY stk.id, stk.name ORDER BY revenue DESC LIMIT 5`,
+        salesParams
       ),
-      pool.query("SELECT name, quantity, low_stock_threshold FROM stock_items WHERE is_active=true AND quantity<=low_stock_threshold ORDER BY quantity ASC LIMIT 10"),
+      pool.query(
+        `SELECT name, quantity, low_stock_threshold FROM stock_items
+         WHERE is_active=true AND quantity<=low_stock_threshold${stockOwner}
+         ORDER BY quantity ASC LIMIT 10`,
+        stockParams
+      ),
     ]);
 
     const totalRevenue = sales.rows.reduce((s, r) => s + parseInt(r.revenue), 0);
     const totalExpenses = expenses.rows.reduce((s, r) => s + parseInt(r.total), 0);
 
     res.json({
-      date,
-      totalRevenue,
-      totalExpenses,
-      netCash: totalRevenue - totalExpenses,
-      transactions: sales.rows,
-      expenseByCategory: expenses.rows,
-      topItems: topItems.rows,
-      stockAlerts: stockAlerts.rows,
+      date, totalRevenue, totalExpenses, netCash: totalRevenue - totalExpenses,
+      transactions: sales.rows, expenseByCategory: expenses.rows,
+      topItems: topItems.rows, stockAlerts: stockAlerts.rows,
     });
   } catch (err) { next(err); }
 });
@@ -185,26 +200,35 @@ router.get("/daily", async (req, res, next) => {
 // ─── Weekly report ────────────────────────────────────────────────────────────
 router.get("/weekly", async (req, res, next) => {
   try {
+    const oid = req.ownerId;
+    const oFilter  = oid != null ? ` AND owner_id = $1` : '';
+    const sOFilter = oid != null ? ` AND s.owner_id = $1` : '';
+    const oParam   = oid != null ? [oid] : [];
+
     const [thisWeek, lastWeek, byDay, topItems] = await Promise.all([
       pool.query(
         `SELECT COALESCE(SUM(total_amount),0) as revenue, COUNT(*) as tx
-         FROM sales WHERE created_at>=DATE_TRUNC('week',NOW()) AND is_voided=false`
+         FROM sales WHERE created_at>=DATE_TRUNC('week',NOW()) AND is_voided=false${oFilter}`,
+        oParam
       ),
       pool.query(
         `SELECT COALESCE(SUM(total_amount),0) as revenue, COUNT(*) as tx
          FROM sales WHERE created_at>=DATE_TRUNC('week',NOW()-INTERVAL '1 week')
-           AND created_at<DATE_TRUNC('week',NOW()) AND is_voided=false`
+           AND created_at<DATE_TRUNC('week',NOW()) AND is_voided=false${oFilter}`,
+        oParam
       ),
       pool.query(
         `SELECT DATE(created_at) as date, SUM(total_amount) as revenue, COUNT(*) as tx
-         FROM sales WHERE created_at>=NOW()-INTERVAL '7 days' AND is_voided=false
-         GROUP BY DATE(created_at) ORDER BY date`
+         FROM sales WHERE created_at>=NOW()-INTERVAL '7 days' AND is_voided=false${oFilter}
+         GROUP BY DATE(created_at) ORDER BY date`,
+        oParam
       ),
       pool.query(
         `SELECT stk.name, SUM(si.quantity) as qty_sold, SUM(si.subtotal) as revenue
          FROM sale_items si JOIN sales s ON s.id=si.sale_id JOIN stock_items stk ON stk.id=si.stock_item_id
-         WHERE s.created_at>=NOW()-INTERVAL '7 days' AND s.is_voided=false
-         GROUP BY stk.id, stk.name ORDER BY revenue DESC LIMIT 5`
+         WHERE s.created_at>=NOW()-INTERVAL '7 days' AND s.is_voided=false${sOFilter}
+         GROUP BY stk.id, stk.name ORDER BY revenue DESC LIMIT 5`,
+        oParam
       ),
     ]);
 
@@ -215,8 +239,7 @@ router.get("/weekly", async (req, res, next) => {
       thisWeek: { revenue: thisRev, transactions: parseInt(thisWeek.rows[0].tx) },
       lastWeek: { revenue: lastRev, transactions: parseInt(lastWeek.rows[0].tx) },
       weekOnWeekChange: lastRev > 0 ? Math.round(((thisRev - lastRev) / lastRev) * 100) : null,
-      byDay: byDay.rows,
-      topItems: topItems.rows,
+      byDay: byDay.rows, topItems: topItems.rows,
     });
   } catch (err) { next(err); }
 });
@@ -229,28 +252,42 @@ router.get("/monthly", async (req, res, next) => {
     const endDate = new Date(new Date(startDate).getFullYear(), new Date(startDate).getMonth() + 1, 0)
       .toISOString().split("T")[0];
 
+    const oid = req.ownerId;
+    const dateParams = [startDate, endDate];
+    const oFilter3 = oid != null ? ` AND owner_id = $3` : '';
+    const sOFilter3 = oid != null ? ` AND s.owner_id = $3` : '';
+    const fullParams = oid != null ? [startDate, endDate, oid] : [startDate, endDate];
+    const stockParams = oid != null ? [oid] : [];
+    const stockOFilter = oid != null ? ` WHERE owner_id = $1 AND is_active=true` : ` WHERE is_active=true`;
+    const arParams = oid != null ? [oid] : [];
+    const arOFilter = oid != null ? ` AND owner_id = $1` : '';
+
     const [revenue, cogs, expenses, stockVal, arSummary, healthScore, topItems] = await Promise.all([
       pool.query(
         `SELECT COALESCE(SUM(total_amount),0) as v, COUNT(*) as tx FROM sales
-         WHERE DATE(created_at) BETWEEN $1 AND $2 AND is_voided=false`,
-        [startDate, endDate]
+         WHERE DATE(created_at) BETWEEN $1 AND $2 AND is_voided=false${oFilter3}`,
+        fullParams
       ),
       pool.query(
         `SELECT COALESCE(SUM(si.quantity*stk.cost_price_rwf),0) as v
          FROM sale_items si JOIN sales s ON s.id=si.sale_id JOIN stock_items stk ON stk.id=si.stock_item_id
-         WHERE DATE(s.created_at) BETWEEN $1 AND $2 AND s.is_voided=false`,
-        [startDate, endDate]
+         WHERE DATE(s.created_at) BETWEEN $1 AND $2 AND s.is_voided=false${sOFilter3}`,
+        fullParams
       ),
       pool.query(
         `SELECT category, SUM(amount) as total FROM expenses
-         WHERE expense_date BETWEEN $1 AND $2 GROUP BY category ORDER BY total DESC`,
-        [startDate, endDate]
+         WHERE expense_date BETWEEN $1 AND $2${oFilter3} GROUP BY category ORDER BY total DESC`,
+        fullParams
       ),
-      pool.query("SELECT COALESCE(SUM(quantity*cost_price_rwf),0) as v FROM stock_items WHERE is_active=true"),
+      pool.query(
+        `SELECT COALESCE(SUM(quantity*cost_price_rwf),0) as v FROM stock_items${stockOFilter}`,
+        stockParams
+      ),
       pool.query(
         `SELECT COALESCE(SUM(amount-amount_paid),0) as outstanding,
           COUNT(*) FILTER (WHERE status='overdue') as overdue_count
-         FROM accounts_receivable WHERE status IN ('pending','partial','overdue')`
+         FROM accounts_receivable WHERE status IN ('pending','partial','overdue')${arOFilter}`,
+        arParams
       ),
       pool.query(
         "SELECT score, band, factors FROM health_score_log WHERE user_id=$1 ORDER BY created_at DESC LIMIT 1",
@@ -259,9 +296,9 @@ router.get("/monthly", async (req, res, next) => {
       pool.query(
         `SELECT stk.name, SUM(si.quantity) as qty_sold, SUM(si.subtotal) as revenue
          FROM sale_items si JOIN sales s ON s.id=si.sale_id JOIN stock_items stk ON stk.id=si.stock_item_id
-         WHERE DATE(s.created_at) BETWEEN $1 AND $2 AND s.is_voided=false
+         WHERE DATE(s.created_at) BETWEEN $1 AND $2 AND s.is_voided=false${sOFilter3}
          GROUP BY stk.id, stk.name ORDER BY revenue DESC LIMIT 10`,
-        [startDate, endDate]
+        fullParams
       ),
     ]);
 
@@ -271,13 +308,10 @@ router.get("/monthly", async (req, res, next) => {
 
     res.json({
       period: { month, startDate, endDate },
-      revenue: rev,
-      transactions: parseInt(revenue.rows[0].tx),
-      costOfGoods,
-      grossProfit: rev - costOfGoods,
+      revenue: rev, transactions: parseInt(revenue.rows[0].tx),
+      costOfGoods, grossProfit: rev - costOfGoods,
       grossMargin: rev > 0 ? Math.round(((rev - costOfGoods) / rev) * 100) : 0,
-      expenses: expenses.rows,
-      totalExpenses: totalExp,
+      expenses: expenses.rows, totalExpenses: totalExp,
       netProfit: rev - costOfGoods - totalExp,
       netMargin: rev > 0 ? Math.round(((rev - costOfGoods - totalExp) / rev) * 100) : 0,
       stockValue: parseInt(stockVal.rows[0].v),
@@ -294,6 +328,8 @@ router.get("/tax/vat", async (req, res, next) => {
     const { start_date, end_date, export: exp } = req.query;
     const conds = ["s.is_voided=false"]; const params = [];
     addDateFilter(params, conds, { start_date, end_date, col: "s.created_at" });
+    addOwnerFilter(conds, params, req.ownerId, 's');
+    const where = conds.join(" AND ");
 
     const VAT_RATE = 0.18;
     const { rows } = await pool.query(
@@ -303,7 +339,7 @@ router.get("/tax/vat", async (req, res, next) => {
         COALESCE(SUM(s.total_amount),0) as gross_sales,
         ROUND(COALESCE(SUM(s.total_amount),0)::numeric / (1+$${params.length+1}::numeric)) as net_sales,
         ROUND(COALESCE(SUM(s.total_amount),0)::numeric - COALESCE(SUM(s.total_amount),0)::numeric / (1+$${params.length+1}::numeric)) as vat_collected
-       FROM sales s WHERE ${conds.join(" AND ")}
+       FROM sales s WHERE ${where}
        GROUP BY DATE_TRUNC('month', s.created_at)
        ORDER BY month`,
       [...params, VAT_RATE]
@@ -325,23 +361,18 @@ router.get("/tax/vat", async (req, res, next) => {
       }]);
     }
 
-    res.json({
-      vat_rate: VAT_RATE,
-      period: { start_date, end_date },
-      byMonth: rows,
-      totals,
-    });
+    res.json({ vat_rate: VAT_RATE, period: { start_date, end_date }, byMonth: rows, totals });
   } catch (err) { next(err); }
 });
 
 // ─── RSSB Contribution Report ─────────────────────────────────────────────────
-// Rwanda Social Security: employee 3% + employer 5% of gross salary
 router.get("/tax/rssb", async (req, res, next) => {
   try {
     const { start_date, end_date, export: exp } = req.query;
-    const conds = ["1=1"]; const params = [];
+    const conds = ["e.category='Salaries'"]; const params = [];
     addDateFilter(params, conds, { start_date, end_date, col: "e.expense_date" });
-    conds.push(`e.category='Salaries'`);
+    addOwnerFilter(conds, params, req.ownerId, 'e');
+    const where = conds.join(" AND ");
 
     const { rows } = await pool.query(
       `SELECT
@@ -350,7 +381,7 @@ router.get("/tax/rssb", async (req, res, next) => {
         ROUND(SUM(e.amount) * 0.03) as employee_contribution,
         ROUND(SUM(e.amount) * 0.05) as employer_contribution,
         ROUND(SUM(e.amount) * 0.08) as total_rssb
-       FROM expenses e WHERE ${conds.join(" AND ")}
+       FROM expenses e WHERE ${where}
        GROUP BY DATE_TRUNC('month', e.expense_date::timestamp)
        ORDER BY month`,
       params
