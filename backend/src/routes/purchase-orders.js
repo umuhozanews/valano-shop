@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require("../config/db");
 const { verifyToken, requireRole } = require("../middleware/auth");
 const { logAudit, paginate } = require("../utils/helpers");
+const { ensureTenantColumns, addOwnerFilter } = require("../utils/tenant");
 
 router.use(verifyToken, requireRole("admin", "sme_owner", "manager", "accountant", "pulse_admin"));
 
@@ -10,11 +11,13 @@ const STATUS_FLOW = ["ordered", "in_transit", "arrived", "stocked"];
 
 router.get("/", async (req, res, next) => {
   try {
+    await ensureTenantColumns();
     const { page, limit, status, supplier_id } = req.query;
     const { limit: lim, offset } = paginate(page, limit);
     const conds = ["1=1"]; const params = [];
     if (status) { params.push(status); conds.push(`po.status=$${params.length}`); }
     if (supplier_id) { params.push(supplier_id); conds.push(`po.supplier_id=$${params.length}`); }
+    addOwnerFilter(conds, params, req.ownerId, 'po');
     params.push(lim); params.push(offset);
 
     const [data, cnt] = await Promise.all([
@@ -61,9 +64,9 @@ router.post("/", async (req, res, next) => {
       return res.status(400).json({ error: "supplier_id and order_date required" });
 
     const { rows: [order] } = await pool.query(
-      `INSERT INTO purchase_orders (supplier_id, order_date, arrival_date, notes, created_by)
-       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [supplier_id, order_date, arrival_date || null, notes || null, req.user.id]
+      `INSERT INTO purchase_orders (supplier_id, order_date, arrival_date, notes, created_by, owner_id)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [supplier_id, order_date, arrival_date || null, notes || null, req.user.id, req.ownerId]
     );
 
     for (const item of items) {

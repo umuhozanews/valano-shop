@@ -4,17 +4,20 @@ const pool = require("../config/db");
 const { verifyToken, requireRole } = require("../middleware/auth");
 const { paginate } = require("../utils/helpers");
 const { createInvoicePDF } = require("../utils/pdf");
+const { ensureTenantColumns, addOwnerFilter } = require("../utils/tenant");
 
 router.use(verifyToken);
 
-router.get("/", requireRole("admin", "manager", "accountant"), async (req, res, next) => {
+router.get("/", requireRole("admin", "sme_owner", "manager", "accountant", "cashier", "pulse_admin"), async (req, res, next) => {
   try {
+    await ensureTenantColumns();
     const { status, start_date, end_date, page, limit } = req.query;
     const { limit: lim, offset } = paginate(page, limit);
     const conds = ["1=1"]; const params = [];
     if (status) { params.push(status); conds.push(`i.status=$${params.length}`); }
     if (start_date) { params.push(start_date); conds.push(`DATE(i.issued_at)>=$${params.length}`); }
     if (end_date) { params.push(end_date); conds.push(`DATE(i.issued_at)<=$${params.length}`); }
+    addOwnerFilter(conds, params, req.ownerId, 's');
     params.push(lim); params.push(offset);
     const where = conds.join(" AND ");
 

@@ -368,7 +368,7 @@ router.post("/backfill-journal", async (req, res, next) => {
 // POST /v2/admin/backfill-owners — assigns all NULL owner_id rows to the first sme_owner
 router.post("/backfill-owners", async (req, res, next) => {
   try {
-    const allTables = ['stock_items','sales','expenses','customers','suppliers','invoices','journal_entries','accounts_receivable','accounts_payable'];
+    const allTables = ['stock_items','sales','expenses','customers','suppliers','invoices','journal_entries','accounts_receivable','accounts_payable','purchase_orders'];
     for (const t of allTables) {
       await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS owner_id INT`).catch(() => {});
     }

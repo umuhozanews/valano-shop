@@ -3,11 +3,13 @@ const router = express.Router();
 const pool = require("../config/db");
 const { verifyToken, requireRole } = require("../middleware/auth");
 const { logAudit, paginate } = require("../utils/helpers");
+const { ensureTenantColumns, addOwnerFilter } = require("../utils/tenant");
 
 router.use(verifyToken, requireRole("admin", "sme_owner", "manager", "accountant", "pulse_admin"));
 
 router.get("/", async (req, res, next) => {
   try {
+    await ensureTenantColumns();
     const { search, page, limit } = req.query;
     const { limit: lim, offset } = paginate(page, limit);
     const conds = ["1=1"]; const params = [];
@@ -15,6 +17,7 @@ router.get("/", async (req, res, next) => {
       params.push(`%${search}%`);
       conds.push(`(s.name ILIKE $${params.length} OR s.products_supplied ILIKE $${params.length})`);
     }
+    addOwnerFilter(conds, params, req.ownerId, 's');
     params.push(lim); params.push(offset);
 
     const [data, cnt] = await Promise.all([
@@ -57,9 +60,9 @@ router.post("/", async (req, res, next) => {
     if (!name) return res.status(400).json({ error: "Supplier name required" });
 
     const { rows: [s] } = await pool.query(
-      `INSERT INTO suppliers (name, phone, email, address, notes, products_supplied, payment_terms)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [name, phone || null, email || null, address || null, notes || null, products_supplied || null, payment_terms || null]
+      `INSERT INTO suppliers (name, phone, email, address, notes, products_supplied, payment_terms, owner_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [name, phone || null, email || null, address || null, notes || null, products_supplied || null, payment_terms || null, req.ownerId]
     );
     await logAudit(req.user.id, "SUPPLIER_CREATED", "suppliers", s.id, null, s, req.ip);
     res.status(201).json(s);
