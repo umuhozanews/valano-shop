@@ -193,11 +193,23 @@ router.get("/worker-leaderboard", async (req, res, next) => {
 
 router.get("/activity-feed", async (req, res, next) => {
   try {
-    const { rows } = await pool.query(
-      `SELECT al.*, u.name as user_name, u.role as user_role
-       FROM audit_log al LEFT JOIN users u ON u.id=al.user_id
-       ORDER BY al.created_at DESC LIMIT 15`
-    );
+    const oid = req.ownerId;
+    let query, params;
+    if (oid != null) {
+      query = `SELECT al.*, u.name as user_name, u.role as user_role
+               FROM audit_log al LEFT JOIN users u ON u.id=al.user_id
+               WHERE al.user_id IN (
+                 SELECT id FROM users WHERE id=$1 OR owner_id=$1
+               )
+               ORDER BY al.created_at DESC LIMIT 15`;
+      params = [oid];
+    } else {
+      query = `SELECT al.*, u.name as user_name, u.role as user_role
+               FROM audit_log al LEFT JOIN users u ON u.id=al.user_id
+               ORDER BY al.created_at DESC LIMIT 15`;
+      params = [];
+    }
+    const { rows } = await pool.query(query, params);
     res.json(rows);
   } catch (err) { next(err); }
 });
