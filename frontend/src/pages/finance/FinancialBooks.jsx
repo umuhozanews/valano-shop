@@ -9,6 +9,7 @@ import { useLanguage } from "../../context/LanguageContext";
 
 const TABS = [
   { id: "journal",       label: "Journal",       icon: List },
+  { id: "ledger",        label: "Ledger",        icon: BookOpen },
   { id: "cashbook",      label: "Cash Book",     icon: Wallet },
   { id: "trial-balance", label: "Trial Balance", icon: Scale },
 ];
@@ -214,6 +215,174 @@ function JournalTab({ dateRange }) {
             className="px-3 py-1.5 text-[13px] border border-border rounded-lg disabled:opacity-40 hover:border-primary hover:text-primary transition-colors">
             Next →
           </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Ledger Tab ────────────────────────────────────────────────────────────────
+function LedgerTab({ dateRange }) {
+  const [accounts, setAccounts]   = useState([]);
+  const [selectedId, setSelectedId] = useState("");
+  const [ledger, setLedger]       = useState([]);
+  const [account, setAccount]     = useState(null);
+  const [loading, setLoading]     = useState(false);
+
+  useEffect(() => {
+    api.get("/books/ledger")
+      .then(r => setAccounts(r.data.accounts || []))
+      .catch(() => {});
+  }, []);
+
+  async function loadLedger(id) {
+    if (!id) { setSelectedId(""); setLedger([]); setAccount(null); return; }
+    setSelectedId(id);
+    setLoading(true);
+    try {
+      const r = await api.get("/books/ledger", { params: { account_id: id, ...dateRange } });
+      setLedger(r.data.ledger || []);
+      setAccount(r.data.account || null);
+    } catch { toast.error("Failed to load ledger"); }
+    finally { setLoading(false); }
+  }
+
+  // Reload when date range changes
+  useEffect(() => {
+    if (selectedId) loadLedger(selectedId);
+  }, [dateRange]); // eslint-disable-line
+
+  async function exportFile(format) {
+    if (!selectedId) return toast.error("Select an account first");
+    try {
+      const r = await api.get(
+        `/books/ledger?account_id=${selectedId}&export=${format}&${new URLSearchParams(dateRange)}`,
+        { responseType: "blob" }
+      );
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(r.data);
+      a.download = `ledger-${account?.code || selectedId}.${format === "excel" ? "xlsx" : "pdf"}`;
+      a.click();
+    } catch { toast.error("Export failed"); }
+  }
+
+  const TYPE_GROUPS = ["Asset", "Liability", "Equity", "Revenue", "Expense"];
+  const closingBalance = ledger.length ? parseFloat(ledger[ledger.length - 1].running_balance) : 0;
+  const totalDebit  = ledger.reduce((s, r) => s + parseFloat(r.debit  || 0), 0);
+  const totalCredit = ledger.reduce((s, r) => s + parseFloat(r.credit || 0), 0);
+
+  return (
+    <div className="space-y-5">
+      {/* Account selector + export */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex-1 min-w-[240px] max-w-sm">
+          <select
+            value={selectedId}
+            onChange={e => loadLedger(e.target.value)}
+            className="w-full h-9 px-3 border border-border rounded-lg text-[14px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="">— Select Account —</option>
+            {TYPE_GROUPS.map(type => {
+              const accs = accounts.filter(a => a.type === type);
+              if (!accs.length) return null;
+              return (
+                <optgroup key={type} label={type}>
+                  {accs.map(a => (
+                    <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
+                  ))}
+                </optgroup>
+              );
+            })}
+          </select>
+        </div>
+        <ExportBtn onExport={exportFile} />
+      </div>
+
+      {/* Summary strip when account is selected */}
+      {account && !loading && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="bg-background border border-border rounded-xl p-3">
+            <p className="text-[11px] text-text-secondary uppercase tracking-wide mb-1">Account</p>
+            <p className="text-[13px] font-semibold text-text-primary truncate">{account.name}</p>
+            <p className="text-[11px] font-mono text-text-secondary mt-0.5">{account.code}</p>
+          </div>
+          <div className="bg-background border border-border rounded-xl p-3">
+            <p className="text-[11px] text-text-secondary uppercase tracking-wide mb-1">Type</p>
+            <TypeBadge type={account.type} />
+            {account.sub_type && <p className="text-[11px] text-text-secondary mt-1">{account.sub_type}</p>}
+          </div>
+          <div className="bg-background border border-border rounded-xl p-3">
+            <p className="text-[11px] text-text-secondary uppercase tracking-wide mb-1">Total DR / CR</p>
+            <p className="text-[13px] font-semibold">
+              <span className="text-emerald-600">{formatRWF(totalDebit)}</span>
+              <span className="text-text-secondary mx-1">/</span>
+              <span className="text-red-500">{formatRWF(totalCredit)}</span>
+            </p>
+          </div>
+          <div className="bg-background border border-border rounded-xl p-3">
+            <p className="text-[11px] text-text-secondary uppercase tracking-wide mb-1">Closing Balance</p>
+            <p className={`text-[14px] font-bold ${closingBalance >= 0 ? "text-text-primary" : "text-red-600"}`}>
+              {formatRWF(closingBalance)}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Table */}
+      {!selectedId ? (
+        <EmptyState icon={BookOpen} text="Select an account above to view its ledger entries." />
+      ) : loading ? (
+        <Skeleton rows={8} />
+      ) : ledger.length === 0 ? (
+        <EmptyState icon={BookOpen} text="No transactions for this account in the selected period." />
+      ) : (
+        <div className="border border-border rounded-xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="bg-background/60 border-b-2 border-border text-[11px] text-text-secondary uppercase tracking-wide">
+                  <th className="text-left py-2.5 px-4 font-medium w-28">Date</th>
+                  <th className="text-left py-2.5 px-4 font-medium">Description</th>
+                  <th className="text-left py-2.5 px-4 font-medium w-24">Type</th>
+                  <th className="text-right py-2.5 px-4 font-medium w-36 text-emerald-600">Debit (RWF)</th>
+                  <th className="text-right py-2.5 px-4 font-medium w-36 text-red-500">Credit (RWF)</th>
+                  <th className="text-right py-2.5 px-4 font-medium w-36">Balance (RWF)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="bg-background/40 border-b border-border/30 text-[12px] italic text-text-secondary">
+                  <td colSpan={5} className="py-2 px-4">Opening Balance</td>
+                  <td className="py-2 px-4 text-right font-mono">0</td>
+                </tr>
+                {ledger.map((row, i) => (
+                  <tr key={i} className={`border-b border-border/20 last:border-0 hover:bg-background/40 transition-colors ${i % 2 === 0 ? "" : "bg-background/20"}`}>
+                    <td className="py-2.5 px-4 text-text-secondary whitespace-nowrap">{formatDate(row.entry_date, "dd MMM yy")}</td>
+                    <td className="py-2.5 px-4 text-text-primary max-w-[280px] truncate">{row.description}</td>
+                    <td className="py-2.5 px-4"><RefBadge type={row.reference_type} /></td>
+                    <td className="py-2.5 px-4 text-right font-mono text-emerald-600 font-medium">
+                      {parseFloat(row.debit) > 0 ? formatRWF(row.debit) : <span className="text-text-secondary/40">—</span>}
+                    </td>
+                    <td className="py-2.5 px-4 text-right font-mono text-red-500 font-medium">
+                      {parseFloat(row.credit) > 0 ? formatRWF(row.credit) : <span className="text-text-secondary/40">—</span>}
+                    </td>
+                    <td className={`py-2.5 px-4 text-right font-mono font-semibold ${parseFloat(row.running_balance) >= 0 ? "text-text-primary" : "text-red-600"}`}>
+                      {formatRWF(row.running_balance)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-border bg-primary/5">
+                  <td colSpan={3} className="py-3 px-4 font-bold text-[13px] text-text-primary">TOTALS</td>
+                  <td className="py-3 px-4 text-right font-bold font-mono text-emerald-600">{formatRWF(totalDebit)}</td>
+                  <td className="py-3 px-4 text-right font-bold font-mono text-red-500">{formatRWF(totalCredit)}</td>
+                  <td className={`py-3 px-4 text-right font-bold font-mono ${closingBalance >= 0 ? "text-text-primary" : "text-red-600"}`}>
+                    {formatRWF(closingBalance)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         </div>
       )}
     </div>
@@ -547,6 +716,7 @@ export default function FinancialBooks() {
       {/* Tab Content */}
       <Card className="p-5">
         {activeTab === "journal"       && <JournalTab      dateRange={dateRange} />}
+        {activeTab === "ledger"        && <LedgerTab       dateRange={dateRange} />}
         {activeTab === "cashbook"      && <CashBookTab     dateRange={dateRange} />}
         {activeTab === "trial-balance" && <TrialBalanceTab dateRange={dateRange} />}
       </Card>
