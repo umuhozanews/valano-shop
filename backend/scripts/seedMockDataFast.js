@@ -122,7 +122,7 @@ async function seedSalesBulk(userId, profile, stockItems, customerIds) {
         ? pick(["mtn_momo","airtel","card","bank_transfer"])
         : "cash";
 
-      salesRows.push([userId, pick(customerIds), method, total, false, daysAgo(dayOffset - t * 0.005)]);
+      salesRows.push([userId, pick(customerIds), method, total, false, daysAgo(dayOffset - t * 0.005), userId]);
       itemsByIdx.push(items);
     }
   }
@@ -132,7 +132,7 @@ async function seedSalesBulk(userId, profile, stockItems, customerIds) {
   // Bulk insert all sales, get IDs back
   const saleIds = await bulkInsert(
     "sales",
-    ["user_id","customer_id","payment_method","total_amount","is_voided","created_at"],
+    ["user_id","customer_id","payment_method","total_amount","is_voided","created_at","owner_id"],
     salesRows,
     "id"
   );
@@ -168,15 +168,15 @@ async function seedExpensesBulk(userId, profile) {
   for (let m = 2; m >= 0; m--) {
     for (const [cat, base] of [["Salaries",monthlySalary],["Rent",monthlyRent],["Utilities",monthlyUtil]]) {
       const d = m * 30 + rnd(1, 5);
-      rows.push([cat, Math.max(1000, base + rnd(-5000, 5000)), `${cat} — month ${3-m}`, userId, dateOnly(d), daysAgo(d)]);
+      rows.push([cat, Math.max(1000, base + rnd(-5000, 5000)), `${cat} — month ${3-m}`, userId, dateOnly(d), daysAgo(d), userId]);
     }
     const varCount = rnd(4, 8);
     for (let v = 0; v < varCount; v++) {
       const d = m * 30 + rnd(6, 28);
-      rows.push([pick(["Transport","Supplies","Maintenance"]), rnd(2000, 15000), "Operational cost", userId, dateOnly(d), daysAgo(d)]);
+      rows.push([pick(["Transport","Supplies","Maintenance"]), rnd(2000, 15000), "Operational cost", userId, dateOnly(d), daysAgo(d), userId]);
     }
   }
-  await bulkInsert("expenses", ["category","amount","description","recorded_by","expense_date","created_at"], rows);
+  await bulkInsert("expenses", ["category","amount","description","recorded_by","expense_date","created_at","owner_id"], rows);
   return rows.length;
 }
 
@@ -187,9 +187,9 @@ async function seedPurchaseOrdersBulk(userId, supplierIds) {
     const od = rnd(5, 60);
     const ad = od - rnd(3, 10);
     const status = ad < 0 ? "ordered" : ad < 2 ? "in_transit" : "arrived";
-    rows.push([pick(supplierIds), dateOnly(od), dateOnly(Math.max(0, ad)), status, "Restocking order", userId, daysAgo(od)]);
+    rows.push([pick(supplierIds), dateOnly(od), dateOnly(Math.max(0, ad)), status, "Restocking order", userId, daysAgo(od), userId]);
   }
-  await bulkInsert("purchase_orders", ["supplier_id","order_date","arrival_date","status","notes","created_by","created_at"], rows);
+  await bulkInsert("purchase_orders", ["supplier_id","order_date","arrival_date","status","notes","created_by","created_at","owner_id"], rows);
   return count;
 }
 
@@ -346,17 +346,17 @@ async function seedFast() {
     const nRows = [
       [userId, "health_score", `Health Score: ${scoreResult?.score ?? "?"}/${100}`,
        scoreResult?.recommendations?.[0]?.en || "Check insights.", Math.random() > 0.4,
-       daysAgo(rnd(0, 3))],
+       daysAgo(rnd(0, 3)), userId],
       [userId, "low_stock", "3 products running low",
-       "Some products are below reorder threshold.", false, daysAgo(rnd(1, 7))],
+       "Some products are below reorder threshold.", false, daysAgo(rnd(1, 7)), userId],
       [userId, "sales_alert", "Weekly Sales Summary",
-       `You recorded ${rnd(15,45)} sales this week.`, true, daysAgo(rnd(3, 10))],
+       `You recorded ${rnd(15,45)} sales this week.`, true, daysAgo(rnd(3, 10)), userId],
     ];
     if (scoreResult?.band === "red") {
       nRows.push([userId, "advisory", "Advisory Session Recommended",
-        "Your score is in the red band. An advisor is available.", false, daysAgo(rnd(0, 5))]);
+        "Your score is in the red band. An advisor is available.", false, daysAgo(rnd(0, 5)), userId]);
     }
-    await bulkInsert("notifications", ["user_id","type","title","message","is_read","created_at"], nRows);
+    await bulkInsert("notifications", ["user_id","type","title","message","is_read","created_at","owner_id"], nRows);
 
     if (scoreResult && (scoreResult.band === "red" || scoreResult.band === "amber")) {
       await seedAdvisorySession(userId, advisorId, scoreResult);
