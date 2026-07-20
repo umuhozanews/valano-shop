@@ -13,6 +13,10 @@ function dateFilter(params, conds, { start_date, end_date, col = "je.entry_date"
   if (end_date)   { params.push(end_date);   conds.push(`${col} <= $${params.length}`); }
 }
 
+function ownerFilter(params, conds, ownerId, alias = "je") {
+  if (ownerId != null) { params.push(ownerId); conds.push(`${alias}.owner_id = $${params.length}`); }
+}
+
 // ── Chart of Accounts ─────────────────────────────────────────────────────────
 router.get("/accounts", async (req, res, next) => {
   try {
@@ -33,6 +37,7 @@ router.get("/journal", async (req, res, next) => {
 
     const conds = ["1=1"]; const params = [];
     dateFilter(params, conds, { start_date, end_date });
+    ownerFilter(params, conds, req.ownerId);
     const where = conds.join(" AND ");
 
     const [entriesRes, countRes, settingsRes] = await Promise.all([
@@ -122,6 +127,7 @@ router.get("/ledger", async (req, res, next) => {
 
     const conds = ["jl.account_id = $1"]; const params = [account_id];
     dateFilter(params, conds, { start_date, end_date });
+    ownerFilter(params, conds, req.ownerId);
 
     const { rows: ledger } = await pool.query(
       `SELECT je.entry_date, je.description, je.reference_type, je.reference_id,
@@ -172,9 +178,9 @@ router.get("/cashbook", async (req, res, next) => {
     const settingsRes = await pool.query("SELECT settings FROM sme_settings LIMIT 1").catch(() => ({ rows: [] }));
     const shopName = settingsRes.rows[0]?.settings?.shop_name;
 
-    // Cash accounts: 1000 (Cash) and 1010 (Mobile Money/Bank)
     const conds = ["coa.code IN ('1000','1010')"]; const params = [];
     dateFilter(params, conds, { start_date, end_date });
+    ownerFilter(params, conds, req.ownerId);
 
     const { rows: cashbook } = await pool.query(
       `SELECT je.entry_date, je.description, je.reference_type,
@@ -191,7 +197,11 @@ router.get("/cashbook", async (req, res, next) => {
       params
     );
 
-    // Summary totals
+    // Summary totals — same owner filter
+    const totalsConds = ["coa.code IN ('1000','1010')"]; const totalsParams = [];
+    dateFilter(totalsParams, totalsConds, { start_date, end_date });
+    ownerFilter(totalsParams, totalsConds, req.ownerId);
+
     const totalsRes = await pool.query(
       `SELECT coa.code, coa.name,
               COALESCE(SUM(jl.debit),0) as total_in,
@@ -200,9 +210,9 @@ router.get("/cashbook", async (req, res, next) => {
        FROM journal_lines jl
        JOIN journal_entries je ON je.id = jl.entry_id
        JOIN chart_of_accounts coa ON coa.id = jl.account_id
-       WHERE coa.code IN ('1000','1010') ${params.length ? `AND je.entry_date >= $1 AND je.entry_date <= $2` : ""}
+       WHERE ${totalsConds.join(" AND ")}
        GROUP BY coa.code, coa.name ORDER BY coa.code`,
-      params
+      totalsParams
     );
 
     if (exp === "pdf") {
@@ -240,22 +250,29 @@ router.get("/trial-balance", async (req, res, next) => {
     const settingsRes = await pool.query("SELECT settings FROM sme_settings LIMIT 1").catch(() => ({ rows: [] }));
     const shopName = settingsRes.rows[0]?.settings?.shop_name;
 
-    const params = as_of_date ? [as_of_date] : [];
-    const dateWhere = as_of_date ? "AND je.entry_date <= $1" : "";
+    // Build filtered journal_lines subquery scoped to this owner
+    const subConds = ["1=1"]; const subParams = [];
+    if (req.ownerId != null) { subParams.push(req.ownerId); subConds.push(`je.owner_id = $${subParams.length}`); }
+    if (as_of_date)          { subParams.push(as_of_date);  subConds.push(`je.entry_date <= $${subParams.length}`); }
+    const subWhere = subConds.join(" AND ");
 
     const { rows } = await pool.query(
       `SELECT coa.code, coa.name, coa.type, coa.sub_type,
-              COALESCE(SUM(jl.debit), 0)  as total_debit,
-              COALESCE(SUM(jl.credit), 0) as total_credit,
-              COALESCE(SUM(jl.debit - jl.credit), 0) as net
+              COALESCE(SUM(filtered.debit), 0)  as total_debit,
+              COALESCE(SUM(filtered.credit), 0) as total_credit,
+              COALESCE(SUM(filtered.debit - filtered.credit), 0) as net
        FROM chart_of_accounts coa
-       LEFT JOIN journal_lines jl ON jl.account_id = coa.id
-       LEFT JOIN journal_entries je ON je.id = jl.entry_id ${dateWhere}
+       LEFT JOIN (
+         SELECT jl.account_id, jl.debit, jl.credit
+         FROM journal_lines jl
+         JOIN journal_entries je ON je.id = jl.entry_id
+         WHERE ${subWhere}
+       ) filtered ON filtered.account_id = coa.id
        WHERE coa.is_active = true
        GROUP BY coa.id, coa.code, coa.name, coa.type, coa.sub_type
-       HAVING COALESCE(SUM(jl.debit), 0) > 0 OR COALESCE(SUM(jl.credit), 0) > 0
+       HAVING COALESCE(SUM(filtered.debit), 0) > 0 OR COALESCE(SUM(filtered.credit), 0) > 0
        ORDER BY coa.code`,
-      params
+      subParams
     );
 
     const grandDebit  = rows.reduce((s, r) => s + parseFloat(r.total_debit), 0);

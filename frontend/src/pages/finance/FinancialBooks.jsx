@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { BookOpen, List, Wallet, Scale, Download, FileText, ChevronDown } from "lucide-react";
+import { useState, useEffect, useCallback, Fragment } from "react";
+import { BookOpen, List, Wallet, Scale, Download, FileText, ChevronDown, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import PageWrapper from "../../components/layout/PageWrapper";
 import Card from "../../components/ui/Card";
 import api from "../../utils/api";
@@ -8,24 +8,37 @@ import toast from "react-hot-toast";
 import { useLanguage } from "../../context/LanguageContext";
 
 const TABS = [
-  { id: "journal",       label: "Journal",        icon: List },
-  { id: "ledger",        label: "Ledger",          icon: BookOpen },
-  { id: "cashbook",      label: "Cash Book",       icon: Wallet },
-  { id: "trial-balance", label: "Trial Balance",   icon: Scale },
+  { id: "journal",       label: "Journal",       icon: List },
+  { id: "cashbook",      label: "Cash Book",     icon: Wallet },
+  { id: "trial-balance", label: "Trial Balance", icon: Scale },
 ];
 
 const TYPE_COLOR = {
-  Asset: "bg-blue-100 text-blue-700",
-  Liability: "bg-red-100 text-red-700",
-  Equity: "bg-purple-100 text-purple-700",
-  Revenue: "bg-green-100 text-green-700",
-  Expense: "bg-orange-100 text-orange-700",
+  Asset:     "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  Liability: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  Equity:    "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+  Revenue:   "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  Expense:   "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
 };
 
-function Badge({ type }) {
+const REF_COLOR = {
+  sale:       "bg-emerald-100 text-emerald-700",
+  expense:    "bg-orange-100 text-orange-700",
+  sale_void:  "bg-red-100 text-red-700",
+};
+
+function TypeBadge({ type }) {
   return (
     <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${TYPE_COLOR[type] || "bg-surface text-text-secondary"}`}>
       {type}
+    </span>
+  );
+}
+
+function RefBadge({ type }) {
+  return (
+    <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-medium ${REF_COLOR[type] || "bg-surface text-text-secondary"}`}>
+      {type?.replace(/_/g, " ") || "manual"}
     </span>
   );
 }
@@ -34,49 +47,73 @@ function ExportBtn({ onExport }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="relative">
-      <button onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-card text-[13px] text-text-secondary hover:text-text-primary hover:border-primary transition-colors">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-lg text-[13px] text-text-secondary hover:text-text-primary hover:border-primary transition-colors"
+      >
         <Download size={14} /> Export <ChevronDown size={12} />
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 bg-surface border border-border rounded-card shadow-lg z-10 min-w-[110px]">
-          <button onClick={() => { onExport("pdf"); setOpen(false); }}
-            className="flex items-center gap-2 w-full px-3 py-2 text-[13px] hover:bg-background">
-            <FileText size={13} /> PDF
-          </button>
-          <button onClick={() => { onExport("excel"); setOpen(false); }}
-            className="flex items-center gap-2 w-full px-3 py-2 text-[13px] hover:bg-background">
-            <Download size={13} /> Excel
-          </button>
-        </div>
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 bg-surface border border-border rounded-lg shadow-lg z-20 min-w-[110px]">
+            <button onClick={() => { onExport("pdf"); setOpen(false); }}
+              className="flex items-center gap-2 w-full px-3 py-2 text-[13px] hover:bg-background rounded-t-lg">
+              <FileText size={13} /> PDF
+            </button>
+            <button onClick={() => { onExport("excel"); setOpen(false); }}
+              className="flex items-center gap-2 w-full px-3 py-2 text-[13px] hover:bg-background rounded-b-lg">
+              <Download size={13} /> Excel
+            </button>
+          </div>
+        </>
       )}
+    </div>
+  );
+}
+
+function EmptyState({ icon: Icon, text }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 text-text-secondary">
+      <Icon size={44} className="mb-4 opacity-20" />
+      <p className="text-[14px] text-center max-w-xs">{text}</p>
+    </div>
+  );
+}
+
+function Skeleton({ rows = 6 }) {
+  return (
+    <div className="space-y-2">
+      {[...Array(rows)].map((_, i) => (
+        <div key={i} className="h-10 bg-surface rounded-lg animate-pulse" style={{ opacity: 1 - i * 0.12 }} />
+      ))}
     </div>
   );
 }
 
 // ── Journal Tab ───────────────────────────────────────────────────────────────
 function JournalTab({ dateRange }) {
-  const [data, setData]   = useState([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage]   = useState(1);
+  const [data, setData]     = useState([]);
+  const [total, setTotal]   = useState(0);
+  const [page, setPage]     = useState(1);
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await api.get("/books/journal", { params: { ...dateRange, page, limit: 30 } });
+      const r = await api.get("/books/journal", { params: { ...dateRange, page, limit: 25 } });
       setData(r.data.data);
       setTotal(r.data.total);
     } catch { toast.error("Failed to load journal"); }
     finally { setLoading(false); }
   }, [dateRange, page]);
 
+  useEffect(() => { setPage(1); }, [dateRange]);
   useEffect(() => { load(); }, [load]);
 
   async function exportFile(format) {
     try {
-      const url = `/books/journal?export=${format}&${new URLSearchParams(dateRange)}`;
-      const r = await api.get(url, { responseType: "blob" });
+      const r = await api.get(`/books/journal?export=${format}&${new URLSearchParams(dateRange)}`, { responseType: "blob" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(r.data);
       a.download = `journal.${format === "excel" ? "xlsx" : "pdf"}`;
@@ -84,60 +121,78 @@ function JournalTab({ dateRange }) {
     } catch { toast.error("Export failed"); }
   }
 
-  const totalPages = Math.ceil(total / 30);
+  const totalPages = Math.ceil(total / 25);
+
+  // Compute totals from visible entries
+  const totalDebit  = data.reduce((s, e) => s + e.lines.reduce((ls, l) => ls + parseFloat(l.debit  || 0), 0), 0);
+  const totalCredit = data.reduce((s, e) => s + e.lines.reduce((ls, l) => ls + parseFloat(l.credit || 0), 0), 0);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-[14px] text-text-secondary">{total} entries</p>
+    <div className="space-y-5">
+      {/* Header row */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex gap-4">
+          <div className="text-center">
+            <p className="text-[11px] text-text-secondary uppercase tracking-wide">Entries</p>
+            <p className="text-[18px] font-bold text-text-primary">{total.toLocaleString()}</p>
+          </div>
+          {!loading && data.length > 0 && (
+            <>
+              <div className="w-px bg-border" />
+              <div className="text-center">
+                <p className="text-[11px] text-text-secondary uppercase tracking-wide">Total DR</p>
+                <p className="text-[15px] font-semibold text-emerald-600">{formatRWF(totalDebit)}</p>
+              </div>
+              <div className="w-px bg-border" />
+              <div className="text-center">
+                <p className="text-[11px] text-text-secondary uppercase tracking-wide">Total CR</p>
+                <p className="text-[15px] font-semibold text-red-500">{formatRWF(totalCredit)}</p>
+              </div>
+            </>
+          )}
+        </div>
         <ExportBtn onExport={exportFile} />
       </div>
 
-      {loading ? (
-        <div className="space-y-3">
-          {[...Array(5)].map((_, i) => <div key={i} className="h-16 bg-surface rounded-card animate-pulse" />)}
-        </div>
-      ) : data.length === 0 ? (
-        <div className="text-center py-16 text-text-secondary">
-          <BookOpen size={40} className="mx-auto mb-3 opacity-30" />
-          <p>No journal entries yet. They appear automatically as you record sales and expenses.</p>
-        </div>
+      {loading ? <Skeleton rows={5} /> : data.length === 0 ? (
+        <EmptyState icon={BookOpen} text="No journal entries yet. They appear automatically as you record sales and expenses." />
       ) : (
         <div className="space-y-3">
           {data.map(entry => (
-            <div key={entry.id} className="bg-surface border border-border rounded-card overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/50 bg-background/50">
-                <div>
-                  <p className="text-[13px] font-semibold text-text-primary">{entry.description}</p>
-                  <p className="text-[12px] text-text-secondary">{formatDate(entry.entry_date, "dd MMM yyyy")} · by {entry.created_by_name || "System"}</p>
+            <div key={entry.id} className="border border-border rounded-xl overflow-hidden">
+              {/* Entry header */}
+              <div className="flex items-start justify-between px-4 py-3 bg-background/60 border-b border-border/50">
+                <div className="flex-1 min-w-0 mr-3">
+                  <p className="text-[13px] font-semibold text-text-primary truncate">{entry.description}</p>
+                  <p className="text-[12px] text-text-secondary mt-0.5">
+                    {formatDate(entry.entry_date, "dd MMM yyyy")}
+                    {entry.created_by_name && <> · {entry.created_by_name}</>}
+                  </p>
                 </div>
-                <span className={`text-[11px] px-2 py-0.5 rounded font-medium ${
-                  entry.reference_type === "sale" ? "bg-green-100 text-green-700" :
-                  entry.reference_type === "expense" ? "bg-orange-100 text-orange-700" :
-                  entry.reference_type === "sale_void" ? "bg-red-100 text-red-700" :
-                  "bg-surface text-text-secondary"}`}>
-                  {entry.reference_type?.replace(/_/g, " ") || "manual"}
-                </span>
+                <RefBadge type={entry.reference_type} />
               </div>
+
+              {/* Lines table */}
               <table className="w-full text-[13px]">
                 <thead>
-                  <tr className="text-[11px] text-text-secondary uppercase tracking-wide">
-                    <th className="text-left px-4 py-1.5 font-medium">Account</th>
-                    <th className="text-right px-4 py-1.5 font-medium">Debit (RWF)</th>
-                    <th className="text-right px-4 py-1.5 font-medium">Credit (RWF)</th>
+                  <tr className="text-[11px] text-text-secondary uppercase tracking-wide border-b border-border/30">
+                    <th className="text-left px-4 py-2 font-medium">Account</th>
+                    <th className="text-right px-4 py-2 font-medium w-36">Debit (RWF)</th>
+                    <th className="text-right px-4 py-2 font-medium w-36">Credit (RWF)</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {entry.lines.map((line, i) => (
-                    <tr key={i} className={i % 2 === 0 ? "" : "bg-background/30"}>
-                      <td className="px-4 py-1.5 text-text-primary font-mono text-[12px]">
-                        <span className="text-text-secondary mr-2">{line.code}</span>{line.account_name}
+                  {(entry.lines || []).map((line, i) => (
+                    <tr key={i} className={`border-b border-border/20 last:border-0 ${i % 2 === 0 ? "bg-surface" : "bg-background/20"}`}>
+                      <td className="px-4 py-2 text-text-primary">
+                        <span className="font-mono text-[11px] text-text-secondary mr-2 shrink-0">{line.code}</span>
+                        {line.account_name}
                       </td>
-                      <td className="px-4 py-1.5 text-right font-mono text-success font-medium">
-                        {line.debit > 0 ? formatRWF(line.debit) : "—"}
+                      <td className="px-4 py-2 text-right font-mono text-emerald-600 font-medium">
+                        {parseFloat(line.debit) > 0 ? formatRWF(line.debit) : <span className="text-text-secondary/40">—</span>}
                       </td>
-                      <td className="px-4 py-1.5 text-right font-mono text-danger font-medium">
-                        {line.credit > 0 ? formatRWF(line.credit) : "—"}
+                      <td className="px-4 py-2 text-right font-mono text-red-500 font-medium">
+                        {parseFloat(line.credit) > 0 ? formatRWF(line.credit) : <span className="text-text-secondary/40">—</span>}
                       </td>
                     </tr>
                   ))}
@@ -151,130 +206,14 @@ function JournalTab({ dateRange }) {
       {totalPages > 1 && (
         <div className="flex items-center justify-between pt-2">
           <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}
-            className="px-3 py-1.5 text-[13px] border border-border rounded-card disabled:opacity-40 hover:border-primary">
-            Previous
+            className="px-3 py-1.5 text-[13px] border border-border rounded-lg disabled:opacity-40 hover:border-primary hover:text-primary transition-colors">
+            ← Previous
           </button>
           <span className="text-[13px] text-text-secondary">Page {page} of {totalPages}</span>
           <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}
-            className="px-3 py-1.5 text-[13px] border border-border rounded-card disabled:opacity-40 hover:border-primary">
-            Next
+            className="px-3 py-1.5 text-[13px] border border-border rounded-lg disabled:opacity-40 hover:border-primary hover:text-primary transition-colors">
+            Next →
           </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Ledger Tab ─────────────────────────────────────────────────────────────────
-function LedgerTab({ dateRange }) {
-  const [accounts, setAccounts] = useState([]);
-  const [selectedId, setSelectedId] = useState("");
-  const [ledger, setLedger]   = useState([]);
-  const [account, setAccount] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    api.get("/books/ledger").then(r => {
-      setAccounts(r.data.accounts || []);
-    }).catch(() => {});
-  }, []);
-
-  async function loadLedger(id) {
-    if (!id) return;
-    setSelectedId(id);
-    setLoading(true);
-    try {
-      const r = await api.get("/books/ledger", { params: { account_id: id, ...dateRange } });
-      setLedger(r.data.ledger || []);
-      setAccount(r.data.account || null);
-    } catch { toast.error("Failed to load ledger"); }
-    finally { setLoading(false); }
-  }
-
-  async function exportFile(format) {
-    if (!selectedId) return toast.error("Select an account first");
-    try {
-      const url = `/books/ledger?account_id=${selectedId}&export=${format}&${new URLSearchParams(dateRange)}`;
-      const r = await api.get(url, { responseType: "blob" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(r.data);
-      a.download = `ledger-${account?.code || selectedId}.${format === "excel" ? "xlsx" : "pdf"}`;
-      a.click();
-    } catch { toast.error("Export failed"); }
-  }
-
-  const openingBalance = 0;
-  const closingBalance = ledger.length ? parseFloat(ledger[ledger.length - 1].running_balance) : 0;
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <select value={selectedId} onChange={e => loadLedger(e.target.value)}
-          className="h-9 px-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary min-w-[240px]">
-          <option value="">— Select Account —</option>
-          {["Asset","Liability","Equity","Revenue","Expense"].map(type => (
-            <optgroup key={type} label={type}>
-              {accounts.filter(a => a.type === type).map(a => (
-                <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
-        <ExportBtn onExport={exportFile} />
-      </div>
-
-      {account && (
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            { label: "Account", val: `${account.code} — ${account.name}` },
-            { label: "Type",    val: account.type },
-            { label: "Closing Balance", val: formatRWF(closingBalance) },
-          ].map(({ label, val }) => (
-            <div key={label} className="bg-surface border border-border rounded-card p-3">
-              <p className="text-[12px] text-text-secondary mb-1">{label}</p>
-              <p className="text-[15px] font-semibold text-text-primary">{val}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {loading ? (
-        <div className="space-y-2">{[...Array(8)].map((_, i) => <div key={i} className="h-10 bg-surface rounded animate-pulse" />)}</div>
-      ) : !selectedId ? (
-        <div className="text-center py-16 text-text-secondary">
-          <BookOpen size={36} className="mx-auto mb-3 opacity-30" />
-          <p>Select an account to see its ledger.</p>
-        </div>
-      ) : ledger.length === 0 ? (
-        <div className="text-center py-12 text-text-secondary">No transactions for this account in the selected period.</div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-[13px]">
-            <thead>
-              <tr className="border-b border-border text-[12px] text-text-secondary uppercase tracking-wide">
-                <th className="text-left py-2 px-3 font-medium">Date</th>
-                <th className="text-left py-2 px-3 font-medium">Description</th>
-                <th className="text-right py-2 px-3 font-medium">Debit (RWF)</th>
-                <th className="text-right py-2 px-3 font-medium">Credit (RWF)</th>
-                <th className="text-right py-2 px-3 font-medium">Balance (RWF)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="bg-background/50 text-text-secondary text-[12px]">
-                <td colSpan={4} className="py-2 px-3 italic">Opening Balance</td>
-                <td className="py-2 px-3 text-right font-mono">{formatRWF(openingBalance)}</td>
-              </tr>
-              {ledger.map((row, i) => (
-                <tr key={i} className={`border-b border-border/30 ${i % 2 === 0 ? "" : "bg-background/30"}`}>
-                  <td className="py-2 px-3 text-text-secondary whitespace-nowrap">{formatDate(row.entry_date, "dd MMM yy")}</td>
-                  <td className="py-2 px-3 text-text-primary max-w-[280px] truncate">{row.description}</td>
-                  <td className="py-2 px-3 text-right font-mono text-success">{row.debit > 0 ? formatRWF(row.debit) : "—"}</td>
-                  <td className="py-2 px-3 text-right font-mono text-danger">{row.credit > 0 ? formatRWF(row.credit) : "—"}</td>
-                  <td className="py-2 px-3 text-right font-mono font-semibold text-text-primary">{formatRWF(row.running_balance)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       )}
     </div>
@@ -301,8 +240,7 @@ function CashBookTab({ dateRange }) {
 
   async function exportFile(format) {
     try {
-      const url = `/books/cashbook?export=${format}&${new URLSearchParams(dateRange)}`;
-      const r = await api.get(url, { responseType: "blob" });
+      const r = await api.get(`/books/cashbook?export=${format}&${new URLSearchParams(dateRange)}`, { responseType: "blob" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(r.data);
       a.download = `cashbook.${format === "excel" ? "xlsx" : "pdf"}`;
@@ -318,71 +256,97 @@ function CashBookTab({ dateRange }) {
   }, {});
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex gap-3">
-          {totals.map(t => (
-            <div key={t.code} className="bg-surface border border-border rounded-card px-4 py-2">
-              <p className="text-[11px] text-text-secondary">{t.name}</p>
-              <div className="flex gap-4 mt-1">
-                <span className="text-[13px] text-success font-semibold">In: {formatRWF(t.total_in)}</span>
-                <span className="text-[13px] text-danger font-semibold">Out: {formatRWF(t.total_out)}</span>
-                <span className="text-[13px] text-text-primary font-bold">Net: {formatRWF(t.net)}</span>
+    <div className="space-y-5">
+      {/* Summary cards */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-wrap gap-3">
+          {totals.length === 0 && !loading ? (
+            <p className="text-[13px] text-text-secondary italic">No transactions in this period.</p>
+          ) : (
+            totals.map(t => (
+              <div key={t.code} className="bg-background border border-border rounded-xl px-5 py-3 min-w-[200px]">
+                <p className="text-[12px] font-medium text-text-secondary mb-2">{t.code} — {t.name}</p>
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div>
+                    <div className="flex items-center justify-center gap-1 text-emerald-600 mb-0.5">
+                      <TrendingUp size={12} />
+                      <span className="text-[10px] font-medium uppercase tracking-wide">In</span>
+                    </div>
+                    <p className="text-[13px] font-bold text-emerald-600">{formatRWF(t.total_in)}</p>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-center gap-1 text-red-500 mb-0.5">
+                      <TrendingDown size={12} />
+                      <span className="text-[10px] font-medium uppercase tracking-wide">Out</span>
+                    </div>
+                    <p className="text-[13px] font-bold text-red-500">{formatRWF(t.total_out)}</p>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-center gap-1 text-text-secondary mb-0.5">
+                      <Minus size={12} />
+                      <span className="text-[10px] font-medium uppercase tracking-wide">Net</span>
+                    </div>
+                    <p className={`text-[13px] font-bold ${parseFloat(t.net) >= 0 ? "text-text-primary" : "text-red-500"}`}>
+                      {formatRWF(t.net)}
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
         <ExportBtn onExport={exportFile} />
       </div>
 
-      {loading ? (
-        <div className="space-y-2">{[...Array(8)].map((_, i) => <div key={i} className="h-10 bg-surface rounded animate-pulse" />)}</div>
-      ) : cashbook.length === 0 ? (
-        <div className="text-center py-16 text-text-secondary">
-          <Wallet size={40} className="mx-auto mb-3 opacity-30" />
-          <p>No cash transactions yet. Record sales or expenses to populate the cash book.</p>
-        </div>
+      {loading ? <Skeleton rows={8} /> : cashbook.length === 0 ? (
+        <EmptyState icon={Wallet} text="No cash transactions yet. Record sales or expenses to populate the cash book." />
       ) : (
-        Object.values(groupedByAccount).map(group => (
-          <div key={group.code} className="space-y-1">
-            <p className="text-[13px] font-bold text-text-primary px-1">
-              {group.code} — {group.name}
-            </p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-[13px]">
-                <thead>
-                  <tr className="border-b border-border text-[12px] text-text-secondary uppercase tracking-wide">
-                    <th className="text-left py-2 px-3 font-medium">Date</th>
-                    <th className="text-left py-2 px-3 font-medium">Description</th>
-                    <th className="text-left py-2 px-3 font-medium">Type</th>
-                    <th className="text-right py-2 px-3 font-medium text-success">Money In</th>
-                    <th className="text-right py-2 px-3 font-medium text-danger">Money Out</th>
-                    <th className="text-right py-2 px-3 font-medium">Balance</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {group.rows.map((row, i) => (
-                    <tr key={i} className={`border-b border-border/30 ${i % 2 === 0 ? "" : "bg-background/30"}`}>
-                      <td className="py-2 px-3 text-text-secondary whitespace-nowrap">{formatDate(row.entry_date, "dd MMM yy")}</td>
-                      <td className="py-2 px-3 text-text-primary max-w-[260px] truncate">{row.description}</td>
-                      <td className="py-2 px-3">
-                        <span className={`text-[11px] px-2 py-0.5 rounded font-medium ${
-                          row.reference_type === "sale" ? "bg-green-100 text-green-700" :
-                          row.reference_type === "expense" ? "bg-orange-100 text-orange-700" :
-                          "bg-surface text-text-secondary"}`}>
-                          {row.reference_type?.replace(/_/g, " ") || "—"}
-                        </span>
-                      </td>
-                      <td className="py-2 px-3 text-right font-mono text-success">{row.money_in > 0 ? formatRWF(row.money_in) : "—"}</td>
-                      <td className="py-2 px-3 text-right font-mono text-danger">{row.money_out > 0 ? formatRWF(row.money_out) : "—"}</td>
-                      <td className="py-2 px-3 text-right font-mono font-semibold">{formatRWF(row.running_balance)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        <div className="space-y-6">
+          {Object.values(groupedByAccount).map(group => (
+            <div key={group.code}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="font-mono text-[12px] text-text-secondary bg-surface border border-border px-2 py-0.5 rounded">
+                  {group.code}
+                </span>
+                <span className="text-[14px] font-semibold text-text-primary">{group.name}</span>
+              </div>
+              <div className="border border-border rounded-xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[13px]">
+                    <thead>
+                      <tr className="bg-background/60 border-b border-border text-[11px] text-text-secondary uppercase tracking-wide">
+                        <th className="text-left py-2.5 px-4 font-medium">Date</th>
+                        <th className="text-left py-2.5 px-4 font-medium">Description</th>
+                        <th className="text-left py-2.5 px-4 font-medium">Type</th>
+                        <th className="text-right py-2.5 px-4 font-medium text-emerald-600">Money In</th>
+                        <th className="text-right py-2.5 px-4 font-medium text-red-500">Money Out</th>
+                        <th className="text-right py-2.5 px-4 font-medium">Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {group.rows.map((row, i) => (
+                        <tr key={i} className={`border-b border-border/30 last:border-0 ${i % 2 === 0 ? "" : "bg-background/30"}`}>
+                          <td className="py-2.5 px-4 text-text-secondary whitespace-nowrap">{formatDate(row.entry_date, "dd MMM yy")}</td>
+                          <td className="py-2.5 px-4 text-text-primary max-w-[260px] truncate">{row.description}</td>
+                          <td className="py-2.5 px-4"><RefBadge type={row.reference_type} /></td>
+                          <td className="py-2.5 px-4 text-right font-mono text-emerald-600 font-medium">
+                            {parseFloat(row.money_in) > 0 ? formatRWF(row.money_in) : <span className="text-text-secondary/40">—</span>}
+                          </td>
+                          <td className="py-2.5 px-4 text-right font-mono text-red-500 font-medium">
+                            {parseFloat(row.money_out) > 0 ? formatRWF(row.money_out) : <span className="text-text-secondary/40">—</span>}
+                          </td>
+                          <td className={`py-2.5 px-4 text-right font-mono font-semibold ${parseFloat(row.running_balance) >= 0 ? "text-text-primary" : "text-red-600"}`}>
+                            {formatRWF(row.running_balance)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-          </div>
-        ))
+          ))}
+        </div>
       )}
     </div>
   );
@@ -413,8 +377,7 @@ function TrialBalanceTab({ dateRange }) {
 
   async function exportFile(format) {
     try {
-      const url = `/books/trial-balance?export=${format}${asOf ? `&as_of_date=${asOf}` : ""}`;
-      const r = await api.get(url, { responseType: "blob" });
+      const r = await api.get(`/books/trial-balance?export=${format}${asOf ? `&as_of_date=${asOf}` : ""}`, { responseType: "blob" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(r.data);
       a.download = `trial-balance.${format === "excel" ? "xlsx" : "pdf"}`;
@@ -428,78 +391,89 @@ function TrialBalanceTab({ dateRange }) {
     return acc;
   }, {});
 
+  const typeOrder = ["Asset", "Liability", "Equity", "Revenue", "Expense"];
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      {/* Controls */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <label className="text-[13px] text-text-secondary">As of date:</label>
+          <label className="text-[13px] text-text-secondary font-medium">As of date:</label>
           <input type="date" value={asOf} onChange={e => setAsOf(e.target.value)}
-            className="h-9 px-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary" />
+            className="h-9 px-3 border border-border rounded-lg text-[14px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary" />
         </div>
-        <ExportBtn onExport={exportFile} />
+        <div className="flex items-center gap-3">
+          {!loading && rows.length > 0 && (
+            <span className={`inline-flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-full ${
+              balanced
+                ? "bg-emerald-100 text-emerald-700"
+                : "bg-red-100 text-red-700"
+            }`}>
+              {balanced ? "✓ Balanced" : "⚠ Out of Balance"}
+            </span>
+          )}
+          <ExportBtn onExport={exportFile} />
+        </div>
       </div>
 
       {!balanced && (
-        <div className="px-4 py-3 bg-danger/10 border border-danger/20 rounded-card text-[13px] text-danger font-medium">
-          ⚠ Books are not balanced. Debit total ({formatRWF(grandDebit)}) ≠ Credit total ({formatRWF(grandCredit)}).
-          This usually means some transactions are missing journal entries.
+        <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-[13px] text-red-700">
+          <strong>Books are not balanced.</strong> Debit total ({formatRWF(grandDebit)}) ≠ Credit total ({formatRWF(grandCredit)}).
+          Difference: {formatRWF(Math.abs(grandDebit - grandCredit))}. Check for missing journal entries.
         </div>
       )}
 
-      {loading ? (
-        <div className="space-y-2">{[...Array(10)].map((_, i) => <div key={i} className="h-9 bg-surface rounded animate-pulse" />)}</div>
-      ) : rows.length === 0 ? (
-        <div className="text-center py-16 text-text-secondary">
-          <Scale size={40} className="mx-auto mb-3 opacity-30" />
-          <p>No transactions recorded yet.</p>
-        </div>
+      {loading ? <Skeleton rows={10} /> : rows.length === 0 ? (
+        <EmptyState icon={Scale} text="No transactions recorded yet. Record sales and expenses to populate the trial balance." />
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-[13px]">
-            <thead>
-              <tr className="border-b-2 border-border text-[12px] text-text-secondary uppercase tracking-wide">
-                <th className="text-left py-2 px-3 font-medium">Code</th>
-                <th className="text-left py-2 px-3 font-medium">Account Name</th>
-                <th className="text-left py-2 px-3 font-medium">Type</th>
-                <th className="text-right py-2 px-3 font-medium">Debit (RWF)</th>
-                <th className="text-right py-2 px-3 font-medium">Credit (RWF)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(grouped).map(([type, accs]) => (
-                <>
-                  <tr key={`hdr-${type}`} className="bg-background/80">
-                    <td colSpan={5} className="py-2 px-3 font-bold text-[12px] uppercase tracking-wider text-text-secondary">
-                      <Badge type={type} /> <span className="ml-2">{type}</span>
-                    </td>
-                  </tr>
-                  {accs.map((r, i) => (
-                    <tr key={i} className="border-b border-border/30 hover:bg-background/40">
-                      <td className="py-2 px-3 font-mono text-text-secondary">{r.code}</td>
-                      <td className="py-2 px-3 text-text-primary">{r.name}</td>
-                      <td className="py-2 px-3"><Badge type={r.type} /></td>
-                      <td className="py-2 px-3 text-right font-mono text-success">{r.total_debit > 0 ? formatRWF(r.total_debit) : "—"}</td>
-                      <td className="py-2 px-3 text-right font-mono text-danger">{r.total_credit > 0 ? formatRWF(r.total_credit) : "—"}</td>
+        <div className="border border-border rounded-xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="bg-background/60 border-b-2 border-border text-[11px] text-text-secondary uppercase tracking-wide">
+                  <th className="text-left py-3 px-4 font-medium w-24">Code</th>
+                  <th className="text-left py-3 px-4 font-medium">Account Name</th>
+                  <th className="text-left py-3 px-4 font-medium w-28">Type</th>
+                  <th className="text-right py-3 px-4 font-medium w-40 text-emerald-600">Debit (RWF)</th>
+                  <th className="text-right py-3 px-4 font-medium w-40 text-red-500">Credit (RWF)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {typeOrder.filter(t => grouped[t]).map(type => (
+                  <Fragment key={type}>
+                    <tr className="bg-background border-y border-border/50">
+                      <td colSpan={5} className="py-2 px-4">
+                        <TypeBadge type={type} />
+                        <span className="ml-2 text-[11px] font-semibold text-text-secondary uppercase tracking-wide">
+                          {type}s
+                        </span>
+                      </td>
                     </tr>
-                  ))}
-                </>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="border-t-2 border-border bg-primary/5">
-                <td colSpan={3} className="py-3 px-3 font-bold text-[14px] text-text-primary">TOTALS</td>
-                <td className="py-3 px-3 text-right font-bold font-mono text-success text-[14px]">{formatRWF(grandDebit)}</td>
-                <td className="py-3 px-3 text-right font-bold font-mono text-danger text-[14px]">{formatRWF(grandCredit)}</td>
-              </tr>
-              <tr>
-                <td colSpan={5} className="py-2 px-3 text-right text-[12px] text-text-secondary">
-                  {balanced
-                    ? "✓ Books are balanced"
-                    : `⚠ Difference: ${formatRWF(Math.abs(grandDebit - grandCredit))}`}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+                    {grouped[type].map((r, i) => (
+                      <tr key={`${type}-${i}`} className={`border-b border-border/20 hover:bg-background/50 transition-colors ${i % 2 === 0 ? "" : "bg-background/20"}`}>
+                        <td className="py-2.5 px-4 font-mono text-[12px] text-text-secondary">{r.code}</td>
+                        <td className="py-2.5 px-4 text-text-primary">{r.name}</td>
+                        <td className="py-2.5 px-4"><TypeBadge type={r.type} /></td>
+                        <td className="py-2.5 px-4 text-right font-mono text-emerald-600 font-medium">
+                          {parseFloat(r.total_debit) > 0 ? formatRWF(r.total_debit) : <span className="text-text-secondary/40">—</span>}
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-mono text-red-500 font-medium">
+                          {parseFloat(r.total_credit) > 0 ? formatRWF(r.total_credit) : <span className="text-text-secondary/40">—</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </Fragment>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-border bg-primary/5">
+                  <td colSpan={3} className="py-3.5 px-4 font-bold text-[14px] text-text-primary">GRAND TOTAL</td>
+                  <td className="py-3.5 px-4 text-right font-bold font-mono text-emerald-600 text-[15px]">{formatRWF(grandDebit)}</td>
+                  <td className="py-3.5 px-4 text-right font-bold font-mono text-red-500 text-[15px]">{formatRWF(grandCredit)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         </div>
       )}
     </div>
@@ -510,51 +484,59 @@ function TrialBalanceTab({ dateRange }) {
 export default function FinancialBooks() {
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState("journal");
-  const today = new Date().toISOString().slice(0, 10);
+  const today      = new Date().toISOString().slice(0, 10);
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
   const [startDate, setStartDate] = useState(monthStart);
   const [endDate, setEndDate]     = useState(today);
 
   const dateRange = { start_date: startDate, end_date: endDate };
 
+  const QUICK = [
+    { label: "This Month", start: monthStart, end: today },
+    { label: "This Year",  start: `${new Date().getFullYear()}-01-01`, end: today },
+    { label: "All Time",   start: "2020-01-01", end: today },
+  ];
+
   return (
     <PageWrapper
       title={t("financial_books") || "Financial Books"}
-      subtitle={t("financial_books_sub") || "Auto-generated journal, ledger, cash book & trial balance"}
-      breadcrumbs={[{ label: t("finance") || "Finance", path: "/app/finance/pnl" }, { label: t("financial_books") || "Books", path: "/app/books" }]}
+      subtitle={t("financial_books_sub") || "Auto-generated journal, cash book & trial balance"}
+      breadcrumbs={[
+        { label: t("finance") || "Finance", path: "/app/finance/pnl" },
+        { label: t("financial_books") || "Books", path: "/app/books" },
+      ]}
     >
       {/* Date Range Filter */}
-      <div className="flex flex-wrap items-center gap-3 mb-6">
-        <div className="flex items-center gap-2">
-          <label className="text-[13px] text-text-secondary">From:</label>
-          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-            className="h-9 px-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary" />
+      <div className="flex flex-wrap items-center gap-2 mb-6 p-3 bg-surface border border-border rounded-xl">
+        <label className="text-[13px] text-text-secondary font-medium">Period:</label>
+        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+          className="h-8 px-2.5 border border-border rounded-lg text-[13px] bg-background focus:outline-none focus:ring-2 focus:ring-primary" />
+        <span className="text-text-secondary text-[13px]">—</span>
+        <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
+          className="h-8 px-2.5 border border-border rounded-lg text-[13px] bg-background focus:outline-none focus:ring-2 focus:ring-primary" />
+        <div className="flex gap-1.5 ml-1">
+          {QUICK.map(q => (
+            <button key={q.label}
+              onClick={() => { setStartDate(q.start); setEndDate(q.end); }}
+              className={`px-2.5 py-1 text-[12px] rounded-md border transition-colors ${
+                startDate === q.start && endDate === q.end
+                  ? "border-primary bg-primary/10 text-primary font-medium"
+                  : "border-border text-text-secondary hover:border-primary hover:text-primary"
+              }`}>
+              {q.label}
+            </button>
+          ))}
         </div>
-        <div className="flex items-center gap-2">
-          <label className="text-[13px] text-text-secondary">To:</label>
-          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-            className="h-9 px-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary" />
-        </div>
-        {[
-          { label: "This Month", start: monthStart, end: today },
-          { label: "This Year", start: `${new Date().getFullYear()}-01-01`, end: today },
-          { label: "All Time", start: "2020-01-01", end: today },
-        ].map(q => (
-          <button key={q.label} onClick={() => { setStartDate(q.start); setEndDate(q.end); }}
-            className="px-3 py-1.5 text-[13px] border border-border rounded-card hover:border-primary hover:text-primary transition-colors">
-            {q.label}
-          </button>
-        ))}
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-border mb-6">
+      <div className="flex gap-0.5 border-b border-border mb-6">
         {TABS.map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-[14px] font-medium border-b-2 transition-colors ${
+            className={`flex items-center gap-2 px-5 py-2.5 text-[14px] font-medium border-b-2 transition-all ${
               activeTab === tab.id
                 ? "border-primary text-primary"
-                : "border-transparent text-text-secondary hover:text-text-primary"
+                : "border-transparent text-text-secondary hover:text-text-primary hover:border-border"
             }`}>
             <tab.icon size={15} />
             {tab.label}
@@ -563,9 +545,8 @@ export default function FinancialBooks() {
       </div>
 
       {/* Tab Content */}
-      <Card>
+      <Card className="p-5">
         {activeTab === "journal"       && <JournalTab      dateRange={dateRange} />}
-        {activeTab === "ledger"        && <LedgerTab       dateRange={dateRange} />}
         {activeTab === "cashbook"      && <CashBookTab     dateRange={dateRange} />}
         {activeTab === "trial-balance" && <TrialBalanceTab dateRange={dateRange} />}
       </Card>

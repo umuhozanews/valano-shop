@@ -209,6 +209,7 @@ router.post("/", async (req, res, next) => {
       saleId: sale.id, total, amountPaid: paid,
       paymentMethod: payment_method, invoiceNumber: invNum,
       createdBy: req.user.id, saleDate: sale.created_at,
+      ownerId: req.ownerId,
     });
     await logAudit(req.user.id, "SALE_CREATED", "sales", sale.id, null, { total, items: items.length }, req.ip);
     res.status(201).json({ ...sale, invoice_number: invNum, invoice_id: invoice.id });
@@ -244,6 +245,7 @@ router.post("/:id/void", requireRole("admin", "sme_owner", "manager", "accountan
       saleId: sale.id, total: parseFloat(sale.total_amount),
       amountPaid: parseFloat(sale.total_amount),
       paymentMethod: sale.payment_method, createdBy: req.user.id,
+      ownerId: req.ownerId,
     });
     await notifyAdminsAndManagers("SALE_VOIDED", "Sale Voided", `Sale #${sale.id} voided: ${void_reason}`);
     await logAudit(req.user.id, "SALE_VOIDED", "sales", sale.id, { is_voided: false }, { is_voided: true, void_reason }, req.ip);

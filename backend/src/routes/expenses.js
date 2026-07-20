@@ -116,6 +116,7 @@ router.post("/", async (req, res, next) => {
       expenseId: exp.id, amount, category,
       description: description || category,
       createdBy: req.user.id, expenseDate: expense_date,
+      ownerId: req.ownerId,
     });
     await logAudit(req.user.id, "EXPENSE_ADDED", "expenses", exp.id, null, exp, req.ip);
     res.status(201).json(exp);

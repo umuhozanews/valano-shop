@@ -60,6 +60,7 @@ async function ensureJournalTables() {
       reference_type VARCHAR(50),
       reference_id INTEGER,
       created_by INTEGER,
+      owner_id INTEGER,
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
 
@@ -74,7 +75,11 @@ async function ensureJournalTables() {
     CREATE INDEX IF NOT EXISTS idx_journal_lines_entry ON journal_lines(entry_id);
     CREATE INDEX IF NOT EXISTS idx_journal_entries_date ON journal_entries(entry_date);
     CREATE INDEX IF NOT EXISTS idx_journal_entries_ref ON journal_entries(reference_type, reference_id);
+    CREATE INDEX IF NOT EXISTS idx_journal_entries_owner ON journal_entries(owner_id, entry_date DESC);
   `);
+  // Backfill owner_id column on existing tables
+  await pool.query(`ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS owner_id INTEGER`)
+    .catch(() => {});
 
   // Seed default accounts
   for (const acc of DEFAULT_ACCOUNTS) {
@@ -92,7 +97,7 @@ async function getAccountId(code) {
   return rows[0]?.id || null;
 }
 
-async function createJournalEntry({ date, description, referenceType, referenceId, lines, createdBy }) {
+async function createJournalEntry({ date, description, referenceType, referenceId, lines, createdBy, ownerId }) {
   await ensureJournalTables();
 
   const totalDebit  = lines.reduce((s, l) => s + (parseFloat(l.debit)  || 0), 0);
@@ -102,9 +107,9 @@ async function createJournalEntry({ date, description, referenceType, referenceI
   }
 
   const { rows: [entry] } = await pool.query(
-    `INSERT INTO journal_entries (entry_date, description, reference_type, reference_id, created_by)
-     VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-    [date || new Date(), description, referenceType || null, referenceId || null, createdBy || null]
+    `INSERT INTO journal_entries (entry_date, description, reference_type, reference_id, created_by, owner_id)
+     VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+    [date || new Date(), description, referenceType || null, referenceId || null, createdBy || null, ownerId || null]
   );
 
   for (const line of lines) {
@@ -121,7 +126,7 @@ async function createJournalEntry({ date, description, referenceType, referenceI
   return entry;
 }
 
-async function journalForSale({ saleId, total, amountPaid, paymentMethod, invoiceNumber, createdBy, saleDate }) {
+async function journalForSale({ saleId, total, amountPaid, paymentMethod, invoiceNumber, createdBy, saleDate, ownerId }) {
   try {
     await ensureJournalTables();
     const paid     = parseFloat(amountPaid) || total;
@@ -145,13 +150,14 @@ async function journalForSale({ saleId, total, amountPaid, paymentMethod, invoic
       referenceId: saleId,
       lines,
       createdBy,
+      ownerId,
     });
   } catch (e) {
     console.error("[Journal] sale entry failed:", e.message);
   }
 }
 
-async function journalForExpense({ expenseId, amount, category, description, createdBy, expenseDate }) {
+async function journalForExpense({ expenseId, amount, category, description, createdBy, expenseDate, ownerId }) {
   try {
     await ensureJournalTables();
     const expCode = EXPENSE_CATEGORY_MAP[category] || "6000";
@@ -165,13 +171,14 @@ async function journalForExpense({ expenseId, amount, category, description, cre
         { accountCode: "1000", debit: 0, credit: parseFloat(amount) },
       ],
       createdBy,
+      ownerId,
     });
   } catch (e) {
     console.error("[Journal] expense entry failed:", e.message);
   }
 }
 
-async function journalForSaleVoid({ saleId, total, paymentMethod, amountPaid, invoiceNumber, createdBy }) {
+async function journalForSaleVoid({ saleId, total, paymentMethod, amountPaid, invoiceNumber, createdBy, ownerId }) {
   try {
     await ensureJournalTables();
     const paid   = parseFloat(amountPaid) || total;
@@ -190,6 +197,7 @@ async function journalForSaleVoid({ saleId, total, paymentMethod, amountPaid, in
       referenceId: saleId,
       lines,
       createdBy,
+      ownerId,
     });
   } catch (e) {
     console.error("[Journal] void entry failed:", e.message);
