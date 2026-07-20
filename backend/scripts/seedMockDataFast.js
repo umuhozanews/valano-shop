@@ -378,18 +378,8 @@ async function seedFast() {
     await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS owner_id INT`).catch(() => {});
   }
 
-  // Ensure invoices table exists (may be missing in some deployments)
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS invoices (
-      id SERIAL PRIMARY KEY,
-      sale_id INT REFERENCES sales(id) ON DELETE CASCADE,
-      invoice_number VARCHAR(50) UNIQUE,
-      status VARCHAR(20) DEFAULT 'issued',
-      issued_at TIMESTAMPTZ DEFAULT NOW(),
-      due_date DATE,
-      owner_id INT
-    )
-  `).catch(() => {});
+  // Ensure invoices owner_id column exists
+  await pool.query(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS owner_id INT`).catch(() => {});
 
   // 1. Lenders
   const lenderIds = [];
@@ -451,10 +441,10 @@ async function seedFast() {
       `SELECT id FROM sales WHERE user_id=$1 ORDER BY created_at DESC LIMIT 2`, [userId]
     );
     for (let i = 0; i < recentSales.length; i++) {
-      const invNum = `INV-${userId}-${Date.now()}-${i}`;
+      const invNum = `INV${userId}-${i}-${Date.now() % 100000}`;
       await pool.query(
         `INSERT INTO invoices (sale_id, invoice_number, status, issued_at, owner_id)
-         VALUES ($1,$2,'issued',NOW()-INTERVAL '${rnd(1,10)} days',$3) ON CONFLICT DO NOTHING`,
+         VALUES ($1,$2,'paid',NOW()-INTERVAL '${rnd(1,10)} days',$3) ON CONFLICT DO NOTHING`,
         [recentSales[i].id, invNum, userId]
       );
     }
