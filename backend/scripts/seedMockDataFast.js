@@ -1,7 +1,7 @@
 /**
- * Inzira Insights — Fast Bulk Seed
- * Same as seedMockData.js but uses batch inserts to run in < 15s
- * Suitable for calling from a Vercel serverless endpoint.
+ * Inzira Insights — Fast Bulk Seed v3
+ * Every record carries owner_id so the tenant filter works for all SME accounts.
+ * Stock items, customers, and suppliers are seeded per-SME.
  */
 
 const pool     = require("../src/config/db");
@@ -27,12 +27,94 @@ const dateOnly = (n) => {
 const HASH = "$2a$10$2JnEksJLQ2Uq5qKqhtPxsumIp4RA/7WuqQeItum/RFcwp4//7nN.S";
 
 const SME_PROFILES = [
-  { email:"amani.grocery@inzira.rw",   name:"Amani Grocery Store",     sector:"Retail Shop",        district:"Gasabo",    phone:"+250788201001", targetBand:"green", revPerDay:{old:[4000,8000],mid:[7000,12000],recent:[10000,18000]}, txPerDay:[3,6], skipDayChance:0.06, expenseRatio:0.38, digitalPct:0.40, ageMonths:8 },
-  { email:"grace.restaurant@inzira.rw", name:"Chez Grace Restaurant",   sector:"Restaurant / Food",  district:"Kicukiro",  phone:"+250788201002", targetBand:"amber", revPerDay:{old:[8000,14000],mid:[7000,12000],recent:[6000,11000]}, txPerDay:[2,4], skipDayChance:0.12, expenseRatio:0.68, digitalPct:0.25, ageMonths:5 },
-  { email:"pierre.hardware@inzira.rw",  name:"Pierre Hardware",          sector:"Hardware / Tools",   district:"Musanze",   phone:"+250788201003", targetBand:"amber", revPerDay:{old:[6000,12000],mid:[8000,15000],recent:[9000,16000]}, txPerDay:[1,3], skipDayChance:0.20, expenseRatio:0.45, digitalPct:0.35, ageMonths:14 },
-  { email:"claudine.salon@inzira.rw",   name:"Claudine Beauty Salon",   sector:"Beauty / Salon",     district:"Nyarugenge",phone:"+250788201004", targetBand:"red",   revPerDay:{old:[2000,5000],mid:[2000,5000],recent:[1000,4000]},  txPerDay:[1,2], skipDayChance:0.40, expenseRatio:0.85, digitalPct:0.15, ageMonths:3 },
-  { email:"nsanzimana.agri@inzira.rw",  name:"Nsanzimana Agribusiness", sector:"Agriculture",        district:"Huye",      phone:"+250788201005", targetBand:"amber", revPerDay:{old:[3000,7000],mid:[5000,9000],recent:[7000,12000]},  txPerDay:[2,5], skipDayChance:0.22, expenseRatio:0.50, digitalPct:0.30, ageMonths:11 },
+  { email:"amani.grocery@inzira.rw",   name:"Amani Grocery Store",    sector:"Retail Shop",       district:"Gasabo",    phone:"+250788201001", revPerDay:{old:[4000,8000],mid:[7000,12000],recent:[10000,18000]}, txPerDay:[3,6], skipDayChance:0.06, digitalPct:0.40, ageMonths:8 },
+  { email:"grace.restaurant@inzira.rw", name:"Chez Grace Restaurant",  sector:"Restaurant / Food", district:"Kicukiro",  phone:"+250788201002", revPerDay:{old:[8000,14000],mid:[7000,12000],recent:[6000,11000]}, txPerDay:[2,4], skipDayChance:0.12, digitalPct:0.25, ageMonths:5 },
+  { email:"pierre.hardware@inzira.rw",  name:"Pierre Hardware",         sector:"Hardware / Tools",  district:"Musanze",   phone:"+250788201003", revPerDay:{old:[6000,12000],mid:[8000,15000],recent:[9000,16000]}, txPerDay:[1,3], skipDayChance:0.20, digitalPct:0.35, ageMonths:14 },
+  { email:"claudine.salon@inzira.rw",   name:"Claudine Beauty Salon",  sector:"Beauty / Salon",    district:"Nyarugenge",phone:"+250788201004", revPerDay:{old:[2000,5000],mid:[2000,5000],recent:[1000,4000]},  txPerDay:[1,2], skipDayChance:0.40, digitalPct:0.15, ageMonths:3 },
+  { email:"nsanzimana.agri@inzira.rw",  name:"Nsanzimana Agribusiness",sector:"Agriculture",       district:"Huye",      phone:"+250788201005", revPerDay:{old:[3000,7000],mid:[5000,9000],recent:[7000,12000]},  txPerDay:[2,5], skipDayChance:0.22, digitalPct:0.30, ageMonths:11 },
 ];
+
+// Per-sector stock catalog
+const STOCK_BY_SECTOR = {
+  "Retail Shop": [
+    { name:"Flour 1kg",        name_rw:"Ufu 1kg",            category:"Groceries",  unit:"kg",    qty:60,  cost:600,  sell:800,  low:15 },
+    { name:"Sugar 1kg",        name_rw:"Isukari 1kg",         category:"Groceries",  unit:"kg",    qty:80,  cost:700,  sell:900,  low:20 },
+    { name:"Rice 1kg",         name_rw:"Umuceri 1kg",         category:"Groceries",  unit:"kg",    qty:100, cost:900,  sell:1200, low:25 },
+    { name:"Cooking Oil 1L",   name_rw:"Amavuta y'iteye 1L",  category:"Groceries",  unit:"litre", qty:50,  cost:1500, sell:2000, low:10 },
+    { name:"Salt 500g",        name_rw:"Umunyo 500g",         category:"Groceries",  unit:"pcs",   qty:120, cost:200,  sell:300,  low:30 },
+    { name:"Milk 1L",          name_rw:"Amata 1L",            category:"Beverages",  unit:"litre", qty:40,  cost:800,  sell:1100, low:10 },
+    { name:"Tea Leaves 100g",  name_rw:"Icyayi 100g",         category:"Beverages",  unit:"pcs",   qty:60,  cost:500,  sell:700,  low:15 },
+    { name:"Tomato Paste 400g",name_rw:"Pasita y'inyanya",    category:"Groceries",  unit:"pcs",   qty:70,  cost:400,  sell:600,  low:15 },
+    { name:"Soap Bar",         name_rw:"Isabuni",             category:"Hygiene",    unit:"pcs",   qty:150, cost:300,  sell:500,  low:30 },
+    { name:"Matchbox",         name_rw:"Ibirimi",             category:"Hygiene",    unit:"pcs",   qty:200, cost:50,   sell:100,  low:50 },
+  ],
+  "Restaurant / Food": [
+    { name:"Cooking Gas 6kg",  name_rw:"Gaze yo gutekereza", category:"Fuel",       unit:"pcs",   qty:5,   cost:12000,sell:15000,low:2 },
+    { name:"Tomatoes 1kg",     name_rw:"Inyanya 1kg",         category:"Produce",    unit:"kg",    qty:30,  cost:500,  sell:800,  low:5 },
+    { name:"Onions 1kg",       name_rw:"Ibitunguru 1kg",      category:"Produce",    unit:"kg",    qty:25,  cost:400,  sell:600,  low:5 },
+    { name:"Cooking Oil 2L",   name_rw:"Amavuta 2L",          category:"Groceries",  unit:"litre", qty:20,  cost:2800, sell:3500, low:5 },
+    { name:"Rice 5kg",         name_rw:"Umuceri 5kg",         category:"Groceries",  unit:"kg",    qty:40,  cost:4000, sell:5500, low:8 },
+    { name:"Beans 1kg",        name_rw:"Ibishyimbo 1kg",      category:"Groceries",  unit:"kg",    qty:50,  cost:1200, sell:1600, low:10 },
+    { name:"Soft Drinks",      name_rw:"Inzoga mbaraga",      category:"Beverages",  unit:"pcs",   qty:60,  cost:400,  sell:600,  low:12 },
+    { name:"Water 1.5L",       name_rw:"Amazi 1.5L",          category:"Beverages",  unit:"pcs",   qty:48,  cost:300,  sell:500,  low:12 },
+    { name:"Salt 1kg",         name_rw:"Umunyo 1kg",          category:"Groceries",  unit:"kg",    qty:10,  cost:350,  sell:550,  low:2 },
+    { name:"Charcoal 5kg",     name_rw:"Amakara 5kg",         category:"Fuel",       unit:"pcs",   qty:15,  cost:2500, sell:3500, low:3 },
+  ],
+  "Hardware / Tools": [
+    { name:"Cement 50kg",      name_rw:"Sima 50kg",           category:"Building",   unit:"sack",  qty:30,  cost:12000,sell:14500,low:5 },
+    { name:"Paint 4L",         name_rw:"Penti 4L",            category:"Paint",      unit:"pcs",   qty:20,  cost:8000, sell:11000,low:4 },
+    { name:"Nails 1kg",        name_rw:"Misumari 1kg",        category:"Fittings",   unit:"kg",    qty:50,  cost:1200, sell:1800, low:10 },
+    { name:"Wire Roll 10m",    name_rw:"Umuseke 10m",         category:"Electrical", unit:"pcs",   qty:15,  cost:3500, sell:5000, low:3 },
+    { name:"PVC Pipe 3m",      name_rw:"Tuyau 3m",            category:"Plumbing",   unit:"pcs",   qty:25,  cost:4000, sell:5500, low:5 },
+    { name:"Iron Sheet",       name_rw:"Fariti",              category:"Roofing",    unit:"pcs",   qty:40,  cost:5000, sell:6500, low:8 },
+    { name:"Bolts & Nuts set", name_rw:"Ibishingiro",         category:"Fittings",   unit:"pcs",   qty:100, cost:500,  sell:800,  low:20 },
+    { name:"Power Socket",     name_rw:"Guhera amashanyarazi",category:"Electrical", unit:"pcs",   qty:30,  cost:1500, sell:2200, low:6 },
+    { name:"Paint Brush",      name_rw:"Buroshi ya penti",    category:"Paint",      unit:"pcs",   qty:40,  cost:800,  sell:1200, low:8 },
+    { name:"Wheelbarrow",      name_rw:"Kareti y'amaboko",    category:"Tools",      unit:"pcs",   qty:5,   cost:18000,sell:25000,low:1 },
+  ],
+  "Beauty / Salon": [
+    { name:"Shampoo 500ml",    name_rw:"Sipuni y'umusatsi",   category:"Hair Care",  unit:"pcs",   qty:30,  cost:2500, sell:3500, low:5 },
+    { name:"Conditioner 250ml",name_rw:"Kondisioneri",        category:"Hair Care",  unit:"pcs",   qty:25,  cost:2000, sell:3000, low:5 },
+    { name:"Hair Dye",         name_rw:"Rangi y'umusatsi",    category:"Hair Color", unit:"pcs",   qty:20,  cost:3000, sell:4500, low:4 },
+    { name:"Nail Polish",      name_rw:"Venikeresi",          category:"Nails",      unit:"pcs",   qty:40,  cost:1000, sell:1500, low:8 },
+    { name:"Hair Wax",         name_rw:"Waxe y'umusatsi",     category:"Styling",    unit:"pcs",   qty:20,  cost:2500, sell:3500, low:4 },
+    { name:"Face Cream",       name_rw:"Kremu y'uburebure",   category:"Skin Care",  unit:"pcs",   qty:25,  cost:3000, sell:4500, low:5 },
+    { name:"Towel",            name_rw:"Serviette",           category:"Tools",      unit:"pcs",   qty:15,  cost:3500, sell:5000, low:3 },
+    { name:"Hair Extensions",  name_rw:"Umusatsi wo gushona", category:"Hair Care",  unit:"pcs",   qty:10,  cost:8000, sell:12000,low:2 },
+    { name:"Scissors",         name_rw:"Inkero",              category:"Tools",      unit:"pcs",   qty:5,   cost:5000, sell:7500, low:1 },
+    { name:"Relaxer Kit",      name_rw:"Rilax",               category:"Hair Care",  unit:"pcs",   qty:15,  cost:4000, sell:6000, low:3 },
+  ],
+  "Agriculture": [
+    { name:"DAP Fertilizer 50kg", name_rw:"Feritire DAP 50kg",  category:"Fertilizer",unit:"sack",  qty:20,  cost:35000,sell:42000,low:4 },
+    { name:"Urea Fertilizer 50kg",name_rw:"Feritire Urée 50kg", category:"Fertilizer",unit:"sack",  qty:15,  cost:28000,sell:34000,low:3 },
+    { name:"Maize Seeds 1kg",  name_rw:"Imbuto z'ibigori 1kg", category:"Seeds",     unit:"kg",    qty:50,  cost:2000, sell:3000, low:10 },
+    { name:"Bean Seeds 1kg",   name_rw:"Imbuto z'ibishyimbo",  category:"Seeds",     unit:"kg",    qty:40,  cost:2500, sell:3500, low:8 },
+    { name:"Pesticide 1L",     name_rw:"Umuti w'inzoka",       category:"Chemicals", unit:"litre", qty:25,  cost:8000, sell:11000,low:5 },
+    { name:"Hoe",              name_rw:"Isuka",                category:"Tools",     unit:"pcs",   qty:30,  cost:3500, sell:5000, low:6 },
+    { name:"Machete",          name_rw:"Inkota",               category:"Tools",     unit:"pcs",   qty:20,  cost:3000, sell:4500, low:4 },
+    { name:"Sacks (10pcs)",    name_rw:"Amasashi (10)",        category:"Packaging", unit:"pcs",   qty:100, cost:3000, sell:4500, low:20 },
+    { name:"Irrigation Pipe 5m",name_rw:"Tuyau y'ubuhinzi 5m",category:"Irrigation",unit:"pcs",   qty:15,  cost:5000, sell:7000, low:3 },
+    { name:"Sprayer 15L",      name_rw:"Pompe ifuka",          category:"Tools",     unit:"pcs",   qty:8,   cost:15000,sell:22000,low:2 },
+  ],
+};
+
+// Per-sector customers
+const CUSTOMERS_BY_SECTOR = {
+  "Retail Shop":      [["Amina Uwase","+250788601001","Kigali","individual","regular"],["Jean Habimana","+250788601002","Musanze","individual","regular"],["Koperative SACCO","+250788601003","Huye","business","wholesale"],["Patrick Nkusi","+250788601004","Rubavu","individual","regular"],["Agathe Mukamana","+250788601005","Kigali","individual","vip"]],
+  "Restaurant / Food":[["Pierre Nzeyimana","+250788602001","Kicukiro","individual","regular"],["Marie Ingabire","+250788602002","Nyarugenge","individual","regular"],["Hotel Mille Collines","+250788602003","Kigali","business","wholesale"],["David Bizimana","+250788602004","Kicukiro","individual","regular"],["Chantal Uwimana","+250788602005","Gasabo","individual","vip"]],
+  "Hardware / Tools": [["Construco Ltd","+250788603001","Musanze","business","wholesale"],["Emmanuel Habimana","+250788603002","Rubavu","individual","regular"],["TechBuild Rwanda","+250788603003","Kigali","business","wholesale"],["Francois Nkurunziza","+250788603004","Musanze","individual","regular"],["Beatrice Uwase","+250788603005","Gisenyi","individual","regular"]],
+  "Beauty / Salon":   [["Solange Mukamana","+250788604001","Nyarugenge","individual","regular"],["Grace Mutoni","+250788604002","Kigali","individual","vip"],["Lydia Kamana","+250788604003","Kicukiro","individual","regular"],["Espoir Nziza","+250788604004","Gasabo","individual","regular"],["Ange Iradukunda","+250788604005","Nyarugenge","individual","regular"]],
+  "Agriculture":      [["Huye Farmers Coop","+250788605001","Huye","business","wholesale"],["Jerome Hakizimana","+250788605002","Huye","individual","regular"],["SACCO wa Abaturage","+250788605003","Butare","business","wholesale"],["Emile Nshimiyimana","+250788605004","Huye","individual","regular"],["Consolee Nzabirinda","+250788605005","Nyanza","individual","regular"]],
+};
+
+// Per-sector suppliers
+const SUPPLIERS_BY_SECTOR = {
+  "Retail Shop":      [["Rwanda Grocers Ltd","info@rwandagrocers.rw","+250788701001","Kigali","Wholesale groceries"],["Bralirwa Distribution","dist@bralirwa.rw","+250788701002","Kigali","Beverages & drinks"]],
+  "Restaurant / Food":[["Fresh Produce RW","produce@fresh.rw","+250788702001","Kigali","Fresh vegetables & produce"],["Muhanga Rice Mills","mills@muhanga.rw","+250788702002","Muhanga","Grains & dry goods"]],
+  "Hardware / Tools": [["CIMERWA Cement","sales@cimerwa.rw","+250788703001","Muganza","Cement & building materials"],["Rwandan Paint Co","info@rwpaint.rw","+250788703002","Kigali","Paint & coatings"]],
+  "Beauty / Salon":   [["BeautyPro Rwanda","info@beautypro.rw","+250788704001","Kigali","Salon products wholesale"],["L'Oréal Distributor","loreal@dist.rw","+250788704002","Kigali","Hair & skin care"]],
+  "Agriculture":      [["RAB Agro Inputs","inputs@rab.gov.rw","+250788705001","Kigali","Fertilizers & seeds"],["Agro Tools Rwanda","tools@agrotools.rw","+250788705002","Huye","Farm tools & equipment"]],
+};
 
 const LENDERS = [
   { email:"equity.bank@inzira.rw",  name:"Equity Bank Rwanda",        phone:"+250788300001" },
@@ -44,7 +126,7 @@ const EXTRA_STAFF = [
   { email:"accountant@inzira.rw", name:"Business Accountant", role:"accountant" },
 ];
 
-// Helpers for bulk inserts ────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function buildInsert(table, cols, rows) {
   if (!rows.length) return null;
   const ph = rows.map((_, ri) =>
@@ -60,7 +142,6 @@ async function bulkInsert(table, cols, rows, returning = "") {
   return result;
 }
 
-// Upsert a user and return their id
 async function upsertUser({ name, email, phone, role, sector, district, ageMonths = 6, owner_id = null }) {
   const created_at = new Date(Date.now() - ageMonths * 30 * 24 * 60 * 60 * 1000).toISOString();
   const { rows: [u] } = await pool.query(
@@ -86,14 +167,55 @@ async function clearUserData(userId) {
   await pool.query("DELETE FROM advisory_sessions WHERE business_id=$1", [userId]);
   await pool.query("DELETE FROM accounts_receivable WHERE owner_id=$1", [userId]).catch(() => {});
   await pool.query("DELETE FROM accounts_payable WHERE owner_id=$1", [userId]).catch(() => {});
+  await pool.query("DELETE FROM stock_items WHERE owner_id=$1", [userId]).catch(() => {});
+  await pool.query("DELETE FROM customers WHERE owner_id=$1", [userId]).catch(() => {});
+  await pool.query("DELETE FROM suppliers WHERE owner_id=$1", [userId]).catch(() => {});
 }
 
-// Build all sales rows in memory, then bulk-insert ────────────────────────────
-async function seedSalesBulk(userId, profile, stockItems, customerIds) {
-  const salesRows = [];   // [user_id, customer_id, payment_method, total_amount, is_voided, created_at]
-  const itemsByIdx = [];  // parallel array of item arrays (to map to sale IDs after insert)
+// Seed sector-specific stock items for one SME, return [{id, sell_price_rwf}]
+async function seedSMEStock(userId, sector) {
+  const items = STOCK_BY_SECTOR[sector] || STOCK_BY_SECTOR["Retail Shop"];
+  const rows = items.map(s => [s.name, s.name_rw, s.category, s.unit, s.qty, s.cost, s.sell, s.low, userId]);
+  const inserted = await bulkInsert(
+    "stock_items",
+    ["name","name_rw","category","unit","quantity","cost_price_rwf","sell_price_rwf","low_stock_threshold","owner_id"],
+    rows,
+    "id, sell_price_rwf"
+  );
+  return inserted;
+}
 
-  const DAYS = 60; // 60 days of history for speed
+// Seed 5 customers for one SME, return [id, ...]
+async function seedSMECustomers(userId, sector) {
+  const list = CUSTOMERS_BY_SECTOR[sector] || CUSTOMERS_BY_SECTOR["Retail Shop"];
+  const rows = list.map(([name, phone, location, type, segment]) => [name, phone, location, type, segment, userId]);
+  const inserted = await bulkInsert(
+    "customers",
+    ["name","phone","location","type","segment","owner_id"],
+    rows,
+    "id"
+  );
+  return inserted.map(r => r.id);
+}
+
+// Seed 2 suppliers for one SME, return [id, ...]
+async function seedSMESuppliers(userId, sector) {
+  const list = SUPPLIERS_BY_SECTOR[sector] || SUPPLIERS_BY_SECTOR["Retail Shop"];
+  const rows = list.map(([name, email, phone, address, products]) => [name, email, phone, address, products, userId]);
+  const inserted = await bulkInsert(
+    "suppliers",
+    ["name","email","phone","address","products_supplied","owner_id"],
+    rows,
+    "id"
+  );
+  return inserted.map(r => r.id);
+}
+
+async function seedSalesBulk(userId, profile, stockItems, customerIds) {
+  const salesRows  = [];
+  const itemsByIdx = [];
+
+  const DAYS = 60;
   for (let dayOffset = DAYS; dayOffset >= 1; dayOffset--) {
     if (Math.random() < profile.skipDayChance) continue;
 
@@ -129,7 +251,6 @@ async function seedSalesBulk(userId, profile, stockItems, customerIds) {
 
   if (!salesRows.length) return 0;
 
-  // Bulk insert all sales, get IDs back
   const saleIds = await bulkInsert(
     "sales",
     ["user_id","customer_id","payment_method","total_amount","is_voided","created_at","owner_id"],
@@ -137,7 +258,6 @@ async function seedSalesBulk(userId, profile, stockItems, customerIds) {
     "id"
   );
 
-  // Build sale_items rows
   const itemRows = [];
   for (let i = 0; i < saleIds.length; i++) {
     const saleId = saleIds[i].id;
@@ -146,7 +266,6 @@ async function seedSalesBulk(userId, profile, stockItems, customerIds) {
     }
   }
 
-  // Batch insert in chunks of 500 rows to stay under pg param limit
   const CHUNK = 500;
   for (let s = 0; s < itemRows.length; s += CHUNK) {
     await bulkInsert(
@@ -181,6 +300,7 @@ async function seedExpensesBulk(userId, profile) {
 }
 
 async function seedPurchaseOrdersBulk(userId, supplierIds) {
+  if (!supplierIds.length) return 0;
   const count = rnd(2, 5);
   const rows  = [];
   for (let i = 0; i < count; i++) {
@@ -204,24 +324,15 @@ async function scoreAndSave(userId) {
     [userId, result.score, result.band, result.model_version, result.advisoryToken]
   );
 
-  // 3-month history
-  const histRows = [];
   for (let i = 2; i >= 0; i--) {
     const hs = Math.max(0, Math.min(100, result.score + rnd(-8, 8) - i * 3));
     const hb = hs < 40 ? "red" : hs < 65 ? "amber" : "green";
-    // Use interval via SQL — store params only, interval as text interpolation is safe (numeric)
-    histRows.push({
-      params: [userId, hs, hb, JSON.stringify(result.factors || {}),
-               JSON.stringify(result.recommendations || []),
-               crypto.randomBytes(16).toString("hex"), result.model_version],
-      interval: `${i + 1} months`
-    });
-  }
-  for (const h of histRows) {
     await pool.query(
       `INSERT INTO health_score_log (user_id,score,band,factors,recommendations,advisory_token,model_version,created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,NOW()-INTERVAL '${h.interval}')`,
-      h.params
+       VALUES ($1,$2,$3,$4,$5,$6,$7,NOW()-INTERVAL '${i + 1} months')`,
+      [userId, hs, hb, JSON.stringify(result.factors || {}),
+       JSON.stringify(result.recommendations || []),
+       crypto.randomBytes(16).toString("hex"), result.model_version]
     );
   }
   await pool.query(
@@ -259,57 +370,28 @@ async function seedFast() {
   const log = [];
   const logLine = (s) => { log.push(s); console.log(s); };
 
-  logLine("🌱  Fast seed starting...");
+  logLine("🌱  Fast seed v3 starting...");
 
-  // 1. Extra stock items (bulk)
-  const EXTRA_STOCK = [
-    { name:"Flour 1kg",       name_rw:"Ufu 1kg",         category:"Groceries", unit:"kg",    qty:60,  cost:600,  sell:800,  low:15 },
-    { name:"Salt 500g",       name_rw:"Umunyo 500g",      category:"Groceries", unit:"pcs",   qty:80,  cost:200,  sell:300,  low:20 },
-    { name:"Tea Leaves 100g", name_rw:"Icyayi 100g",      category:"Beverages", unit:"pcs",   qty:50,  cost:500,  sell:700,  low:10 },
-    { name:"Matchbox",        name_rw:"Ibirimi",           category:"Hygiene",   unit:"pcs",   qty:200, cost:50,   sell:100,  low:50 },
-    { name:"Milk 1L",         name_rw:"Amata 1L",          category:"Beverages", unit:"litre", qty:40,  cost:800,  sell:1000, low:10 },
-    { name:"Tomato Paste",    name_rw:"Pasita y'inyanya",  category:"Groceries", unit:"pcs",   qty:70,  cost:400,  sell:600,  low:15 },
-    { name:"Bleach 1L",       name_rw:"Amazi yo gukanika", category:"Hygiene",   unit:"litre", qty:30,  cost:700,  sell:1000, low:5  },
-    { name:"Cement 50kg",     name_rw:"Sima 50kg",         category:"Hardware",  unit:"sack",  qty:20,  cost:12000,sell:14000,low:5  },
-    { name:"Paint Bucket 4L", name_rw:"Penti 4L",          category:"Hardware",  unit:"pcs",   qty:15,  cost:8000, sell:10500,low:3  },
-    { name:"Notebook A4",     name_rw:"Akayabo A4",        category:"Stationery",unit:"pcs",   qty:100, cost:600,  sell:900,  low:20 },
-  ];
-  for (const s of EXTRA_STOCK) {
-    await pool.query(
-      `INSERT INTO stock_items (name, name_rw, category, unit, quantity, cost_price_rwf, sell_price_rwf, low_stock_threshold, is_active)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true) ON CONFLICT DO NOTHING`,
-      [s.name, s.name_rw, s.category, s.unit, s.qty, s.cost, s.sell, s.low]
-    );
+  // Ensure owner_id columns exist on all tenant tables
+  const tenantTables = ["stock_items","sales","expenses","customers","suppliers","purchase_orders","notifications","accounts_receivable","accounts_payable"];
+  for (const t of tenantTables) {
+    await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS owner_id INT`).catch(() => {});
   }
-  const { rows: stockItems } = await pool.query(
-    "SELECT id, cost_price_rwf, sell_price_rwf FROM stock_items WHERE is_active=true"
-  );
-  logLine(`✓ Stock: ${stockItems.length} items`);
 
-  // 2. Customers
-  const EXTRA_CUSTOMERS = [
-    { name:"Amina Uwase",    phone:"+250788501001", location:"Kigali",  type:"individual", segment:"regular" },
-    { name:"Jean Habimana",  phone:"+250788501002", location:"Musanze", type:"individual", segment:"regular" },
-    { name:"Koperative SACCO",phone:"+250788501003",location:"Huye",   type:"business",   segment:"wholesale" },
-    { name:"Patrick Nkusi",  phone:"+250788501004", location:"Rubavu",  type:"individual", segment:"regular" },
-    { name:"Agathe Mukamana",phone:"+250788501005", location:"Kigali",  type:"individual", segment:"regular" },
-  ];
-  for (const c of EXTRA_CUSTOMERS) {
-    await pool.query(
-      `INSERT INTO customers (name, phone, location, type, segment)
-       VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`,
-      [c.name, c.phone, c.location, c.type, c.segment]
-    );
-  }
-  const { rows: customers } = await pool.query("SELECT id FROM customers LIMIT 20");
-  const custIds = customers.map(c => c.id);
-  logLine(`✓ Customers: ${custIds.length}`);
+  // Ensure invoices table exists (may be missing in some deployments)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS invoices (
+      id SERIAL PRIMARY KEY,
+      sale_id INT REFERENCES sales(id) ON DELETE CASCADE,
+      invoice_number VARCHAR(50) UNIQUE,
+      status VARCHAR(20) DEFAULT 'issued',
+      issued_at TIMESTAMPTZ DEFAULT NOW(),
+      due_date DATE,
+      owner_id INT
+    )
+  `).catch(() => {});
 
-  // 3. Suppliers
-  const { rows: suppliers } = await pool.query("SELECT id FROM suppliers LIMIT 5");
-  const suppIds = suppliers.length ? suppliers.map(s => s.id) : [null];
-
-  // 4. Lenders
+  // 1. Lenders
   const lenderIds = [];
   for (const l of LENDERS) {
     const id = await upsertUser({ ...l, role: "lender", ageMonths: 12 });
@@ -317,17 +399,15 @@ async function seedFast() {
     logLine(`  ✓ Lender: ${l.name} (id=${id})`);
   }
 
-  // 5. Advisor
+  // 2. Advisor
   const advisorId = await upsertUser({ ...ADVISOR, role: "databridge_advisor", ageMonths: 10 });
   logLine(`  ✓ Advisor (id=${advisorId})`);
 
-  // 6. SMEs — seed transactions in parallel-ish (sequential to avoid pool exhaustion)
+  // 3. SMEs — per-SME stock, customers, suppliers, then transactions
   const smeIds     = [];
   const smeResults = {};
-  logLine("\n📊  Seeding SME data...");
-
-  // Seed amani first so we have her ID for staff linking
   let amaniId = null;
+  logLine("\n📊  Seeding SME data...");
 
   for (const profile of SME_PROFILES) {
     const userId = await upsertUser({ ...profile, role: "sme_owner" });
@@ -335,26 +415,65 @@ async function seedFast() {
     smeIds.push(userId);
     await clearUserData(userId);
 
-    const salesCount = await seedSalesBulk(userId, profile, stockItems, custIds);
+    // Per-SME catalog
+    const stockItems  = await seedSMEStock(userId, profile.sector);
+    const customerIds = await seedSMECustomers(userId, profile.sector);
+    const supplierIds = await seedSMESuppliers(userId, profile.sector);
+
+    const salesCount = await seedSalesBulk(userId, profile, stockItems, customerIds);
     const expCount   = await seedExpensesBulk(userId, profile);
-    const poCount    = await seedPurchaseOrdersBulk(userId, suppIds.filter(Boolean));
+    const poCount    = await seedPurchaseOrdersBulk(userId, supplierIds);
+
+    // AR — 3 credit sales per SME
+    const arRows = [];
+    for (let i = 0; i < 3; i++) {
+      const amount     = rnd(5000, 60000);
+      const amountPaid = pick([0, Math.round(amount * 0.5), amount]);
+      const daysOver   = rnd(-10, 40);
+      const status     = amountPaid >= amount ? "paid" : daysOver > 0 ? "overdue" : amountPaid > 0 ? "partial" : "pending";
+      arRows.push([pick(customerIds), amount, amountPaid, dateOnly(-daysOver), status, "Credit sale", userId, daysAgo(rnd(5,45))]);
+    }
+    await bulkInsert("accounts_receivable", ["customer_id","amount","amount_paid","due_date","status","notes","owner_id","created_at"], arRows);
+
+    // AP — 2 supplier invoices per SME
+    await pool.query(`ALTER TABLE accounts_payable ADD COLUMN IF NOT EXISTS owner_id INT`).catch(() => {});
+    for (let i = 0; i < 2; i++) {
+      const amount   = rnd(10000, 80000);
+      const daysOver = rnd(-15, 30);
+      await pool.query(
+        `INSERT INTO accounts_payable (supplier_id, amount, due_date, notes, owner_id) VALUES ($1,$2,$3,$4,$5)`,
+        [pick(supplierIds), amount, dateOnly(-daysOver), "Supplier invoice", userId]
+      );
+    }
+
+    // Invoices — 2 per SME (linked to recent sales)
+    const { rows: recentSales } = await pool.query(
+      `SELECT id FROM sales WHERE user_id=$1 ORDER BY created_at DESC LIMIT 2`, [userId]
+    );
+    for (let i = 0; i < recentSales.length; i++) {
+      const invNum = `INV-${userId}-${Date.now()}-${i}`;
+      await pool.query(
+        `INSERT INTO invoices (sale_id, invoice_number, status, issued_at, owner_id)
+         VALUES ($1,$2,'issued',NOW()-INTERVAL '${rnd(1,10)} days',$3) ON CONFLICT DO NOTHING`,
+        [recentSales[i].id, invNum, userId]
+      );
+    }
 
     const scoreResult = await scoreAndSave(userId);
     smeResults[userId] = scoreResult;
 
-    // Notifications (bulk)
+    // Notifications
     const nRows = [
-      [userId, "health_score", `Health Score: ${scoreResult?.score ?? "?"}/${100}`,
-       scoreResult?.recommendations?.[0]?.en || "Check insights.", Math.random() > 0.4,
-       daysAgo(rnd(0, 3)), userId],
-      [userId, "low_stock", "3 products running low",
-       "Some products are below reorder threshold.", false, daysAgo(rnd(1, 7)), userId],
+      [userId, "health_score", `Health Score: ${scoreResult?.score ?? "?"}/100`,
+       scoreResult?.recommendations?.[0]?.en || "Check insights.", Math.random() > 0.4, daysAgo(rnd(0,3)), userId],
+      [userId, "low_stock", "Stock running low",
+       "Some products are below reorder threshold.", false, daysAgo(rnd(1,7)), userId],
       [userId, "sales_alert", "Weekly Sales Summary",
-       `You recorded ${rnd(15,45)} sales this week.`, true, daysAgo(rnd(3, 10)), userId],
+       `You recorded ${rnd(15,45)} sales this week.`, true, daysAgo(rnd(3,10)), userId],
     ];
     if (scoreResult?.band === "red") {
       nRows.push([userId, "advisory", "Advisory Session Recommended",
-        "Your score is in the red band. An advisor is available.", false, daysAgo(rnd(0, 5)), userId]);
+        "Your score is in the red band. An advisor is available.", false, daysAgo(rnd(0,5)), userId]);
     }
     await bulkInsert("notifications", ["user_id","type","title","message","is_read","created_at","owner_id"], nRows);
 
@@ -364,58 +483,16 @@ async function seedFast() {
 
     const band  = scoreResult?.band?.toUpperCase() || "N/A";
     const emoji = band === "GREEN" ? "🟢" : band === "AMBER" ? "🟡" : "🔴";
-    logLine(`  ${emoji} ${profile.name}: ${scoreResult?.score ?? "?"}/${100} | Sales: ${salesCount} | Exp: ${expCount} | POs: ${poCount}`);
+    logLine(`  ${emoji} ${profile.name}: ${scoreResult?.score ?? "?"}/100 | Sales: ${salesCount} | Stock: ${stockItems.length} | Customers: ${customerIds.length} | Suppliers: ${supplierIds.length}`);
   }
 
-  // 7b. Staff — linked to amani.grocery as their owner
+  // 4. Staff — linked to amani.grocery
   for (const s of EXTRA_STAFF) {
     const id = await upsertUser({ ...s, ageMonths: 8, owner_id: amaniId });
     logLine(`  ✓ Staff: ${s.name} → owner_id=${amaniId} (id=${id})`);
   }
 
-  // 8. Accounts receivable — 2 records per SME owner so every dashboard shows AR data
-  const arRows = [];
-  for (const smeId of smeIds) {
-    for (let i = 0; i < 2; i++) {
-      const amount     = rnd(5000, 50000);
-      const amountPaid = pick([0, Math.round(amount * 0.5), amount]);
-      const daysOver   = rnd(-10, 40);
-      const status     = amountPaid >= amount ? "paid"
-                       : daysOver > 0         ? "overdue"
-                       : amountPaid > 0       ? "partial"
-                       :                        "pending";
-      arRows.push([pick(custIds), amount, amountPaid, dateOnly(-daysOver), status, "Credit sale", smeId, daysAgo(rnd(5,45))]);
-    }
-  }
-  await pool.query(
-    `INSERT INTO accounts_receivable (customer_id,amount,amount_paid,due_date,status,notes,owner_id,created_at)
-     VALUES ${arRows.map((_,i)=>`($${i*8+1},$${i*8+2},$${i*8+3},$${i*8+4},$${i*8+5},$${i*8+6},$${i*8+7},$${i*8+8})`).join(",")}
-     ON CONFLICT DO NOTHING`,
-    arRows.flat()
-  );
-  logLine(`✓ Accounts receivable: ${arRows.length} (${arRows.length / smeIds.length} per SME)`);
-
-  // 8b. Accounts payable — 2 records per SME (money owed to suppliers)
-  await pool.query(`ALTER TABLE accounts_payable ADD COLUMN IF NOT EXISTS owner_id INT`).catch(() => {});
-  const apRows = [];
-  for (const smeId of smeIds) {
-    for (let i = 0; i < 2; i++) {
-      const amount   = rnd(10000, 80000);
-      const daysOver = rnd(-15, 30);
-      const status   = daysOver > 0 ? "overdue" : "pending";
-      apRows.push([suppIds[0] || null, amount, dateOnly(-daysOver), "Supplier invoice", smeId]);
-    }
-  }
-  if (apRows.length) {
-    await pool.query(
-      `INSERT INTO accounts_payable (supplier_id,amount,due_date,notes,owner_id)
-       VALUES ${apRows.map((_,i)=>`($${i*5+1},$${i*5+2},$${i*5+3},$${i*5+4},$${i*5+5})`).join(",")}`,
-      apRows.flat()
-    );
-  }
-  logLine(`✓ Accounts payable: ${apRows.length} (${apRows.length / smeIds.length} per SME)`);
-
-  // 9. Lender portfolio (bulk)
+  // 5. Lender portfolio
   let refCount = 0;
   for (const lenderId of lenderIds) {
     const portfolio = [...smeIds].sort(() => 0.5 - Math.random()).slice(0, rnd(2, 4));
@@ -447,7 +524,7 @@ async function seedFast() {
     { email: "accountant@inzira.rw", role: "accountant" },
   ];
 
-  logLine("\n✅  Fast seed complete!");
+  logLine("\n✅  Fast seed v3 complete!");
   return { smeResults, allAccounts, log };
 }
 
