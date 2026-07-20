@@ -289,6 +289,7 @@ COMMIT;
 
 // Indexes run outside the transaction so one failure doesn't roll back everything
 const INDEX_SQL = [
+  // Existing
   "CREATE INDEX IF NOT EXISTS idx_sales_created   ON sales(created_at DESC)",
   "CREATE INDEX IF NOT EXISTS idx_sales_user      ON sales(user_id)",
   "CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id)",
@@ -299,6 +300,23 @@ const INDEX_SQL = [
   "CREATE INDEX IF NOT EXISTS idx_credit_user     ON credit_scores(user_id, calculated_at DESC)",
   "CREATE INDEX IF NOT EXISTS idx_ar_customer     ON accounts_receivable(customer_id)",
   "CREATE INDEX IF NOT EXISTS idx_ar_status       ON accounts_receivable(status)",
+  // owner_id indexes — every tenant-filtered query uses these
+  "CREATE INDEX IF NOT EXISTS idx_sales_owner         ON sales(owner_id, created_at DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_sales_owner_voided  ON sales(owner_id, is_voided, created_at DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_expenses_owner      ON expenses(owner_id, created_at DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_stock_owner_active  ON stock_items(owner_id, is_active)",
+  "CREATE INDEX IF NOT EXISTS idx_customers_owner     ON customers(owner_id)",
+  "CREATE INDEX IF NOT EXISTS idx_suppliers_owner     ON suppliers(owner_id)",
+  "CREATE INDEX IF NOT EXISTS idx_purchase_orders_owner ON purchase_orders(owner_id, created_at DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_notifications_owner ON notifications(owner_id, is_read)",
+  "CREATE INDEX IF NOT EXISTS idx_invoices_owner      ON invoices(owner_id)",
+  "CREATE INDEX IF NOT EXISTS idx_ar_owner            ON accounts_receivable(owner_id, status)",
+  "CREATE INDEX IF NOT EXISTS idx_ap_owner            ON accounts_payable(owner_id)",
+  "CREATE INDEX IF NOT EXISTS idx_journal_owner       ON journal_entries(owner_id)",
+  // Other high-frequency filters
+  "CREATE INDEX IF NOT EXISTS idx_sales_customer      ON sales(customer_id)",
+  "CREATE INDEX IF NOT EXISTS idx_expenses_date       ON expenses(expense_date DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_sales_payment       ON sales(payment_method)",
 ];
 
 // Migration SQL: safely evolves existing databases

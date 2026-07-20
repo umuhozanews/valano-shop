@@ -12,4 +12,17 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    target: "es2020",
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "react-vendor": ["react", "react-dom", "react-router-dom"],
+          "charts": ["recharts"],
+          "icons": ["lucide-react"],
+          "utils": ["axios", "date-fns"],
+        },
+      },
+    },
+  },
 });

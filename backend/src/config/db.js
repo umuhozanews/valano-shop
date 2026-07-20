@@ -18,8 +18,10 @@ const useSsl = !isLocal && !isRailwayInternal;
 const pool = new Pool({
   connectionString,
   ssl: useSsl ? { rejectUnauthorized: false } : false,
-  // Keep the pool small — friendly to serverless and Neon connection limits.
-  max: parseInt(process.env.PG_POOL_MAX || "3", 10),
+  max: parseInt(process.env.PG_POOL_MAX || "10", 10),
+  idleTimeoutMillis: 10000,
+  connectionTimeoutMillis: 5000,
+  allowExitOnIdle: false,
 });
 
 pool.on("error", (err) => {

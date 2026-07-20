@@ -100,12 +100,21 @@ router.post("/", async (req, res, next) => {
 
     await pool.query("BEGIN");
 
+    // Batch-lock all stock items in one query instead of N per-item SELECTs
+    const stockItemIds = [...new Set(items.filter(i => i.stock_item_id).map(i => i.stock_item_id))];
+    const stockMap = new Map();
+    if (stockItemIds.length) {
+      const { rows: stockRows } = await pool.query(
+        "SELECT * FROM stock_items WHERE id = ANY($1) AND is_active=true FOR UPDATE",
+        [stockItemIds]
+      );
+      stockRows.forEach(s => stockMap.set(s.id, s));
+    }
+
     let total = 0;
     for (const item of items) {
       if (item.stock_item_id) {
-        const { rows: [stk] } = await pool.query(
-          "SELECT * FROM stock_items WHERE id=$1 AND is_active=true FOR UPDATE", [item.stock_item_id]
-        );
+        const stk = stockMap.get(item.stock_item_id);
         if (!stk) throw Object.assign(new Error(`Item ${item.stock_item_id} not found`), { status: 400 });
         if (stk.quantity < item.quantity)
           throw Object.assign(new Error(`Insufficient stock for ${stk.name}`), { status: 400 });
@@ -134,19 +143,34 @@ router.post("/", async (req, res, next) => {
       ]
     );
 
-    for (const item of items) {
+    // Bulk insert all sale_items in one query
+    const siValues = items.map((_, i) => {
+      const b = i * 5;
+      return `($${b+1},$${b+2},$${b+3},$${b+4},$${b+5})`;
+    }).join(",");
+    await pool.query(
+      `INSERT INTO sale_items (sale_id, stock_item_id, quantity, unit_price, subtotal) VALUES ${siValues}`,
+      items.flatMap(item => [sale.id, item.stock_item_id || null, item.quantity, item.unit_price, item.unit_price * item.quantity])
+    );
+
+    // Batch update stock quantities and check low-stock in two queries
+    const stockUpdates = items.filter(i => i.stock_item_id);
+    if (stockUpdates.length) {
       await pool.query(
-        `INSERT INTO sale_items (sale_id, stock_item_id, quantity, unit_price, subtotal)
-         VALUES ($1,$2,$3,$4,$5)`,
-        [sale.id, item.stock_item_id || null, item.quantity, item.unit_price, item.unit_price * item.quantity]
+        `UPDATE stock_items SET quantity = quantity - u.qty
+         FROM (SELECT unnest($1::int[]) as id, unnest($2::numeric[]) as qty) u
+         WHERE stock_items.id = u.id`,
+        [stockUpdates.map(i => i.stock_item_id), stockUpdates.map(i => i.quantity)]
       );
-      if (item.stock_item_id) {
-        await pool.query("UPDATE stock_items SET quantity = quantity - $1 WHERE id=$2", [item.quantity, item.stock_item_id]);
-        const { rows: [updated] } = await pool.query("SELECT * FROM stock_items WHERE id=$1", [item.stock_item_id]);
-        if (updated.quantity === 0) {
-          await notifyAdminsAndManagers("OUT_OF_STOCK", "Out of Stock Alert", `${updated.name} is out of stock`);
-        } else if (updated.quantity <= updated.low_stock_threshold) {
-          await notifyAdminsAndManagers("LOW_STOCK", "Low Stock Alert", `${updated.name} has only ${updated.quantity} left`);
+      const { rows: updatedStocks } = await pool.query(
+        "SELECT * FROM stock_items WHERE id = ANY($1)",
+        [stockUpdates.map(i => i.stock_item_id)]
+      );
+      for (const s of updatedStocks) {
+        if (s.quantity === 0) {
+          await notifyAdminsAndManagers("OUT_OF_STOCK", "Out of Stock Alert", `${s.name} is out of stock`);
+        } else if (s.quantity <= s.low_stock_threshold) {
+          await notifyAdminsAndManagers("LOW_STOCK", "Low Stock Alert", `${s.name} has only ${s.quantity} left`);
         }
       }
     }
