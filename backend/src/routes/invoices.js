@@ -22,9 +22,9 @@ router.get("/", requireRole("admin", "sme_owner", "manager", "accountant", "cash
     const where = conds.join(" AND ");
 
     const [data, cnt, summary] = await Promise.all([
-      pool.query(`SELECT i.*, s.total_amount, c.name as customer_name, b.name as branch_name
+      pool.query(`SELECT i.*, s.total_amount, c.name as customer_name
          FROM invoices i JOIN sales s ON s.id=i.sale_id
-         LEFT JOIN customers c ON c.id=s.customer_id LEFT JOIN branches b ON b.id=s.branch_id
+         LEFT JOIN customers c ON c.id=s.customer_id
          WHERE ${where} ORDER BY i.issued_at DESC
          LIMIT $${params.length-1} OFFSET $${params.length}`, params),
       pool.query(`SELECT COUNT(*) FROM invoices i WHERE ${where}`, params.slice(0,-2)),
@@ -56,7 +56,7 @@ router.get("/:id/pdf", async (req, res, next) => {
     const [items, branch, customer, settings, debtRes] = await Promise.all([
       pool.query(`SELECT si.*, stk.name as item_name FROM sale_items si
         JOIN stock_items stk ON stk.id=si.stock_item_id WHERE si.sale_id=$1`, [invoice.sale_id]),
-      pool.query(`SELECT b.* FROM sales s JOIN branches b ON b.id=s.branch_id WHERE s.id=$1`, [invoice.sale_id]),
+      Promise.resolve({ rows: [{}] }),
       pool.query(`SELECT c.* FROM sales s LEFT JOIN customers c ON c.id=s.customer_id WHERE s.id=$1`, [invoice.sale_id]),
       pool.query("SELECT * FROM settings LIMIT 1"),
       pool.query("SELECT * FROM debts WHERE sale_id=$1", [invoice.sale_id]),
