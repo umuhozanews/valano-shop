@@ -61,16 +61,16 @@ async function bulkInsert(table, cols, rows, returning = "") {
 }
 
 // Upsert a user and return their id
-async function upsertUser({ name, email, phone, role, sector, district, ageMonths = 6 }) {
+async function upsertUser({ name, email, phone, role, sector, district, ageMonths = 6, owner_id = null }) {
   const created_at = new Date(Date.now() - ageMonths * 30 * 24 * 60 * 60 * 1000).toISOString();
   const { rows: [u] } = await pool.query(
-    `INSERT INTO users (name, email, password_hash, role, phone, sector, district, consent_status, created_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,'consented',$8)
+    `INSERT INTO users (name, email, password_hash, role, phone, sector, district, consent_status, created_at, owner_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,'consented',$8,$9)
      ON CONFLICT (email) DO UPDATE SET
        name=$1, password_hash=$3, role=$4, phone=$5,
-       sector=$6, district=$7, consent_status='consented', created_at=$8
+       sector=$6, district=$7, consent_status='consented', created_at=$8, owner_id=$9
      RETURNING id`,
-    [name, email, HASH, role || "sme_owner", phone, sector || null, district || null, created_at]
+    [name, email, HASH, role || "sme_owner", phone, sector || null, district || null, created_at, owner_id]
   );
   return u.id;
 }
@@ -84,6 +84,8 @@ async function clearUserData(userId) {
   await pool.query("DELETE FROM credit_scores WHERE user_id=$1", [userId]);
   await pool.query("DELETE FROM notifications WHERE user_id=$1", [userId]);
   await pool.query("DELETE FROM advisory_sessions WHERE business_id=$1", [userId]);
+  await pool.query("DELETE FROM accounts_receivable WHERE owner_id=$1", [userId]).catch(() => {});
+  await pool.query("DELETE FROM accounts_payable WHERE owner_id=$1", [userId]).catch(() => {});
 }
 
 // Build all sales rows in memory, then bulk-insert ────────────────────────────
@@ -319,19 +321,17 @@ async function seedFast() {
   const advisorId = await upsertUser({ ...ADVISOR, role: "databridge_advisor", ageMonths: 10 });
   logLine(`  ✓ Advisor (id=${advisorId})`);
 
-  // 6. Staff
-  for (const s of EXTRA_STAFF) {
-    const id = await upsertUser({ ...s, ageMonths: 8 });
-    logLine(`  ✓ Staff: ${s.name} (id=${id})`);
-  }
-
-  // 7. SMEs — seed transactions in parallel-ish (sequential to avoid pool exhaustion)
+  // 6. SMEs — seed transactions in parallel-ish (sequential to avoid pool exhaustion)
   const smeIds     = [];
   const smeResults = {};
   logLine("\n📊  Seeding SME data...");
 
+  // Seed amani first so we have her ID for staff linking
+  let amaniId = null;
+
   for (const profile of SME_PROFILES) {
     const userId = await upsertUser({ ...profile, role: "sme_owner" });
+    if (profile.email === "amani.grocery@inzira.rw") amaniId = userId;
     smeIds.push(userId);
     await clearUserData(userId);
 
@@ -367,25 +367,53 @@ async function seedFast() {
     logLine(`  ${emoji} ${profile.name}: ${scoreResult?.score ?? "?"}/${100} | Sales: ${salesCount} | Exp: ${expCount} | POs: ${poCount}`);
   }
 
-  // 8. Accounts receivable (bulk)
+  // 7b. Staff — linked to amani.grocery as their owner
+  for (const s of EXTRA_STAFF) {
+    const id = await upsertUser({ ...s, ageMonths: 8, owner_id: amaniId });
+    logLine(`  ✓ Staff: ${s.name} → owner_id=${amaniId} (id=${id})`);
+  }
+
+  // 8. Accounts receivable — 2 records per SME owner so every dashboard shows AR data
   const arRows = [];
-  for (let i = 0; i < 6; i++) {
-    const amount     = rnd(5000, 50000);
-    const amountPaid = pick([0, Math.round(amount * 0.5), amount]);
-    const daysOver   = rnd(-10, 40);
-    const status     = amountPaid >= amount ? "paid"
-                     : daysOver > 0         ? "overdue"
-                     : amountPaid > 0       ? "partial"
-                     :                        "pending";
-    arRows.push([pick(custIds), amount, amountPaid, dateOnly(-daysOver), status, "Credit sale", daysAgo(rnd(5,45))]);
+  for (const smeId of smeIds) {
+    for (let i = 0; i < 2; i++) {
+      const amount     = rnd(5000, 50000);
+      const amountPaid = pick([0, Math.round(amount * 0.5), amount]);
+      const daysOver   = rnd(-10, 40);
+      const status     = amountPaid >= amount ? "paid"
+                       : daysOver > 0         ? "overdue"
+                       : amountPaid > 0       ? "partial"
+                       :                        "pending";
+      arRows.push([pick(custIds), amount, amountPaid, dateOnly(-daysOver), status, "Credit sale", smeId, daysAgo(rnd(5,45))]);
+    }
   }
   await pool.query(
-    `INSERT INTO accounts_receivable (customer_id,amount,amount_paid,due_date,status,notes,created_at)
-     VALUES ${arRows.map((_,i)=>`($${i*7+1},$${i*7+2},$${i*7+3},$${i*7+4},$${i*7+5},$${i*7+6},$${i*7+7})`).join(",")}
+    `INSERT INTO accounts_receivable (customer_id,amount,amount_paid,due_date,status,notes,owner_id,created_at)
+     VALUES ${arRows.map((_,i)=>`($${i*8+1},$${i*8+2},$${i*8+3},$${i*8+4},$${i*8+5},$${i*8+6},$${i*8+7},$${i*8+8})`).join(",")}
      ON CONFLICT DO NOTHING`,
     arRows.flat()
   );
-  logLine(`✓ Accounts receivable: ${arRows.length}`);
+  logLine(`✓ Accounts receivable: ${arRows.length} (${arRows.length / smeIds.length} per SME)`);
+
+  // 8b. Accounts payable — 2 records per SME (money owed to suppliers)
+  await pool.query(`ALTER TABLE accounts_payable ADD COLUMN IF NOT EXISTS owner_id INT`).catch(() => {});
+  const apRows = [];
+  for (const smeId of smeIds) {
+    for (let i = 0; i < 2; i++) {
+      const amount   = rnd(10000, 80000);
+      const daysOver = rnd(-15, 30);
+      const status   = daysOver > 0 ? "overdue" : "pending";
+      apRows.push([suppIds[0] || null, amount, dateOnly(-daysOver), "Supplier invoice", smeId]);
+    }
+  }
+  if (apRows.length) {
+    await pool.query(
+      `INSERT INTO accounts_payable (supplier_id,amount,due_date,notes,owner_id)
+       VALUES ${apRows.map((_,i)=>`($${i*5+1},$${i*5+2},$${i*5+3},$${i*5+4},$${i*5+5})`).join(",")}`,
+      apRows.flat()
+    );
+  }
+  logLine(`✓ Accounts payable: ${apRows.length} (${apRows.length / smeIds.length} per SME)`);
 
   // 9. Lender portfolio (bulk)
   let refCount = 0;
