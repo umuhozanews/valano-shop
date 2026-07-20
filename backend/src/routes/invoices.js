@@ -27,7 +27,7 @@ router.get("/", requireRole("admin", "sme_owner", "manager", "accountant", "cash
          LEFT JOIN customers c ON c.id=s.customer_id
          WHERE ${where} ORDER BY i.issued_at DESC
          LIMIT $${params.length-1} OFFSET $${params.length}`, params),
-      pool.query(`SELECT COUNT(*) FROM invoices i WHERE ${where}`, params.slice(0,-2)),
+      pool.query(`SELECT COUNT(*) FROM invoices i JOIN sales s ON s.id=i.sale_id WHERE ${where}`, params.slice(0,-2)),
       pool.query(`SELECT status, COUNT(*) as cnt, COALESCE(SUM(s.total_amount),0) as total
          FROM invoices i JOIN sales s ON s.id=i.sale_id GROUP BY status`),
     ]);
