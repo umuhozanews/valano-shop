@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Printer, Trash2, Landmark, Download } from "lucide-react";
+import { ArrowLeft, Printer, Trash2, Landmark, Download, FileText, Receipt } from "lucide-react";
 import PageWrapper from "../../components/layout/PageWrapper";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
+import EbmReceipt from "../../components/sales/EbmReceipt";
 import api from "../../utils/api";
 import { formatRWF, formatDate } from "../../utils/formatters";
 import toast from "react-hot-toast";
@@ -18,6 +19,7 @@ export default function SaleDetail() {
   const [sale, setSale] = useState(null);
   const [shopSettings, setShopSettings] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState("ebm"); // "ebm" (thermal) or "invoice"
 
   useEffect(() => {
     Promise.all([
@@ -81,8 +83,25 @@ export default function SaleDetail() {
         body * {
           visibility: hidden !important;
         }
+        #ebm-thermal-receipt, #ebm-thermal-receipt *,
         #print-invoice-card, #print-invoice-card * {
           visibility: visible !important;
+        }
+        #ebm-thermal-receipt {
+          position: absolute !important;
+          left: 50% !important;
+          transform: translateX(-50%) !important;
+          top: 0 !important;
+          width: 80mm !important;
+          max-width: 80mm !important;
+          margin: 0 auto !important;
+          padding: 15px !important;
+          border: none !important;
+          box-shadow: none !important;
+          background: #ffffff !important;
+          z-index: 9999999 !important;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
         }
         #print-invoice-card {
           position: fixed !important;
@@ -117,17 +136,22 @@ export default function SaleDetail() {
   }
 
   async function downloadPDF() {
-    if (!sale.invoice_id) return toast.error("Invoice not generated yet");
     try {
-      const response = await api.get(`/invoices/${sale.invoice_id}/pdf`, { responseType: "blob" });
+      const url = `/sales/${id}/receipt-pdf`;
+      const response = await api.get(url, { responseType: "blob" });
       const blob = new Blob([response.data], { type: "application/pdf" });
+      const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.href = window.URL.createObjectURL(blob);
-      link.download = `${sale.invoice_number || 'invoice'}.pdf`;
+      link.href = downloadUrl;
+      link.download = `receipt-${sale?.invoice_number || sale?.id || id}.pdf`;
+      document.body.appendChild(link);
       link.click();
-      toast.success(t("success") || "Downloaded");
-    } catch {
-      toast.error(t("error") || "Download failed");
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+      toast.success(t("success") || "Receipt PDF Downloaded");
+    } catch (e) {
+      console.error("PDF Download error:", e);
+      toast.error(t("error") || "PDF Download failed");
     }
   }
 
@@ -179,8 +203,39 @@ export default function SaleDetail() {
           </Card>
         </div>
 
-        {/* Right Column: Vivid Precision Mobile Invoice Generator */}
-        <div className="xl:col-span-8 flex justify-center">
+        {/* Right Column: EBM Receipt or Mobile Invoice Generator */}
+        <div className="xl:col-span-8 space-y-4 flex flex-col items-center">
+          {/* View Switcher Tabs */}
+          <div className="flex bg-surface border border-border p-1 rounded-xl gap-1 self-center mb-2">
+            <button
+              onClick={() => setViewMode("ebm")}
+              className={`flex items-center gap-2 px-4 py-2 text-[13px] font-semibold rounded-lg transition-all ${
+                viewMode === "ebm"
+                  ? "bg-primary text-white shadow-sm"
+                  : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
+              }`}
+            >
+              <Receipt className="w-4 h-4" />
+              <span>RRA EBM v2 Receipt</span>
+            </button>
+            <button
+              onClick={() => setViewMode("invoice")}
+              className={`flex items-center gap-2 px-4 py-2 text-[13px] font-semibold rounded-lg transition-all ${
+                viewMode === "invoice"
+                  ? "bg-primary text-white shadow-sm"
+                  : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              <span>Standard Invoice</span>
+            </button>
+          </div>
+
+          {viewMode === "ebm" ? (
+            <div className="w-full flex justify-center animate-reveal-up">
+              <EbmReceipt sale={sale} shopSettings={shopSettings} />
+            </div>
+          ) : (
           <div 
             id="print-invoice-card"
             className="w-full max-w-[390px] min-h-[700px] shadow-2xl rounded-2xl border border-[#e5e0d8] overflow-hidden flex flex-col bg-white relative animate-reveal-up"
@@ -365,6 +420,7 @@ export default function SaleDetail() {
             {/* Bottom Accent Bar */}
             <div className="h-2 bg-[#7C3AED] w-full shrink-0" />
           </div>
+          )}
         </div>
       </div>
     </PageWrapper>

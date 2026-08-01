@@ -79,13 +79,19 @@ export default function SettingsPage() {
     ]).then(([sRes, uRes]) => {
       const s = sRes.data?.settings || {};
       setBusiness({
-        name:      s.shop_name || "",
-        address:   s.shop_address || "",
-        phone:     s.shop_phone || "",
-        low_stock: s.default_low_stock_threshold || 5,
-        footer:    s.invoice_footer_text || "",
-        sector:    s.sector_default || "",
-        district:  s.district_default || "",
+        name:        s.shop_name || "",
+        address:     s.shop_address || "",
+        phone:       s.shop_phone || "",
+        email:       s.shop_email || "andrenikobatuye@gmail.com",
+        tin_number:  s.tin_number || "103777856",
+        sdc_id:      s.sdc_id || "SDC010013000",
+        mrc_number:  s.mrc_number || "MIS00013705",
+        cashier_tin: s.cashier_tin || "103777856",
+        vat_rate:    s.vat_rate || 18,
+        low_stock:   s.default_low_stock_threshold || 5,
+        footer:      s.invoice_footer_text || "",
+        sector:      s.sector_default || "",
+        district:    s.district_default || "",
       });
       const u = uRes.data || {};
       setProfile({ name: u.name || "", email: u.email || "", phone: u.phone || "" });
@@ -106,12 +112,18 @@ export default function SettingsPage() {
         shop_name:                   business.name,
         shop_address:                business.address,
         shop_phone:                  business.phone,
+        shop_email:                  business.email,
+        tin_number:                  business.tin_number,
+        sdc_id:                      business.sdc_id,
+        mrc_number:                  business.mrc_number,
+        cashier_tin:                 business.cashier_tin,
+        vat_rate:                    parseFloat(business.vat_rate) || 18,
         default_low_stock_threshold: parseInt(business.low_stock) || 5,
         invoice_footer_text:         business.footer,
         sector_default:              business.sector,
         district_default:            business.district,
       });
-      toast.success("Business info saved");
+      toast.success("Business info & EBM fiscal details saved");
     } catch { toast.error("Failed to save"); }
     finally { setSaving(false); }
   }
@@ -239,6 +251,18 @@ export default function SettingsPage() {
                     </div>
                     <Input label="Phone" value={business.phone}
                       onChange={e => setBusiness(b => ({ ...b, phone: e.target.value }))} />
+                    <Input label="Business Email" value={business.email}
+                      onChange={e => setBusiness(b => ({ ...b, email: e.target.value }))} />
+                    
+                    <Input label="Taxpayer TIN Number (TIN)" value={business.tin_number}
+                      onChange={e => setBusiness(b => ({ ...b, tin_number: e.target.value }))} />
+                    <Input label="SDC ID (EBM Machine ID)" value={business.sdc_id}
+                      onChange={e => setBusiness(b => ({ ...b, sdc_id: e.target.value }))} />
+                    <Input label="MRC Serial Number" value={business.mrc_number}
+                      onChange={e => setBusiness(b => ({ ...b, mrc_number: e.target.value }))} />
+                    <Input label="VAT Standard Rate (%)" type="number" value={business.vat_rate}
+                      onChange={e => setBusiness(b => ({ ...b, vat_rate: e.target.value }))} />
+
                     <Input label="Low Stock Alert Threshold" type="number" value={business.low_stock}
                       onChange={e => setBusiness(b => ({ ...b, low_stock: e.target.value }))} />
 

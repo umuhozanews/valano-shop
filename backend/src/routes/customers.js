@@ -23,12 +23,18 @@ router.get("/", requireRole("admin", "sme_owner", "manager", "accountant", "puls
     params.push(lim); params.push(offset);
     const where = conds.join(" AND ");
 
+    const summaryParams = params.slice(0, -2);
     const [data, cnt, summary] = await Promise.all([
       pool.query(
         `SELECT c.*,
           COUNT(s.id) as total_orders,
           COALESCE(SUM(s.total_amount),0) as total_spent,
           MAX(s.created_at) as last_purchase,
+          CASE
+            WHEN COALESCE(SUM(s.total_amount),0) >= 500000 THEN 'vip'
+            WHEN COALESCE(SUM(s.total_amount),0) >= 100000 OR COUNT(s.id) >= 3 THEN 'regular'
+            ELSE 'new'
+          END as segment,
           COALESCE(SUM(ar.amount - ar.amount_paid) FILTER (WHERE ar.status IN ('pending','partial','overdue')),0) as outstanding_balance
          FROM customers c
          LEFT JOIN sales s ON s.customer_id=c.id AND s.is_voided=false
@@ -38,8 +44,28 @@ router.get("/", requireRole("admin", "sme_owner", "manager", "accountant", "puls
          LIMIT $${params.length-1} OFFSET $${params.length}`,
         params
       ),
-      pool.query(`SELECT COUNT(*) FROM customers c WHERE ${where}`, params.slice(0,-2)),
-      pool.query("SELECT segment, COUNT(*) as cnt FROM customers GROUP BY segment"),
+      pool.query(`SELECT COUNT(*) FROM customers c WHERE ${where}`, summaryParams),
+      pool.query(
+        `WITH stats AS (
+           SELECT c.id,
+                  COALESCE(SUM(s.total_amount),0) as total_spent,
+                  COUNT(s.id) as total_orders
+           FROM customers c
+           LEFT JOIN sales s ON s.customer_id=c.id AND s.is_voided=false
+           WHERE ${where}
+           GROUP BY c.id
+         )
+         SELECT
+           CASE
+             WHEN total_spent >= 500000 THEN 'vip'
+             WHEN total_spent >= 100000 OR total_orders >= 3 THEN 'regular'
+             ELSE 'new'
+           END as segment,
+           COUNT(*)::text as cnt
+         FROM stats
+         GROUP BY 1`,
+        params
+      ),
     ]);
     res.json({ data: data.rows, total: parseInt(cnt.rows[0].count), summary: summary.rows });
   } catch (err) { next(err); }

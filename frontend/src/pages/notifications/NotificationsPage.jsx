@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Bell, Package, ShoppingCart, AlertTriangle, Users, Check, CheckCheck } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Bell, Package, ShoppingCart, AlertTriangle, Users, Check, CheckCheck, ArrowRight, DollarSign, FileText } from "lucide-react";
 import PageWrapper from "../../components/layout/PageWrapper";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
@@ -13,9 +14,53 @@ const TYPE_CONFIG = {
   sale:         { icon: ShoppingCart,  color: "text-success",  bg: "bg-success/10"  },
   stock:        { icon: Package,       color: "text-primary",  bg: "bg-primary/10"  },
   worker:       { icon: Users,         color: "text-neutral",  bg: "bg-neutral/10"  },
+  expense:      { icon: DollarSign,    color: "text-danger",   bg: "bg-danger/10"   },
+  tax:          { icon: FileText,      color: "text-warning",  bg: "bg-warning/10"  },
 };
 
+function getNotificationRoute(notif) {
+  if (!notif) return "/app/dashboard";
+  if (notif.route) return notif.route;
+  if (notif.link) return notif.link;
+
+  const type = (notif.type || "").toLowerCase();
+  const title = (notif.title || "").toLowerCase();
+  const msg = (notif.message || "").toLowerCase();
+
+  if (type === "low_stock" || type === "stock" || title.includes("stock") || msg.includes("stock") || msg.includes("inventory")) {
+    return "/app/stock";
+  }
+  if (type === "sale" || title.includes("sale") || title.includes("invoice") || msg.includes("sale") || msg.includes("invoice")) {
+    const saleIdMatch = msg.match(/invoice #?(\d+)/i) || msg.match(/sale #?(\d+)/i);
+    if (saleIdMatch && saleIdMatch[1]) {
+      return `/app/sales/${saleIdMatch[1]}`;
+    }
+    return "/app/sales";
+  }
+  if (type === "procurement" || type === "purchase_order" || title.includes("procurement") || msg.includes("procurement") || title.includes("purchase order")) {
+    return "/app/purchase-orders";
+  }
+  if (type === "expense" || title.includes("expense") || msg.includes("expense")) {
+    return "/app/expenses";
+  }
+  if (type === "payable" || type === "receivable" || title.includes("debt") || title.includes("due") || msg.includes("payable") || msg.includes("receivable")) {
+    return "/app/payables";
+  }
+  if (type === "health_score" || title.includes("health") || msg.includes("health") || msg.includes("advisory")) {
+    return "/app/health-score";
+  }
+  if (type === "worker" || title.includes("worker") || msg.includes("worker") || msg.includes("staff")) {
+    return "/app/workers";
+  }
+  if (type === "tax" || title.includes("tax") || title.includes("ebm") || title.includes("vat")) {
+    return "/app/reports/tax";
+  }
+
+  return "/app/dashboard";
+}
+
 export default function NotificationsPage() {
+  const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
@@ -24,9 +69,18 @@ export default function NotificationsPage() {
     api.get("/notifications").then(d => setItems(d.data?.data || [])).finally(() => setLoading(false));
   }, []);
 
-  function markRead(id) {
+  function markRead(id, e) {
+    if (e) e.stopPropagation();
     api.put(`/notifications/${id}/read`).catch(() => {});
     setItems(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+  }
+
+  function handleNotificationClick(notif) {
+    if (!notif.is_read) {
+      markRead(notif.id);
+    }
+    const route = getNotificationRoute(notif);
+    navigate(route);
   }
 
   function markAllRead() {
@@ -91,14 +145,20 @@ export default function NotificationsPage() {
               const cfg = TYPE_CONFIG[notif.type] || TYPE_CONFIG.sale;
               const Icon = cfg.icon;
               return (
-                <div key={notif.id}
-                  className={`flex items-start gap-3 py-4 px-1 transition-colors ${!notif.is_read ? "bg-primary/2" : ""}`}>
+                <div
+                  key={notif.id}
+                  onClick={() => handleNotificationClick(notif)}
+                  className={`flex items-start gap-3 py-4 px-3 rounded-[8px] cursor-pointer transition-all hover:bg-background group ${
+                    !notif.is_read ? "bg-primary/5 border-l-4 border-l-primary" : ""
+                  }`}
+                  title="Click to view details and go to event"
+                >
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${cfg.bg}`}>
                     <Icon size={18} className={cfg.color} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <p className={`text-[14px] font-semibold ${!notif.is_read ? "text-text-primary" : "text-text-secondary"}`}>
+                      <p className={`text-[14px] font-semibold ${!notif.is_read ? "text-text-primary font-bold" : "text-text-secondary"}`}>
                         {notif.title}
                       </p>
                       {!notif.is_read && (
@@ -106,11 +166,19 @@ export default function NotificationsPage() {
                       )}
                     </div>
                     <p className="text-[14px] text-text-secondary leading-relaxed">{notif.message}</p>
-                    <p className="text-[13px] text-text-secondary mt-1">{formatRelative(notif.created_at)}</p>
+                    <div className="flex items-center justify-between mt-2">
+                      <p className="text-[12px] text-text-secondary">{formatRelative(notif.created_at)}</p>
+                      <span className="text-[12px] text-primary font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                        Go to event <ArrowRight size={12} />
+                      </span>
+                    </div>
                   </div>
                   {!notif.is_read && (
-                    <button onClick={() => markRead(notif.id)}
-                      className="p-1.5 text-text-secondary hover:text-primary rounded shrink-0" title="Mark as read">
+                    <button
+                      onClick={(e) => markRead(notif.id, e)}
+                      className="p-1.5 text-text-secondary hover:text-primary rounded shrink-0"
+                      title="Mark as read"
+                    >
                       <Check size={14} />
                     </button>
                   )}

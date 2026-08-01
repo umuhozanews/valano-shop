@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, Fragment } from "react";
-import { BookOpen, List, Wallet, Scale, Download, FileText, ChevronDown, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { BookOpen, List, Wallet, Scale, Download, FileText, ChevronDown, TrendingUp, TrendingDown, Minus, Plus, Trash2 } from "lucide-react";
 import PageWrapper from "../../components/layout/PageWrapper";
 import Card from "../../components/ui/Card";
+import Modal from "../../components/ui/Modal";
 import api from "../../utils/api";
 import { formatRWF, formatDate } from "../../utils/formatters";
 import toast from "react-hot-toast";
@@ -94,10 +95,21 @@ function Skeleton({ rows = 6 }) {
 
 // ── Journal Tab ───────────────────────────────────────────────────────────────
 function JournalTab({ dateRange }) {
-  const [data, setData]     = useState([]);
-  const [total, setTotal]   = useState(0);
-  const [page, setPage]     = useState(1);
+  const [data, setData]       = useState([]);
+  const [total, setTotal]     = useState(0);
+  const [page, setPage]       = useState(1);
   const [loading, setLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [accounts, setAccounts]   = useState([]);
+  const [saving, setSaving]       = useState(false);
+  const [form, setForm]           = useState({
+    entry_date: new Date().toISOString().slice(0, 10),
+    description: "",
+    lines: [
+      { account_id: "", debit: 0, credit: 0 },
+      { account_id: "", debit: 0, credit: 0 },
+    ],
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -112,6 +124,55 @@ function JournalTab({ dateRange }) {
   useEffect(() => { setPage(1); }, [dateRange]);
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    api.get("/books/accounts").then(r => setAccounts(r.data || [])).catch(() => {});
+  }, []);
+
+  async function handleCreateEntry(e) {
+    e.preventDefault();
+    if (!form.description) return toast.error("Please enter a description");
+    const dr = form.lines.reduce((s, l) => s + parseFloat(l.debit || 0), 0);
+    const cr = form.lines.reduce((s, l) => s + parseFloat(l.credit || 0), 0);
+    if (Math.abs(dr - cr) > 0.01) {
+      return toast.error(`Unbalanced Entry! Total Debit (${formatRWF(dr)}) must equal Total Credit (${formatRWF(cr)})`);
+    }
+    setSaving(true);
+    try {
+      await api.post("/books/journal", form);
+      toast.success("Journal Entry posted successfully!");
+      setShowModal(false);
+      setForm({
+        entry_date: new Date().toISOString().slice(0, 10),
+        description: "",
+        lines: [
+          { account_id: "", debit: 0, credit: 0 },
+          { account_id: "", debit: 0, credit: 0 },
+        ],
+      });
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to post entry");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const addLine = () => {
+    setForm(f => ({ ...f, lines: [...f.lines, { account_id: "", debit: 0, credit: 0 }] }));
+  };
+
+  const removeLine = (idx) => {
+    if (form.lines.length <= 2) return toast.error("Journal entries must have at least 2 accounts");
+    setForm(f => ({ ...f, lines: f.lines.filter((_, i) => i !== idx) }));
+  };
+
+  const updateLine = (idx, field, val) => {
+    setForm(f => ({
+      ...f,
+      lines: f.lines.map((l, i) => i === idx ? { ...l, [field]: val } : l),
+    }));
+  };
+
   async function exportFile(format) {
     try {
       const r = await api.get(`/books/journal?export=${format}&${new URLSearchParams(dateRange)}`, { responseType: "blob" });
@@ -124,9 +185,12 @@ function JournalTab({ dateRange }) {
 
   const totalPages = Math.ceil(total / 25);
 
-  // Compute totals from visible entries
   const totalDebit  = data.reduce((s, e) => s + e.lines.reduce((ls, l) => ls + parseFloat(l.debit  || 0), 0), 0);
   const totalCredit = data.reduce((s, e) => s + e.lines.reduce((ls, l) => ls + parseFloat(l.credit || 0), 0), 0);
+
+  const modalDr = form.lines.reduce((s, l) => s + parseFloat(l.debit || 0), 0);
+  const modalCr = form.lines.reduce((s, l) => s + parseFloat(l.credit || 0), 0);
+  const isBalanced = Math.abs(modalDr - modalCr) < 0.01;
 
   return (
     <div className="space-y-5">
@@ -152,8 +216,93 @@ function JournalTab({ dateRange }) {
             </>
           )}
         </div>
-        <ExportBtn onExport={exportFile} />
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary/90 text-white rounded-lg text-[13px] font-medium transition-colors shadow-sm"
+          >
+            <Plus size={14} /> New Journal Entry
+          </button>
+          <ExportBtn onExport={exportFile} />
+        </div>
       </div>
+
+      <Modal open={showModal} onClose={() => setShowModal(false)} title="Create Journal Entry"
+        footer={
+          <div className="flex items-center justify-between w-full">
+            <div className="text-[12px]">
+              <span className={`font-bold ${isBalanced ? "text-emerald-600" : "text-red-500"}`}>
+                {isBalanced ? "✓ BALANCED" : `✕ UNBALANCED (Diff: ${formatRWF(Math.abs(modalDr - modalCr))})`}
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setShowModal(false)} className="px-3 py-1.5 border border-border rounded-lg text-[13px]">Cancel</button>
+              <button type="button" onClick={handleCreateEntry} disabled={saving || !isBalanced} className="px-4 py-1.5 bg-primary text-white rounded-lg text-[13px] font-medium disabled:opacity-50">
+                {saving ? "Posting..." : "Post Entry"}
+              </button>
+            </div>
+          </div>
+        }>
+        <form onSubmit={handleCreateEntry} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[12px] text-text-secondary mb-1 block font-medium">Entry Date</label>
+              <input type="date" value={form.entry_date} onChange={e => setForm(f => ({ ...f, entry_date: e.target.value }))}
+                className="w-full h-9 px-3 border border-border rounded-lg text-[13px] bg-background" required />
+            </div>
+            <div>
+              <label className="text-[12px] text-text-secondary mb-1 block font-medium">Description / Memo</label>
+              <input type="text" placeholder="e.g. Owner Capital Injection, Bank Transfer..." value={form.description}
+                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                className="w-full h-9 px-3 border border-border rounded-lg text-[13px] bg-background" required />
+            </div>
+          </div>
+
+          <div className="border border-border rounded-xl p-3 bg-surface space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-[13px] font-bold text-text-primary">Journal Lines (Debits & Credits)</p>
+              <button type="button" onClick={addLine} className="flex items-center gap-1 text-[12px] text-primary font-semibold hover:underline">
+                <Plus size={12} /> Add Account Line
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {form.lines.map((line, idx) => (
+                <div key={idx} className="flex items-center gap-2 bg-background p-2 rounded-lg border border-border/60">
+                  <select value={line.account_id} onChange={e => updateLine(idx, "account_id", e.target.value)}
+                    className="flex-1 h-8 px-2 border border-border rounded text-[12px] bg-surface font-medium" required>
+                    <option value="">Select Account...</option>
+                    {accounts.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name} ({a.type})</option>)}
+                  </select>
+                  <div className="w-28">
+                    <input type="number" placeholder="Debit RWF" min="0" value={line.debit || ""}
+                      onChange={e => updateLine(idx, "debit", e.target.value)}
+                      className="w-full h-8 px-2 border border-border rounded text-[12px] font-mono text-emerald-600 bg-surface" />
+                  </div>
+                  <div className="w-28">
+                    <input type="number" placeholder="Credit RWF" min="0" value={line.credit || ""}
+                      onChange={e => updateLine(idx, "credit", e.target.value)}
+                      className="w-full h-8 px-2 border border-border rounded text-[12px] font-mono text-red-500 bg-surface" />
+                  </div>
+                  <button type="button" onClick={() => removeLine(idx)} className="p-1 text-text-secondary hover:text-danger rounded">
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-border/40 text-[12px]">
+              <span className="font-medium text-text-secondary">Totals</span>
+              <div className="space-x-4 font-mono font-bold">
+                <span className="text-emerald-600">DR: {formatRWF(modalDr)}</span>
+                <span className="text-red-500">CR: {formatRWF(modalCr)}</span>
+              </div>
+            </div>
+          </div>
+        </form>
+      </Modal>
 
       {loading ? <Skeleton rows={5} /> : data.length === 0 ? (
         <EmptyState icon={BookOpen} text="No journal entries yet. They appear automatically as you record sales and expenses." />

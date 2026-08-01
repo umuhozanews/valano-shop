@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Search, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, Edit, Trash2, MessageCircle } from "lucide-react";
 import PageWrapper from "../../components/layout/PageWrapper";
 import Table from "../../components/ui/Table";
 import Button from "../../components/ui/Button";
@@ -10,6 +10,7 @@ import api from "../../utils/api";
 import { formatRWF } from "../../utils/formatters";
 import toast from "react-hot-toast";
 import { useLanguage } from "../../context/LanguageContext";
+import { openWhatsAppChat } from "../../utils/whatsapp";
 
 const EMPTY = { name:"", wechat:"", whatsapp:"", city:"", country:"China", specialty:"", notes:"" };
 
@@ -48,9 +49,32 @@ export default function SuppliersList() {
   }
 
   const columns = [
-    { key:"name", label: t("supplier_col") },
+    { key:"name", label: t("supplier_col"), render:(v, r) => (
+      <div>
+        <p className="font-semibold text-text-primary">{v}</p>
+        {r.whatsapp && <p className="text-[11px] text-emerald-600 font-mono">WA: {r.whatsapp}</p>}
+      </div>
+    )},
     { key:"city", label: t("city_country"), render:(v,r) => `${v||"—"}, ${r.country||"China"}` },
     { key:"specialty", label: t("specialty") },
+    { key:"whatsapp", label: "WhatsApp Direct", render:(v, r) => (
+      <button
+        type="button"
+        onClick={() => {
+          if (!v) {
+            const phonePrompt = prompt(`Enter WhatsApp phone number for ${r.name}:`, "");
+            if (phonePrompt) openWhatsAppChat(phonePrompt, `Hello ${r.name}, we are reaching out from INZIRA Insights regarding stock supplies.`);
+          } else {
+            openWhatsAppChat(v, `Hello ${r.name}, we are reaching out from INZIRA Insights regarding stock supplies.`);
+          }
+        }}
+        className="flex items-center gap-1.5 px-3 py-1 rounded-card bg-emerald-600 hover:bg-emerald-700 text-white text-[12px] font-bold transition-all shadow-sm"
+        title="Open WhatsApp chat with supplier"
+      >
+        <MessageCircle size={14} />
+        <span>{v ? "WhatsApp" : "Add & Chat"}</span>
+      </button>
+    )},
     { key:"wechat", label: t("wechat") },
     { key:"orders_count", label: t("orders_count"), render:v => parseInt(v)||0 },
     { key:"total_purchased_rwf", label: t("total_invested"), render:v => formatRWF(Math.round(v||0)) },

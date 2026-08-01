@@ -52,6 +52,7 @@ router.put("/", requireRole("admin", "sme_owner", "pulse_admin"), async (req, re
       shop_name, shop_address, shop_phone,
       default_low_stock_threshold, invoice_footer_text,
       language, sector_default, district_default,
+      tin_number, sdc_id, mrc_number, shop_email, cashier_tin, vat_rate,
     } = req.body;
 
     let s;
@@ -59,15 +60,19 @@ router.put("/", requireRole("admin", "sme_owner", "pulse_admin"), async (req, re
       // Upsert user-scoped settings row
       const { rows: [row] } = await pool.query(
         `INSERT INTO settings (owner_id, shop_name, shop_address, shop_phone,
-           default_low_stock_threshold, invoice_footer_text, language, sector_default, district_default)
-         VALUES ($9,$1,$2,$3,$4,$5,$6,$7,$8)
+           default_low_stock_threshold, invoice_footer_text, language, sector_default, district_default,
+           tin_number, sdc_id, mrc_number, shop_email, cashier_tin, vat_rate)
+         VALUES ($9,$1,$2,$3,$4,$5,$6,$7,$8,$10,$11,$12,$13,$14,$15)
          ON CONFLICT (owner_id) DO UPDATE SET
            shop_name=$1, shop_address=$2, shop_phone=$3,
            default_low_stock_threshold=$4, invoice_footer_text=$5,
-           language=$6, sector_default=$7, district_default=$8
+           language=$6, sector_default=$7, district_default=$8,
+           tin_number=$10, sdc_id=$11, mrc_number=$12, shop_email=$13, cashier_tin=$14, vat_rate=$15
          RETURNING *`,
         [shop_name, shop_address, shop_phone, default_low_stock_threshold, invoice_footer_text,
-         language || 'en', sector_default || null, district_default || null, req.user.id]
+         language || 'en', sector_default || null, district_default || null, req.user.id,
+         tin_number || '103777856', sdc_id || 'SDC010013000', mrc_number || 'MIS00013705',
+         shop_email || 'andrenikobatuye@gmail.com', cashier_tin || '103777856', parseFloat(vat_rate) || 18.0]
       );
       s = row;
     } else {
@@ -76,10 +81,13 @@ router.put("/", requireRole("admin", "sme_owner", "pulse_admin"), async (req, re
         `UPDATE settings SET
           shop_name=$1, shop_address=$2, shop_phone=$3,
           default_low_stock_threshold=$4, invoice_footer_text=$5,
-          language=$6, sector_default=$7, district_default=$8
+          language=$6, sector_default=$7, district_default=$8,
+          tin_number=$9, sdc_id=$10, mrc_number=$11, shop_email=$12, cashier_tin=$13, vat_rate=$14
          WHERE id=1 RETURNING *`,
         [shop_name, shop_address, shop_phone, default_low_stock_threshold, invoice_footer_text,
-         language || 'en', sector_default || null, district_default || null]
+         language || 'en', sector_default || null, district_default || null,
+         tin_number || '103777856', sdc_id || 'SDC010013000', mrc_number || 'MIS00013705',
+         shop_email || 'andrenikobatuye@gmail.com', cashier_tin || '103777856', parseFloat(vat_rate) || 18.0]
       );
       s = row;
     }

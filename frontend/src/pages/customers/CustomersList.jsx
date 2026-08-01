@@ -95,10 +95,18 @@ export default function CustomersList() {
   return (
     <PageWrapper title={t("customers")} subtitle={t("management")} breadcrumbs={[{label: t("customers"), path:"/app/customers"}]}>
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
-        <StatCard title={t("total")} value={total} />
-        <StatCard title={t("vip")} value={getSegCount("vip")} />
-        <StatCard title={t("regular")} value={getSegCount("regular")} />
-        <StatCard title={t("new_label")} value={getSegCount("new")} />
+        <div onClick={() => setFilters(f => ({ ...f, segment: "" }))} className="cursor-pointer transition-all hover:scale-[1.01]" title="Click to show all customers">
+          <StatCard title={t("total")} value={total} className={filters.segment === "" ? "border-2 border-primary shadow-sm" : ""} />
+        </div>
+        <div onClick={() => setFilters(f => ({ ...f, segment: "vip" }))} className="cursor-pointer transition-all hover:scale-[1.01]" title="Click to filter VIP customers">
+          <StatCard title={`${t("vip")} (Over 500k RWF)`} value={getSegCount("vip")} className={filters.segment === "vip" ? "border-2 border-emerald-500 shadow-sm" : ""} />
+        </div>
+        <div onClick={() => setFilters(f => ({ ...f, segment: "regular" }))} className="cursor-pointer transition-all hover:scale-[1.01]" title="Click to filter Regular customers">
+          <StatCard title={`${t("regular")} (Over 100k RWF)`} value={getSegCount("regular")} className={filters.segment === "regular" ? "border-2 border-amber-500 shadow-sm" : ""} />
+        </div>
+        <div onClick={() => setFilters(f => ({ ...f, segment: "new" }))} className="cursor-pointer transition-all hover:scale-[1.01]" title="Click to filter New customers">
+          <StatCard title={t("new_label")} value={getSegCount("new")} className={filters.segment === "new" ? "border-2 border-blue-500 shadow-sm" : ""} />
+        </div>
       </div>
 
       <Card action={<Button icon={Plus} size="sm" onClick={() => setShowModal(true)}>{t("add")}</Button>}>
@@ -108,6 +116,13 @@ export default function CustomersList() {
             <input value={filters.search} onChange={e=>setFilters(f=>({...f,search:e.target.value}))} placeholder={`${t("search")}…`}
               className="w-full h-9 pl-9 pr-3 border border-border rounded-card text-[14px] focus:outline-none focus:ring-2 focus:ring-primary" />
           </div>
+          <select value={filters.segment} onChange={e=>setFilters(f=>({...f,segment:e.target.value}))}
+            className="h-9 px-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary font-medium">
+            <option value="">All Segments</option>
+            <option value="vip">⭐ VIP (Over 500k RWF)</option>
+            <option value="regular">🔥 Regular (Over 100k RWF)</option>
+            <option value="new">🌱 New Customer</option>
+          </select>
           <select value={filters.type} onChange={e=>setFilters(f=>({...f,type:e.target.value}))}
             className="h-9 px-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary">
             <option value="">{t("all_types")}</option><option value="retailer">{t("retailer")}</option><option value="wholesaler">{t("wholesaler")}</option>

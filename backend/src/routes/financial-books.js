@@ -28,6 +28,55 @@ router.get("/accounts", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── Create Manual Journal Entry ────────────────────────────────────────────────
+router.post("/journal", async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    await ensureJournalTables();
+    const { entry_date, description, lines } = req.body;
+
+    if (!description || !Array.isArray(lines) || lines.length < 2) {
+      return res.status(400).json({ error: "At least 2 line items (debit and credit) are required" });
+    }
+
+    let totalDebit = 0;
+    let totalCredit = 0;
+    for (const l of lines) {
+      totalDebit += parseFloat(l.debit || 0);
+      totalCredit += parseFloat(l.credit || 0);
+    }
+
+    if (Math.abs(totalDebit - totalCredit) > 0.01) {
+      return res.status(400).json({ error: `Unbalanced entry: Total Debit (${totalDebit.toLocaleString()} RWF) must equal Total Credit (${totalCredit.toLocaleString()} RWF)` });
+    }
+
+    await client.query("BEGIN");
+
+    const entryRes = await client.query(
+      `INSERT INTO journal_entries (entry_date, description, reference_type, created_by, owner_id)
+       VALUES ($1, $2, 'manual', $3, $4) RETURNING *`,
+      [entry_date || new Date().toISOString().slice(0, 10), description, req.user.id, req.ownerId]
+    );
+    const entry = entryRes.rows[0];
+
+    for (const line of lines) {
+      await client.query(
+        `INSERT INTO journal_lines (entry_id, account_id, debit, credit)
+         VALUES ($1, $2, $3, $4)`,
+        [entry.id, line.account_id, parseFloat(line.debit || 0), parseFloat(line.credit || 0)]
+      );
+    }
+
+    await client.query("COMMIT");
+    res.status(201).json(entry);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    next(err);
+  } finally {
+    client.release();
+  }
+});
+
 // ── Journal Entries ────────────────────────────────────────────────────────────
 router.get("/journal", async (req, res, next) => {
   try {

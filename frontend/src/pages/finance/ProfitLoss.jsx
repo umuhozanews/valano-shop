@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { ComposedChart, AreaChart, Area, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from "recharts";
+import { AlertTriangle, TrendingDown, TrendingUp } from "lucide-react";
 import PageWrapper from "../../components/layout/PageWrapper";
 import Card from "../../components/ui/Card";
 import StatCard from "../../components/ui/StatCard";
@@ -106,13 +107,47 @@ export default function ProfitLoss() {
         </select>
       </div>
 
+      {/* Net Loss Warning Banner if overall period is in Net Loss */}
+      {netProfit < 0 && (
+        <div className="flex items-center gap-3 p-4 mb-6 rounded-card bg-danger/10 border border-danger/30 text-danger font-semibold animate-pulse">
+          <AlertTriangle className="w-5 h-5 shrink-0 text-danger" />
+          <div>
+            <p className="text-[15px] font-bold">⚠️ NET LOSS WARNING: Your business operated at a net loss of {formatRWF(Math.abs(netProfit))} during this period.</p>
+            <p className="text-[13px] text-danger/80 font-normal mt-0.5">Total operating expenses and cost of goods sold exceeded total revenue.</p>
+          </div>
+        </div>
+      )}
+
       {/* Summary KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 mb-6">
         <StatCard title={t("revenue")} value={formatRWF(totals.revenue||0)} />
-        <StatCard title={t("gross_profit")} value={formatRWF(grossProfit)} />
-        <StatCard title={t("operating_expenses")} value={formatRWF(totals.expenses||0)} />
-        <StatCard title={t("procurement_costs")} value={formatRWF(totals.procurement||0)} />
-        <StatCard title={t("net_profit")} value={formatRWF(netProfit)} />
+        <StatCard title={t("gross_profit")} value={formatRWF(grossProfit)} color={grossProfit >= 0 ? "success" : "danger"} />
+        <StatCard title={t("operating_expenses")} value={formatRWF(totals.expenses||0)} color="danger" />
+        <StatCard title={t("procurement_costs")} value={formatRWF(totals.procurement||0)} color="warning" />
+        
+        {/* Dynamic Net Profit vs NET LOSS Card */}
+        <div className={`border rounded-card p-6 relative overflow-hidden transition-all ${
+          netProfit < 0 
+            ? "bg-danger/10 border-danger/50 shadow-md" 
+            : "bg-surface border-border"
+        }`}>
+          <div className="flex items-center justify-between mb-2">
+            <p className={`text-[14px] font-bold uppercase tracking-wider ${netProfit < 0 ? "text-danger" : "text-text-secondary"}`}>
+              {netProfit < 0 ? "🚨 NET LOSS" : t("net_profit")}
+            </p>
+            {netProfit < 0 ? (
+              <span className="px-2 py-0.5 text-[11px] font-black uppercase rounded bg-danger text-white">LOSS</span>
+            ) : (
+              <span className="px-2 py-0.5 text-[11px] font-black uppercase rounded bg-success/20 text-success">PROFIT</span>
+            )}
+          </div>
+          <p className={`text-[26px] font-black leading-none mb-2 ${netProfit < 0 ? "text-danger" : "text-success"}`}>
+            {formatRWF(netProfit)}
+          </p>
+          <p className={`text-[12px] font-medium ${netProfit < 0 ? "text-danger/90 font-bold" : "text-text-secondary"}`}>
+            {netProfit < 0 ? "Expenses exceed Revenue" : `Net Margin: ${totals.netMargin || 0}%`}
+          </p>
+        </div>
       </div>
 
       {loading ? (
@@ -144,16 +179,18 @@ export default function ProfitLoss() {
                       </tr>
                       <tr className="border-b-2 border-border bg-success/5">
                         <td className="py-2.5 px-3 font-bold text-text-primary">{t("gross_profit")}</td>
-                        <td className="py-2.5 px-3 text-right font-bold text-success">{formatRWF(grossProfit)}</td>
+                        <td className={`py-2.5 px-3 text-right font-bold ${grossProfit >= 0 ? "text-success" : "text-danger"}`}>{formatRWF(grossProfit)}</td>
                       </tr>
                       <tr className="bg-background"><td className="py-2 px-3 font-semibold text-text-secondary uppercase text-[12px] tracking-wide">{t("operating_expenses")}</td><td /></tr>
                       <tr className="border-b border-border">
                         <td className="py-2 px-3 text-text-secondary">{t("operating_expenses")}</td>
                         <td className="py-2 px-3 text-right text-danger">({formatRWF(totals.expenses||0)})</td>
                       </tr>
-                      <tr className={`border-t-2 border-border ${netProfit >= 0 ? "bg-success/5":"bg-danger/5"}`}>
-                        <td className="py-2.5 px-3 font-bold text-text-primary">{t("net_profit")}</td>
-                        <td className={`py-2.5 px-3 text-right font-bold ${netProfit >= 0 ? "text-success":"text-danger"}`}>
+                      <tr className={`border-t-2 ${netProfit >= 0 ? "border-success bg-success/10" : "border-danger bg-danger/10"}`}>
+                        <td className="py-3 px-3 font-extrabold uppercase text-[14px]">
+                          {netProfit >= 0 ? t("net_profit") : "🚨 NET LOSS"}
+                        </td>
+                        <td className={`py-3 px-3 text-right font-black text-[16px] ${netProfit >= 0 ? "text-success" : "text-danger"}`}>
                           {formatRWF(netProfit)}
                         </td>
                       </tr>
@@ -162,19 +199,26 @@ export default function ProfitLoss() {
                 </Card>
               </div>
 
-              {/* Monthly Trend Chart */}
+              {/* Monthly Trend Chart with Red Loss Bars & Reference Line */}
               <div className="lg:col-span-7">
-                <Card title={t("sales_trend")}>
-                  <ResponsiveContainer width="100%" height={280}>
-                    <AreaChart data={byMonth}>
+                <Card title="Monthly Profit & Net Loss Trend" subtitle="Green = Net Profit, Red = Net Loss">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <ComposedChart data={byMonth}>
                       <XAxis dataKey="month" tick={{fontSize:10}} />
-                      <YAxis tick={{fontSize:10}} tickFormatter={v=>v >= 100000 ? (v/1000).toFixed(0)+"k" : v} />
-                      <Tooltip formatter={v=>formatRWF(v)} />
+                      <YAxis tick={{fontSize:10}} tickFormatter={v=>v >= 100000 || v <= -100000 ? (v/1000).toFixed(0)+"k" : v} />
+                      <Tooltip formatter={(value, name) => [
+                        formatRWF(value),
+                        name === "netProfit" ? (value < 0 ? "🚨 NET LOSS" : "NET PROFIT") : name === "revenue" ? "Revenue" : "Expenses & COGS"
+                      ]} />
                       <Legend />
-                      <Area type="monotone" dataKey="revenue" stroke="#10B981" fill="#D1FAE5" name={t("revenue")} />
-                      <Area type="monotone" dataKey="cogs" stroke="#F59E0B" fill="#FEF3C7" name={t("cogs")} />
-                      <Area type="monotone" dataKey="netProfit" stroke="#3B82F6" fill="#DBEAFE" name={t("net_profit")} />
-                    </AreaChart>
+                      <ReferenceLine y={0} stroke="#6B7280" strokeDasharray="3 3" label={{ value: "0 RWF", fill: "#6B7280", fontSize: 10 }} />
+                      <Area type="monotone" dataKey="revenue" stroke="#10B981" fill="#D1FAE5" opacity={0.4} name="Revenue" />
+                      <Bar dataKey="netProfit" name="Net Profit / Loss" barSize={16}>
+                        {byMonth.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.netProfit < 0 ? "#EF4444" : "#10B981"} />
+                        ))}
+                      </Bar>
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </Card>
               </div>
@@ -228,17 +272,25 @@ export default function ProfitLoss() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               {/* Daily Trend Chart */}
               <div className="lg:col-span-12">
-                <Card title={`${t("daily_pnl_trend")} — ${getMonthName(month)} ${year}`}>
-                  <ResponsiveContainer width="100%" height={260}>
-                    <AreaChart data={byDay}>
+                <Card title={`${t("daily_pnl_trend")} — ${getMonthName(month)} ${year}`} subtitle="Green bars = Net Profit, Red bars = Net Loss">
+                  <ResponsiveContainer width="100%" height={280}>
+                    <ComposedChart data={byDay}>
                       <XAxis dataKey="shortDate" tick={{fontSize:10}} />
-                      <YAxis tick={{fontSize:10}} tickFormatter={v=>v >= 100000 ? (v/1000).toFixed(0)+"k" : v} />
-                      <Tooltip formatter={v=>formatRWF(v)} />
+                      <YAxis tick={{fontSize:10}} tickFormatter={v=>v >= 100000 || v <= -100000 ? (v/1000).toFixed(0)+"k" : v} />
+                      <Tooltip formatter={(value, name) => [
+                        formatRWF(value),
+                        name === "netProfit" ? (value < 0 ? "🚨 NET LOSS" : "NET PROFIT") : name === "revenue" ? "Revenue" : "Expenses"
+                      ]} />
                       <Legend />
-                      <Area type="monotone" dataKey="revenue" stroke="#10B981" fill="#D1FAE5" name={t("revenue")} />
-                      <Area type="monotone" dataKey="expenses" stroke="#EF4444" fill="#FEE2E2" name={t("operating_expenses")} />
-                      <Area type="monotone" dataKey="netProfit" stroke="#3B82F6" fill="#DBEAFE" name={t("net_profit")} />
-                    </AreaChart>
+                      <ReferenceLine y={0} stroke="#6B7280" strokeDasharray="3 3" label={{ value: "0 RWF", fill: "#6B7280", fontSize: 10 }} />
+                      <Area type="monotone" dataKey="revenue" stroke="#10B981" fill="#D1FAE5" opacity={0.3} name={t("revenue")} />
+                      <Area type="monotone" dataKey="expenses" stroke="#F59E0B" fill="#FEF3C7" opacity={0.3} name={t("operating_expenses")} />
+                      <Bar dataKey="netProfit" name="Net Profit / Loss" barSize={12}>
+                        {byDay.map((entry, index) => (
+                          <Cell key={`cell-d-${index}`} fill={entry.netProfit < 0 ? "#EF4444" : "#10B981"} />
+                        ))}
+                      </Bar>
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </Card>
               </div>
@@ -264,18 +316,19 @@ export default function ProfitLoss() {
                         {dailyList.map((r, idx) => {
                           const gross = parseFloat(r.revenue) - parseFloat(r.cogs);
                           const net = gross - parseFloat(r.expenses);
+                          const isLoss = net < 0;
                           return (
-                            <tr key={idx} className="hover:bg-background/50 transition-colors">
+                            <tr key={idx} className={`hover:bg-background/50 transition-colors ${isLoss ? "bg-danger/5" : ""}`}>
                               <td className="py-2.5 px-3 font-semibold text-text-primary whitespace-nowrap">
                                 {formatDate(r.date, "dd MMM yyyy")}
                               </td>
                               <td className="py-2.5 px-3 text-right text-success font-semibold">{formatRWF(r.revenue)}</td>
                               <td className="py-2.5 px-3 text-right text-text-secondary">({formatRWF(r.cogs)})</td>
-                              <td className="py-2.5 px-3 text-right font-medium text-text-primary">{formatRWF(gross)}</td>
+                              <td className={`py-2.5 px-3 text-right font-medium ${gross >= 0 ? "text-text-primary" : "text-danger"}`}>{formatRWF(gross)}</td>
                               <td className="py-2.5 px-3 text-right text-danger">({formatRWF(r.expenses)})</td>
                               <td className="py-2.5 px-3 text-right text-amber-600 font-mono text-[13px]">{formatRWF(r.procurement)}</td>
-                              <td className={`py-2.5 px-3 text-right font-bold ${net >= 0 ? "text-success" : "text-danger"}`}>
-                                {formatRWF(net)}
+                              <td className={`py-2.5 px-3 text-right font-black ${isLoss ? "text-danger" : "text-success"}`}>
+                                {isLoss ? `🚨 LOSS: ${formatRWF(net)}` : formatRWF(net)}
                               </td>
                               <td className="py-2.5 px-3 text-center">
                                 <div className="flex justify-center gap-1.5 text-[12px]">

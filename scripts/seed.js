@@ -3,9 +3,11 @@
  * Run: node scripts/seed.js
  * Requires DATABASE_URL in .env
  */
-require("dotenv").config({ path: require("path").join(__dirname, "../backend/.env") });
-const { Pool } = require("pg");
-const bcrypt = require("bcryptjs");
+const path = require("path");
+const backendModules = path.join(__dirname, "../backend/node_modules");
+require(path.join(backendModules, "dotenv")).config({ path: path.join(__dirname, "../backend/.env") });
+const { Pool } = require(path.join(backendModules, "pg"));
+const bcrypt = require(path.join(backendModules, "bcryptjs"));
 const crypto = require("crypto");
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });

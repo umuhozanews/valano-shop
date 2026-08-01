@@ -59,7 +59,7 @@ router.get("/:id/pdf", async (req, res, next) => {
       Promise.resolve({ rows: [{}] }),
       pool.query(`SELECT c.* FROM sales s LEFT JOIN customers c ON c.id=s.customer_id WHERE s.id=$1`, [invoice.sale_id]),
       pool.query("SELECT * FROM settings LIMIT 1"),
-      pool.query("SELECT * FROM debts WHERE sale_id=$1", [invoice.sale_id]),
+      pool.query("SELECT * FROM accounts_receivable WHERE sale_id=$1", [invoice.sale_id]),
     ]);
 
     createInvoicePDF(res, {
@@ -82,10 +82,10 @@ router.put("/:id/status", requireRole("admin", "manager", "accountant"), async (
       [status, req.params.id]
     );
 
-    // Sync: If the invoice is marked as 'paid', mark any corresponding debt as 'paid'
+    // Sync: If the invoice is marked as 'paid', mark any corresponding receivable as 'paid'
     if (status === "paid" && inv) {
       await pool.query(
-        "UPDATE debts SET status = 'paid' WHERE sale_id = $1",
+        "UPDATE accounts_receivable SET status = 'paid' WHERE sale_id = $1",
         [inv.sale_id]
       );
     }

@@ -21,25 +21,50 @@ function CartPanel({ cart, setCart, updateQty, customer, setCustomer, payment, s
       ) : (
         <div className="flex-1 overflow-y-auto space-y-3 mb-4">
           {cart.map(item => (
-            <div key={item.stock_item_id} className="flex items-center gap-2">
+            <div key={item.stock_item_id} className="flex items-center gap-2 border-b border-border/50 pb-2">
               <div className="flex-1 min-w-0">
                 <p className="text-[14px] font-medium text-text-primary truncate">{item.name}</p>
-                <p className="text-[13px] text-text-secondary">{formatRWF(item.unit_price)} / {item.unit}</p>
+                <p className="text-[12px] text-text-secondary">
+                  {formatRWF(item.unit_price)} / {item.unit} · <span className="font-semibold text-text-primary">Stock: {item.max_qty}</span>
+                </p>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                <button onClick={() => updateQty(item.stock_item_id, item.quantity-1)}
-                  className="w-6 h-6 bg-background border border-border rounded flex items-center justify-center hover:bg-border">
-                  <Minus size={10} />
+                <button
+                  type="button"
+                  onClick={() => updateQty(item.stock_item_id, (Number(item.quantity) || 1) - 1)}
+                  className="w-7 h-7 bg-background border border-border rounded flex items-center justify-center hover:bg-border text-text-primary font-bold transition-colors"
+                  title="Decrease"
+                >
+                  <Minus size={12} />
                 </button>
-                <span className="w-6 text-center text-[14px] font-medium">{item.quantity}</span>
-                <button onClick={() => updateQty(item.stock_item_id, item.quantity+1)}
-                  className="w-6 h-6 bg-background border border-border rounded flex items-center justify-center hover:bg-border">
-                  <Plus size={10} />
+                <input
+                  type="number"
+                  min="1"
+                  max={item.max_qty}
+                  value={item.quantity}
+                  onChange={e => updateQty(item.stock_item_id, e.target.value)}
+                  onBlur={() => {
+                    if (item.quantity === "" || Number(item.quantity) < 1) {
+                      updateQty(item.stock_item_id, 1);
+                    }
+                  }}
+                  className="w-14 h-7 text-center font-bold text-[14px] border border-border rounded bg-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary px-1"
+                  title={`Type quantity manually (Max stock: ${item.max_qty})`}
+                />
+                <button
+                  type="button"
+                  onClick={() => updateQty(item.stock_item_id, (Number(item.quantity) || 0) + 1)}
+                  className="w-7 h-7 bg-background border border-border rounded flex items-center justify-center hover:bg-border text-text-primary font-bold transition-colors"
+                  title="Increase"
+                >
+                  <Plus size={12} />
                 </button>
               </div>
-              <span className="text-[14px] font-semibold text-text-primary w-20 text-right">{formatRWF(item.unit_price*item.quantity)}</span>
+              <span className="text-[14px] font-semibold text-text-primary w-20 text-right font-mono">
+                {formatRWF(item.unit_price * (Number(item.quantity) || 0))}
+              </span>
               <button onClick={() => setCart(c => c.filter(x => x.stock_item_id !== item.stock_item_id))}
-                className="text-text-secondary hover:text-danger"><X size={14}/></button>
+                className="text-text-secondary hover:text-danger p-1"><X size={14}/></button>
             </div>
           ))}
         </div>
@@ -161,25 +186,53 @@ export default function NewSale() {
     return matchSearch && matchCat;
   });
 
-  const total     = cart.reduce((s, i) => s + i.unit_price * i.quantity, 0);
-  const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
+  const total     = cart.reduce((s, i) => s + i.unit_price * (Number(i.quantity) || 0), 0);
+  const cartCount = cart.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
 
   function addToCart(item) {
     if (item.quantity === 0) return toast.error(t("out_of_stock"));
     setCart(c => {
       const ex = c.find(x => x.stock_item_id === item.id);
       if (ex) {
-        if (ex.quantity >= item.quantity) { toast.error("Max stock reached"); return c; }
-        return c.map(x => x.stock_item_id === item.id ? {...x, quantity: x.quantity+1} : x);
+        const currentQty = Number(ex.quantity) || 0;
+        if (currentQty >= item.quantity) {
+          toast.error(`Max stock reached (${item.quantity} ${item.unit || "pcs"})`);
+          return c;
+        }
+        return c.map(x => x.stock_item_id === item.id ? { ...x, quantity: currentQty + 1 } : x);
       }
-      return [...c, { stock_item_id: item.id, name: item.name, unit: item.unit || "pcs",
-                      unit_price: item.sell_price_rwf, quantity: 1, max_qty: item.quantity }];
+      return [...c, {
+        stock_item_id: item.id,
+        name: item.name,
+        unit: item.unit || "pcs",
+        unit_price: item.sell_price_rwf,
+        quantity: 1,
+        max_qty: item.quantity
+      }];
     });
   }
 
-  function updateQty(id, qty) {
-    if (qty < 1) { setCart(c => c.filter(x => x.stock_item_id !== id)); return; }
-    setCart(c => c.map(x => x.stock_item_id === id ? {...x, quantity: Math.min(qty, x.max_qty)} : x));
+  function updateQty(id, qtyInput) {
+    if (qtyInput === "" || qtyInput === null || qtyInput === undefined) {
+      setCart(c => c.map(x => x.stock_item_id === id ? { ...x, quantity: "" } : x));
+      return;
+    }
+    const parsed = parseInt(qtyInput, 10);
+    if (isNaN(parsed)) {
+      setCart(c => c.map(x => x.stock_item_id === id ? { ...x, quantity: "" } : x));
+      return;
+    }
+    if (parsed < 1) {
+      setCart(c => c.filter(x => x.stock_item_id !== id));
+      return;
+    }
+    const existing = cart.find(x => x.stock_item_id === id);
+    if (existing && parsed > existing.max_qty) {
+      toast.error(`Cannot exceed stock limit of ${existing.max_qty} ${existing.unit}`);
+      setCart(c => c.map(x => x.stock_item_id === id ? { ...x, quantity: existing.max_qty } : x));
+      return;
+    }
+    setCart(c => c.map(x => x.stock_item_id === id ? { ...x, quantity: parsed } : x));
   }
 
   async function confirmSale() {
@@ -200,7 +253,7 @@ export default function NewSale() {
       const body = {
         customer_name:  customer || "Walk-in",
         payment_method: payment,
-        items:          cart.map(i => ({ stock_item_id: i.stock_item_id, quantity: i.quantity, unit_price: i.unit_price })),
+        items:          cart.map(i => ({ stock_item_id: i.stock_item_id, quantity: Number(i.quantity) || 1, unit_price: i.unit_price })),
         amount_paid:    isPartial ? parseFloat(amountPaid) : total,
         due_date:       isPartial ? dueDate : null,
       };

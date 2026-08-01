@@ -12,11 +12,11 @@ if %ERRORLEVEL% neq 0 (
 
 :: Start backend
 echo Starting backend...
-start "Backend" cmd /k "cd /d C:\Users\user\Desktop\SYSTEM\MEGA\valano-shop\backend && node server.js"
+start "Backend" cmd /k "cd /d %~dp0backend && npm run dev"
 
 :: Start frontend
 echo Starting frontend...
-start "Frontend" cmd /k "cd /d C:\Users\user\Desktop\SYSTEM\MEGA\valano-shop\frontend && npm run dev"
+start "Frontend" cmd /k "cd /d %~dp0frontend && npm run dev"
 
 echo.
 echo App running at http://localhost:3000

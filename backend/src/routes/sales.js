@@ -7,6 +7,31 @@ const { createInvoicePDF } = require("../utils/pdf");
 const { journalForSale, journalForSaleVoid } = require("../utils/journal");
 const { ensureTenantColumns, addOwnerFilter } = require("../utils/tenant");
 
+router.get("/:id/qr", async (req, res, next) => {
+  try {
+    const bwipjs = require("bwip-js");
+    const [saleRes, settingsRes] = await Promise.all([
+      pool.query(`SELECT s.*, i.invoice_number FROM sales s LEFT JOIN invoices i ON i.sale_id=s.id WHERE s.id=$1`, [req.params.id]),
+      pool.query("SELECT * FROM settings LIMIT 1"),
+    ]);
+    const sale = saleRes.rows[0];
+    if (!sale) return res.status(404).send("Sale not found");
+    const st = settingsRes.rows[0] || {};
+    const qrText = `https://ebm.rra.gov.rw/verify/receipt?tin=${st.tin_number || '103777856'}&sdc=${st.sdc_id || 'SDC010013000'}&mrc=${st.mrc_number || 'MIS00013705'}&receipt=${sale.id}&total=${sale.total_amount}`;
+    
+    const png = await bwipjs.toBuffer({
+      bcid: 'qrcode',
+      text: qrText,
+      scale: 3,
+      height: 10,
+      width: 10,
+      includetext: false,
+    });
+    res.setHeader("Content-Type", "image/png");
+    res.send(png);
+  } catch (err) { next(err); }
+});
+
 router.use(verifyToken);
 
 router.get("/", async (req, res, next) => {
@@ -62,7 +87,7 @@ router.get("/:id", async (req, res, next) => {
   try {
     const [saleRes, itemsRes, arRes] = await Promise.all([
       pool.query(
-        `SELECT s.*, u.name as cashier_name, c.name as customer_name, c.phone as customer_phone,
+        `SELECT s.*, u.name as cashier_name, u.email as cashier_email, c.name as customer_name, c.phone as customer_phone, c.tin_number as customer_tin,
           i.id as invoice_id, i.invoice_number, i.status as invoice_status
          FROM sales s
          LEFT JOIN users u ON u.id=s.user_id
@@ -258,15 +283,14 @@ router.post("/:id/void", requireRole("admin", "sme_owner", "manager", "accountan
 
 router.get("/:id/receipt-pdf", async (req, res, next) => {
   try {
-    const [saleRes, itemsRes] = await Promise.all([
+    const [saleRes, itemsRes, settingsRes] = await Promise.all([
       pool.query(
-        `SELECT s.*, u.name as cashier_name, c.name as customer_name, c.phone as customer_phone,
-          i.invoice_number, st.shop_name, st.shop_address, st.shop_phone, st.invoice_footer_text
+        `SELECT s.*, u.name as cashier_name, c.name as customer_name, c.phone as customer_phone, c.tin_number as customer_tin,
+          i.invoice_number, i.issued_at
          FROM sales s
          LEFT JOIN users u ON u.id=s.user_id
          LEFT JOIN customers c ON c.id=s.customer_id
          LEFT JOIN invoices i ON i.sale_id=s.id
-         LEFT JOIN settings st ON (st.owner_id = s.owner_id OR (s.owner_id IS NULL AND st.owner_id IS NULL))
          WHERE s.id=$1`,
         [req.params.id]
       ),
@@ -275,13 +299,51 @@ router.get("/:id/receipt-pdf", async (req, res, next) => {
          JOIN stock_items stk ON stk.id=si.stock_item_id WHERE si.sale_id=$1`,
         [req.params.id]
       ),
+      pool.query("SELECT * FROM settings LIMIT 1"),
     ]);
-    if (!saleRes.rows[0]) return res.status(404).json({ error: "Sale not found" });
+    const sale = saleRes.rows[0];
+    if (!sale) return res.status(404).json({ error: "Sale not found" });
 
-    const pdf = await createInvoicePDF({ ...saleRes.rows[0], items: itemsRes.rows });
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename=receipt-${req.params.id}.pdf`);
-    res.send(pdf);
+    createInvoicePDF(res, {
+      invoice: { invoice_number: sale.invoice_number || `INV-${sale.id}`, issued_at: sale.issued_at || sale.created_at },
+      sale,
+      items: itemsRes.rows,
+      settings: settingsRes.rows[0] || {},
+      customer: { name: sale.customer_name, tin_number: sale.customer_tin, phone: sale.customer_phone },
+    });
+  } catch (err) { next(err); }
+});
+
+router.get("/:id/pdf", async (req, res, next) => {
+  try {
+    const [saleRes, itemsRes, settingsRes] = await Promise.all([
+      pool.query(
+        `SELECT s.*, u.name as cashier_name, c.name as customer_name, c.phone as customer_phone, c.tin_number as customer_tin,
+          i.invoice_number, i.issued_at
+         FROM sales s
+         LEFT JOIN users u ON u.id=s.user_id
+         LEFT JOIN customers c ON c.id=s.customer_id
+         LEFT JOIN invoices i ON i.sale_id=s.id
+         WHERE s.id=$1`,
+        [req.params.id]
+      ),
+      pool.query(
+        `SELECT si.*, stk.name as item_name, stk.unit FROM sale_items si
+         JOIN stock_items stk ON stk.id=si.stock_item_id WHERE si.sale_id=$1`,
+        [req.params.id]
+      ),
+      pool.query("SELECT * FROM settings LIMIT 1"),
+    ]);
+    const sale = saleRes.rows[0];
+    if (!sale) return res.status(404).json({ error: "Sale not found" });
+
+    createInvoicePDF(res, {
+      invoice: { invoice_number: sale.invoice_number || `INV-${sale.id}`, issued_at: sale.issued_at || sale.created_at },
+      sale,
+      items: itemsRes.rows,
+      settings: settingsRes.rows[0] || {},
+      customer: { name: sale.customer_name, tin_number: sale.customer_tin, phone: sale.customer_phone },
+    });
   } catch (err) { next(err); }
 });
 

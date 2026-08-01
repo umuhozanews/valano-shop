@@ -96,16 +96,45 @@ router.get("/sales-trend", async (req, res, next) => {
   try {
     const days = Math.min(parseInt(req.query.days) || 7, 90);
     const oid = req.ownerId;
-    const oWhere = oid !== null && oid !== undefined ? ` AND owner_id = $2` : '';
+    const sOwner = oid !== null && oid !== undefined ? ` AND s.owner_id = $2` : '';
+    const eOwner = oid !== null && oid !== undefined ? ` AND owner_id = $2` : '';
     const oParam = oid !== null && oid !== undefined ? [days, oid] : [days];
+
     const { rows } = await pool.query(
-      `SELECT DATE(created_at) as date,
-        SUM(total_amount) as revenue,
-        COUNT(*) as transactions
-       FROM sales
-       WHERE created_at >= NOW() - ($1 || ' days')::INTERVAL AND is_voided=false${oWhere}
-       GROUP BY DATE(created_at)
-       ORDER BY date`,
+      `WITH dates AS (
+         SELECT generate_series(CURRENT_DATE - ($1 || ' days')::INTERVAL + INTERVAL '1 day', CURRENT_DATE, '1 day')::date AS date
+       ),
+       d_sales AS (
+         SELECT DATE(created_at) as date, COALESCE(SUM(total_amount),0) as revenue, COUNT(*) as transactions
+         FROM sales s WHERE created_at >= CURRENT_DATE - ($1 || ' days')::INTERVAL AND is_voided=false ${sOwner}
+         GROUP BY DATE(created_at)
+       ),
+       d_cogs AS (
+         SELECT DATE(s.created_at) as date, COALESCE(SUM(si.quantity * stk.cost_price_rwf),0) as cogs
+         FROM sale_items si
+         JOIN sales s ON s.id = si.sale_id
+         JOIN stock_items stk ON stk.id = si.stock_item_id
+         WHERE s.created_at >= CURRENT_DATE - ($1 || ' days')::INTERVAL AND s.is_voided=false ${sOwner}
+         GROUP BY DATE(s.created_at)
+       ),
+       d_expenses AS (
+         SELECT DATE(expense_date) as date, COALESCE(SUM(amount),0) as expenses
+         FROM expenses
+         WHERE expense_date >= CURRENT_DATE - ($1 || ' days')::INTERVAL ${eOwner}
+         GROUP BY DATE(expense_date)
+       )
+       SELECT 
+         d.date::text,
+         COALESCE(s.revenue, 0)::bigint as revenue,
+         COALESCE(s.transactions, 0)::integer as transactions,
+         COALESCE(c.cogs, 0)::bigint as cogs,
+         COALESCE(e.expenses, 0)::bigint as expenses,
+         (COALESCE(s.revenue, 0) - COALESCE(c.cogs, 0) - COALESCE(e.expenses, 0))::bigint as net_profit
+       FROM dates d
+       LEFT JOIN d_sales s ON s.date = d.date
+       LEFT JOIN d_cogs c ON c.date = d.date
+       LEFT JOIN d_expenses e ON e.date = d.date
+       ORDER BY d.date ASC`,
       oParam
     );
     res.json(rows);
