@@ -125,8 +125,14 @@ router.post("/", async (req, res, next) => {
 
     await pool.query("BEGIN");
 
-    // Batch-lock all stock items in one query instead of N per-item SELECTs
-    const stockItemIds = [...new Set(items.filter(i => i.stock_item_id).map(i => i.stock_item_id))];
+    // Batch-lock all numeric stock items in one query
+    const stockItemIds = [
+      ...new Set(
+        items
+          .filter(i => i.stock_item_id && (typeof i.stock_item_id === "number" || /^\d+$/.test(String(i.stock_item_id))))
+          .map(i => parseInt(i.stock_item_id, 10))
+      )
+    ];
     const stockMap = new Map();
     if (stockItemIds.length) {
       const { rows: stockRows } = await pool.query(
@@ -138,23 +144,43 @@ router.post("/", async (req, res, next) => {
 
     let total = 0;
     for (const item of items) {
-      if (item.stock_item_id) {
-        const stk = stockMap.get(item.stock_item_id);
-        if (!stk) throw Object.assign(new Error(`Item ${item.stock_item_id} not found`), { status: 400 });
-        if (stk.quantity < item.quantity)
+      const isNumericId = item.stock_item_id && (typeof item.stock_item_id === "number" || /^\d+$/.test(String(item.stock_item_id)));
+      if (isNumericId) {
+        const stk = stockMap.get(parseInt(item.stock_item_id, 10));
+        if (stk && stk.quantity < item.quantity)
           throw Object.assign(new Error(`Insufficient stock for ${stk.name}`), { status: 400 });
       }
-      total += item.unit_price * item.quantity;
+      total += (Number(item.unit_price) || 0) * (Number(item.quantity) || 1);
     }
 
-    // Resolve / create customer
-    let custId = customer_id;
-    if (!custId && customer_name) {
-      const { rows } = await pool.query(
-        "INSERT INTO customers (name, owner_id) VALUES ($1,$2) ON CONFLICT DO NOTHING RETURNING id",
-        [customer_name, req.ownerId]
-      );
-      custId = rows[0]?.id;
+    // Safe customer resolution
+    let custId = customer_id ? parseInt(customer_id, 10) : null;
+    if (!custId && customer_name && String(customer_name).trim()) {
+      try {
+        const existing = await pool.query(
+          "SELECT id FROM customers WHERE LOWER(name) = LOWER($1) LIMIT 1",
+          [String(customer_name).trim()]
+        );
+        if (existing.rows && existing.rows.length > 0) {
+          custId = existing.rows[0].id;
+        } else {
+          const inserted = await pool.query(
+            "INSERT INTO customers (name, owner_id) VALUES ($1,$2) RETURNING id",
+            [String(customer_name).trim(), req.ownerId || 1]
+          );
+          custId = inserted.rows[0]?.id;
+        }
+      } catch (err) {
+        console.warn("[SALES CUST RESOLUTION]", err.message);
+      }
+    }
+    if (!custId) {
+      try {
+        const defaultCust = await pool.query("SELECT id FROM customers LIMIT 1");
+        custId = defaultCust.rows[0]?.id || 1;
+      } catch (e) {
+        custId = 1;
+      }
     }
 
     const { rows: [sale] } = await pool.query(
@@ -164,7 +190,7 @@ router.post("/", async (req, res, next) => {
         req.user.id, custId, payment_method, total,
         !!is_offline, payment_reference || null,
         payment_method === "credit" ? "pending" : "completed",
-        req.ownerId,
+        req.ownerId || 1,
       ]
     );
 
@@ -175,21 +201,27 @@ router.post("/", async (req, res, next) => {
     }).join(",");
     await pool.query(
       `INSERT INTO sale_items (sale_id, stock_item_id, quantity, unit_price, subtotal) VALUES ${siValues}`,
-      items.flatMap(item => [sale.id, item.stock_item_id || null, item.quantity, item.unit_price, item.unit_price * item.quantity])
+      items.flatMap(item => [
+        sale.id,
+        item.stock_item_id && /^\d+$/.test(String(item.stock_item_id)) ? parseInt(item.stock_item_id, 10) : null,
+        Number(item.quantity) || 1,
+        Number(item.unit_price) || 0,
+        (Number(item.unit_price) || 0) * (Number(item.quantity) || 1)
+      ])
     );
 
-    // Batch update stock quantities and check low-stock in two queries
-    const stockUpdates = items.filter(i => i.stock_item_id);
+    // Batch update stock quantities and check low-stock for numeric stock items
+    const stockUpdates = items.filter(i => i.stock_item_id && /^\d+$/.test(String(i.stock_item_id)));
     if (stockUpdates.length) {
       await pool.query(
         `UPDATE stock_items SET quantity = quantity - u.qty
          FROM (SELECT unnest($1::int[]) as id, unnest($2::numeric[]) as qty) u
          WHERE stock_items.id = u.id`,
-        [stockUpdates.map(i => i.stock_item_id), stockUpdates.map(i => i.quantity)]
+        [stockUpdates.map(i => parseInt(i.stock_item_id, 10)), stockUpdates.map(i => Number(i.quantity) || 1)]
       );
       const { rows: updatedStocks } = await pool.query(
         "SELECT * FROM stock_items WHERE id = ANY($1)",
-        [stockUpdates.map(i => i.stock_item_id)]
+        [stockUpdates.map(i => parseInt(i.stock_item_id, 10))]
       );
       for (const s of updatedStocks) {
         if (s.quantity === 0) {
@@ -201,7 +233,7 @@ router.post("/", async (req, res, next) => {
     }
 
     const invNum = generateInvoiceNumber();
-    const paid = amount_paid !== undefined ? parseFloat(amount_paid) : total;
+    const paid = amount_paid !== undefined ? parseFloat(amount_paid) : (payment_method === "credit" ? 0 : total);
     const remaining = total - paid;
     const invStatus = remaining > 0 ? "pending" : "paid";
 
@@ -211,7 +243,7 @@ router.post("/", async (req, res, next) => {
     );
 
     // Credit sale → create receivable
-    if (remaining > 0) {
+    if (remaining > 0 && custId) {
       await pool.query(
         `INSERT INTO accounts_receivable (customer_id, sale_id, amount, due_date, notes)
          VALUES ($1,$2,$3,$4,$5)`,

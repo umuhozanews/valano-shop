@@ -17,6 +17,7 @@ app.use(cors({
     const allowed = !origin
       || origin.endsWith(".vercel.app")
       || origin.endsWith(".up.railway.app")
+      || origin.endsWith(".pages.dev")
       || allowedOrigins.some(o => origin.startsWith(o));
     cb(null, allowed);
   },
@@ -38,8 +39,24 @@ app.get("/", (req, res) => {
     time: new Date().toISOString(),
   });
 });
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", time: new Date().toISOString(), version: "2.0.0", app: "Inzira Insights" });
+app.get("/api/health", async (req, res) => {
+  const pool = require("./src/config/db");
+  let dbStatus = "unknown";
+  let dbError = null;
+  let dbHost = "not_configured";
+  try {
+    const raw = process.env.DATABASE_URL || process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL || "";
+    if (raw) {
+      const match = raw.match(/@([^:\/]+)/);
+      dbHost = match ? match[1] : "configured";
+    }
+    await pool.query("SELECT 1");
+    dbStatus = "connected";
+  } catch (e) {
+    dbStatus = "error";
+    dbError = e.message;
+  }
+  res.json({ status: "ok", dbStatus, dbHost, dbError, time: new Date().toISOString(), version: "2.0.0" });
 });
 app.get("/health", (req, res) => {
   res.json({ status: "ok", time: new Date().toISOString(), version: "2.0.0", app: "Inzira Insights" });

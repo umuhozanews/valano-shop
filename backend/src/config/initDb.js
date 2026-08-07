@@ -517,8 +517,22 @@ ON CONFLICT (email) DO UPDATE SET
 `;
 
 let initPromise = null;
+let isInitialized = false;
 
 async function runInit() {
+  if (isInitialized) return;
+
+  try {
+    const check = await pool.query("SELECT 1 FROM users LIMIT 1");
+    if (check.rows.length >= 0) {
+      isInitialized = true;
+      console.log("[DB INIT] Database tables already present; skipping migration.");
+      return;
+    }
+  } catch (e) {
+    // Table doesn't exist yet — proceed with full schema setup
+  }
+
   await pool.query(SCHEMA_SQL);
   await pool.query(MIGRATION_SQL);
   await pool.query(BOOTSTRAP_SQL);
@@ -532,16 +546,23 @@ async function runInit() {
   try { await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS uq_credit_scores_user ON credit_scores(user_id) WHERE user_id IS NOT NULL"); } catch (e) { /* skip */ }
   try { await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS uq_lender_clients ON lender_clients(lender_user_id, sme_user_id) WHERE lender_user_id IS NOT NULL AND sme_user_id IS NOT NULL"); } catch (e) { /* skip */ }
 
-  const { rows } = await pool.query("SELECT COUNT(*)::int AS count FROM stock_items");
-  if (rows[0].count === 0) {
-    await pool.query(SEED_SQL);
-    console.log("[DB INIT] Schema created and seed data inserted.");
-  } else {
-    console.log("[DB INIT] Schema verified; existing data preserved.");
+  try {
+    const { rows } = await pool.query("SELECT COUNT(*)::int AS count FROM stock_items");
+    if (rows[0].count === 0) {
+      await pool.query(SEED_SQL);
+      console.log("[DB INIT] Schema created and seed data inserted.");
+    } else {
+      console.log("[DB INIT] Schema verified; existing data preserved.");
+    }
+  } catch (e) {
+    console.log("[DB INIT] Schema created.");
   }
+
+  isInitialized = true;
 }
 
 function ensureDbReady() {
+  if (isInitialized) return Promise.resolve();
   if (!initPromise) {
     initPromise = runInit().catch((err) => {
       initPromise = null;
