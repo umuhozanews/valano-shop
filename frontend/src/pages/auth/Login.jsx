@@ -24,7 +24,7 @@ export default function Login() {
     setError("");
     setLoading(true);
     try {
-      const u = await login(email, password);
+      const u = await login(email.trim(), password.trim());
       toast.success(`${t("welcome_back")}, ${u.name.split(" ")[0]}!`);
     } catch (err) {
       setError(err.response?.data?.error || t("login_failed"));

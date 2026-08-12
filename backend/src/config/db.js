@@ -118,16 +118,9 @@ const memoryStore = {
   ]
 };
 
-let useFallback = false;
-
 async function executeQuery(text, params = []) {
-  if (pool && !useFallback) {
-    try {
-      return await pool.query(text, params);
-    } catch (err) {
-      console.warn("[DB] PostgreSQL pool query failed. Switching to in-memory fallback:", err.message);
-      useFallback = true;
-    }
+  if (pool) {
+    return await pool.query(text, params);
   }
 
   // Fallback Execution
