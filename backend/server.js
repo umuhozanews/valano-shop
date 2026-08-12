@@ -27,18 +27,12 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(logger);
 
-// Serve uploaded files
+// Serve uploaded files & compiled static web app
+const fs = require("fs");
+const publicPath = path.join(__dirname, "public");
+app.use(express.static(publicPath));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-app.get("/", (req, res) => {
-  res.json({
-    app: "Inzira Insights API",
-    version: "2.0.0",
-    status: "running",
-    docs: "/api/health",
-    time: new Date().toISOString(),
-  });
-});
 app.get("/api/health", async (req, res) => {
   const pool = require("./src/config/db");
   let dbStatus = "unknown";
@@ -63,7 +57,17 @@ app.get("/health", (req, res) => {
 });
 
 app.use("/api", routes);
-app.use("/", routes);
+
+// SPA fallback for all web routes (serves Inzira Insights frontend on Vercel .vercel.app domain)
+app.get("*", (req, res, next) => {
+  if (req.path.startsWith("/api")) return next();
+  const indexPath = path.join(publicPath, "index.html");
+  if (fs.existsSync(indexPath)) {
+    return res.sendFile(indexPath);
+  }
+  next();
+});
+
 app.use(errorHandler);
 
 // Only start a long-running server (with cron + local backups) when this file

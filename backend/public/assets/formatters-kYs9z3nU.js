@@ -1,0 +1,1 @@
+import{f as n,b as e}from"./utils-N84C0eGB.js";function i(r){return r==null?"—":new Intl.NumberFormat("en-RW",{style:"currency",currency:"RWF",minimumFractionDigits:0,maximumFractionDigits:0}).format(r)}function f(r,t="dd MMM yyyy"){return r?n(new Date(r),t):"—"}function o(r){return r?e(new Date(r),{addSuffix:!0}):"—"}export{f as a,o as b,i as f};
