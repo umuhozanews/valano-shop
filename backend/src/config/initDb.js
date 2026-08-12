@@ -527,6 +527,26 @@ ON CONFLICT (email) DO UPDATE SET
   password_hash = EXCLUDED.password_hash,
   role          = EXCLUDED.role,
   name          = EXCLUDED.name;
+
+-- Ensure credit_scores exist for all SME users
+INSERT INTO credit_scores (user_id, score, band, factors, calculated_at)
+SELECT id, 74, 'green', '{"positive":[{"key":"sales_growth","label_en":"Strong sales turnover","value":15}],"negative":[]}', NOW()
+FROM users WHERE role IN ('sme_owner','admin')
+ON CONFLICT (user_id) DO NOTHING;
+
+-- Auto-link SMEs to default Advisor
+INSERT INTO advisor_clients (advisor_user_id, sme_user_id, notes)
+SELECT a.id, s.id, 'Assigned to DataBridge Advisory'
+FROM users a, users s
+WHERE a.email = 'advisor@inzira.rw' AND s.role IN ('sme_owner','admin')
+ON CONFLICT (advisor_user_id, sme_user_id) DO NOTHING;
+
+-- Auto-link SMEs to default Lenders
+INSERT INTO lender_clients (lender_user_id, sme_user_id, notes)
+SELECT l.id, s.id, 'Registered SME Client'
+FROM users l, users s
+WHERE l.email IN ('equity.bank@inzira.rw', 'bk.group@inzira.rw') AND s.role IN ('sme_owner','admin')
+ON CONFLICT (lender_user_id, sme_user_id) DO NOTHING;
 `;
 
 let initPromise = null;

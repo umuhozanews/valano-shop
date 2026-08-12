@@ -14,28 +14,27 @@ router.get("/dashboard", async (req, res, next) => {
       ? (req.query.advisor_id || req.user.id)
       : req.user.id;
 
-    // Overview statistics from advisor_clients or consented SMEs
+    // Overview statistics across all SMEs in the platform
     const { rows: [overview] } = await pool.query(`
       SELECT
-        COUNT(DISTINCT ac.sme_user_id) AS total_clients,
+        COUNT(DISTINCT u.id) AS total_clients,
         COUNT(DISTINCT cs.user_id) FILTER (WHERE cs.band='red') AS red_count,
         COUNT(DISTINCT cs.user_id) FILTER (WHERE cs.band='amber') AS amber_count,
         COUNT(DISTINCT cs.user_id) FILTER (WHERE cs.band='green') AS green_count,
         ROUND(AVG(cs.score) FILTER (WHERE cs.score IS NOT NULL), 1) AS avg_score,
-        (SELECT COUNT(*) FROM advisory_sessions WHERE advisor_id = $1 AND status IN ('scheduled','requested')) AS upcoming_sessions,
-        (SELECT COUNT(*) FROM advisory_sessions WHERE advisor_id = $1 AND status = 'completed') AS completed_sessions
-      FROM advisor_clients ac
-      LEFT JOIN credit_scores cs ON cs.user_id = ac.sme_user_id
-      WHERE ac.advisor_user_id = $1`, [advisorId]);
+        (SELECT COUNT(*) FROM advisory_sessions WHERE status IN ('scheduled','requested')) AS upcoming_sessions,
+        (SELECT COUNT(*) FROM advisory_sessions WHERE status = 'completed') AS completed_sessions
+      FROM users u
+      LEFT JOIN credit_scores cs ON cs.user_id = u.id
+      WHERE u.role IN ('sme_owner','admin')`);
 
     // High-risk SMEs needing urgent advisory
     const { rows: atRisk } = await pool.query(`
-      SELECT ac.sme_user_id, u.name, u.email, u.phone, u.sector, u.district, cs.score, cs.band, cs.factors, cs.calculated_at
-      FROM advisor_clients ac
-      JOIN users u ON u.id = ac.sme_user_id
-      LEFT JOIN credit_scores cs ON cs.user_id = ac.sme_user_id
-      WHERE ac.advisor_user_id = $1 AND (cs.band = 'red' OR cs.score < 40)
-      ORDER BY cs.score ASC NULLS FIRST LIMIT 10`, [advisorId]);
+      SELECT u.id as sme_user_id, u.name, u.email, u.phone, u.sector, u.district, cs.score, cs.band, cs.factors, cs.calculated_at
+      FROM users u
+      LEFT JOIN credit_scores cs ON cs.user_id = u.id
+      WHERE u.role IN ('sme_owner','admin') AND (cs.band = 'red' OR cs.score < 40 OR cs.score IS NULL)
+      ORDER BY cs.score ASC NULLS FIRST LIMIT 10`);
 
     // Upcoming sessions
     const { rows: upcomingSessions } = await pool.query(`
@@ -43,8 +42,8 @@ router.get("/dashboard", async (req, res, next) => {
              u.name as business_name, u.email as business_email, u.sector
       FROM advisory_sessions s
       JOIN users u ON u.id = s.business_id
-      WHERE s.advisor_id = $1 AND s.status IN ('scheduled','requested')
-      ORDER BY s.scheduled_at ASC NULLS LAST LIMIT 10`, [advisorId]);
+      WHERE s.status IN ('scheduled','requested')
+      ORDER BY s.scheduled_at ASC NULLS LAST LIMIT 10`);
 
     res.json({
       overview: {
@@ -72,8 +71,9 @@ router.get("/clients", async (req, res, next) => {
     const { band, sector, search, page = 1, limit = 20 } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    const conditions = ["ac.advisor_user_id = $1"];
-    const params = [advisorId];
+    const conditions = ["u.role IN ('sme_owner','admin')"];
+    const params = [];
+
     if (band)   { params.push(band);   conditions.push(`cs.band = $${params.length}`); }
     if (sector) { params.push(sector); conditions.push(`u.sector = $${params.length}`); }
     if (search) { params.push(`%${search}%`); conditions.push(`(u.name ILIKE $${params.length} OR u.email ILIKE $${params.length})`); }
@@ -81,22 +81,22 @@ router.get("/clients", async (req, res, next) => {
     const where = conditions.join(" AND ");
 
     const { rows } = await pool.query(`
-      SELECT ac.id, ac.sme_user_id, ac.notes as client_notes, ac.created_at as linked_at,
+      SELECT COALESCE(ac.id, u.id) as id, u.id as sme_user_id, ac.notes as client_notes,
+             COALESCE(ac.created_at, u.created_at) as linked_at,
              u.name, u.email, u.phone, u.sector, u.district, u.created_at as member_since,
              cs.score, cs.band, cs.advisory_token, cs.calculated_at,
-             (SELECT MAX(scheduled_at) FROM advisory_sessions WHERE business_id = ac.sme_user_id AND advisor_id = ac.advisor_user_id) as last_session_at,
-             (SELECT COUNT(*) FROM advisory_sessions WHERE business_id = ac.sme_user_id AND advisor_id = ac.advisor_user_id) as total_sessions
-      FROM advisor_clients ac
-      JOIN users u ON u.id = ac.sme_user_id
-      LEFT JOIN credit_scores cs ON cs.user_id = ac.sme_user_id
+             (SELECT MAX(scheduled_at) FROM advisory_sessions WHERE business_id = u.id) as last_session_at,
+             (SELECT COUNT(*) FROM advisory_sessions WHERE business_id = u.id) as total_sessions
+      FROM users u
+      LEFT JOIN advisor_clients ac ON ac.sme_user_id = u.id AND ac.advisor_user_id = $1
+      LEFT JOIN credit_scores cs ON cs.user_id = u.id
       WHERE ${where}
-      ORDER BY cs.score ASC NULLS FIRST, ac.created_at DESC
+      ORDER BY cs.score ASC NULLS FIRST, u.created_at DESC
       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
-      [...params, parseInt(limit), offset]);
+      [advisorId, ...params, parseInt(limit), offset]);
 
     const { rows: [cnt] } = await pool.query(
-      `SELECT COUNT(*) FROM advisor_clients ac JOIN users u ON u.id=ac.sme_user_id
-       LEFT JOIN credit_scores cs ON cs.user_id=ac.sme_user_id WHERE ${where}`,
+      `SELECT COUNT(*) FROM users u LEFT JOIN credit_scores cs ON cs.user_id=u.id WHERE ${where}`,
       params
     );
 

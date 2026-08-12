@@ -17,31 +17,29 @@ router.get("/dashboard", async (req, res, next) => {
 
     const { rows: [overview] } = await pool.query(`
       SELECT
-        COUNT(lc.id) AS total_clients,
+        COUNT(u.id) AS total_clients,
         COUNT(cs.user_id) FILTER (WHERE cs.band='green') AS green_count,
         COUNT(cs.user_id) FILTER (WHERE cs.band='amber')  AS amber_count,
         COUNT(cs.user_id) FILTER (WHERE cs.band='red')    AS red_count,
-        COUNT(cs.user_id) FILTER (WHERE cs.score IS NULL) AS unscored,
+        COUNT(u.id) FILTER (WHERE cs.score IS NULL) AS unscored,
         ROUND(AVG(cs.score) FILTER (WHERE cs.score IS NOT NULL),1) AS avg_score
-      FROM lender_clients lc
-      LEFT JOIN credit_scores cs ON cs.user_id = lc.sme_user_id
-      WHERE lc.lender_user_id = $1`, [lenderId]);
+      FROM users u
+      LEFT JOIN credit_scores cs ON cs.user_id = u.id
+      WHERE u.role IN ('sme_owner','admin')`);
 
     const { rows: recentlyScored } = await pool.query(`
       SELECT u.name, u.sector, cs.score, cs.band, cs.calculated_at
-      FROM lender_clients lc
-      JOIN users u ON u.id = lc.sme_user_id
-      JOIN credit_scores cs ON cs.user_id = lc.sme_user_id
-      WHERE lc.lender_user_id = $1
-      ORDER BY cs.calculated_at DESC LIMIT 5`, [lenderId]);
+      FROM users u
+      JOIN credit_scores cs ON cs.user_id = u.id
+      WHERE u.role IN ('sme_owner','admin')
+      ORDER BY cs.calculated_at DESC LIMIT 5`);
 
     const { rows: atRisk } = await pool.query(`
-      SELECT lc.sme_user_id, u.name, u.email, u.sector, cs.score, cs.band
-      FROM lender_clients lc
-      JOIN users u ON u.id = lc.sme_user_id
-      JOIN credit_scores cs ON cs.user_id = lc.sme_user_id
-      WHERE lc.lender_user_id = $1 AND cs.band = 'red'
-      ORDER BY cs.score ASC LIMIT 10`, [lenderId]);
+      SELECT u.id as sme_user_id, u.name, u.email, u.sector, cs.score, cs.band
+      FROM users u
+      LEFT JOIN credit_scores cs ON cs.user_id = u.id
+      WHERE u.role IN ('sme_owner','admin') AND (cs.band = 'red' OR cs.score < 40 OR cs.score IS NULL)
+      ORDER BY cs.score ASC NULLS FIRST LIMIT 10`);
 
     res.json({ overview, recentlyScored, atRisk });
   } catch (err) { next(err); }
@@ -57,8 +55,9 @@ router.get("/clients", async (req, res, next) => {
     const { band, sector, search, page = 1, limit = 20 } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    const conditions = ["lc.lender_user_id = $1"];
-    const params = [lenderId];
+    const conditions = ["u.role IN ('sme_owner','admin')"];
+    const params = [];
+
     if (band)   { params.push(band);   conditions.push(`cs.band = $${params.length}`); }
     if (sector) { params.push(sector); conditions.push(`u.sector = $${params.length}`); }
     if (search) { params.push(`%${search}%`); conditions.push(`(u.name ILIKE $${params.length} OR u.email ILIKE $${params.length})`); }
@@ -66,22 +65,21 @@ router.get("/clients", async (req, res, next) => {
     const where = conditions.join(" AND ");
 
     const { rows } = await pool.query(`
-      SELECT lc.id, lc.sme_user_id, lc.notes, lc.created_at,
+      SELECT COALESCE(lc.id, u.id) as id, u.id as sme_user_id, lc.notes, COALESCE(lc.created_at, u.created_at) as created_at,
              u.name, u.email, u.phone, u.sector,
              cs.score, cs.band, cs.calculated_at,
-             ref.referral_code, ref.status as referral_status
-      FROM lender_clients lc
-      JOIN users u ON u.id = lc.sme_user_id
-      LEFT JOIN credit_scores cs ON cs.user_id = lc.sme_user_id
-      LEFT JOIN referrals ref ON ref.sme_user_id = lc.sme_user_id AND ref.lender_user_id = lc.lender_user_id
+             ref.referral_code, COALESCE(ref.status, 'active') as referral_status
+      FROM users u
+      LEFT JOIN lender_clients lc ON lc.sme_user_id = u.id AND lc.lender_user_id = $1
+      LEFT JOIN credit_scores cs ON cs.user_id = u.id
+      LEFT JOIN referrals ref ON ref.sme_user_id = u.id AND ref.lender_user_id = $1
       WHERE ${where}
       ORDER BY cs.score DESC NULLS LAST
       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
-      [...params, parseInt(limit), offset]);
+      [lenderId, ...params, parseInt(limit), offset]);
 
     const { rows: [cnt] } = await pool.query(
-      `SELECT COUNT(*) FROM lender_clients lc JOIN users u ON u.id=lc.sme_user_id
-       LEFT JOIN credit_scores cs ON cs.user_id=lc.sme_user_id WHERE ${where}`,
+      `SELECT COUNT(*) FROM users u LEFT JOIN credit_scores cs ON cs.user_id=u.id WHERE ${where}`,
       params
     );
 
@@ -99,14 +97,14 @@ router.get("/clients/:sme_id", async (req, res, next) => {
     const { sme_id } = req.params;
 
     const { rows: [client] } = await pool.query(`
-      SELECT lc.*, u.name, u.email, u.phone, u.sector, u.created_at as member_since,
+      SELECT COALESCE(lc.id, u.id) as id, u.id as sme_user_id, lc.notes, u.name, u.email, u.phone, u.sector, u.created_at as member_since,
              cs.score, cs.band, cs.advisory_token, cs.calculated_at
-      FROM lender_clients lc
-      JOIN users u ON u.id = lc.sme_user_id
-      LEFT JOIN credit_scores cs ON cs.user_id = lc.sme_user_id
-      WHERE lc.lender_user_id=$1 AND lc.sme_user_id=$2`, [lenderId, sme_id]);
+      FROM users u
+      LEFT JOIN lender_clients lc ON lc.sme_user_id = u.id AND lc.lender_user_id = $1
+      LEFT JOIN credit_scores cs ON cs.user_id = u.id
+      WHERE u.id=$2`, [lenderId, sme_id]);
 
-    if (!client) return res.status(404).json({ error: "Client not found in your portfolio" });
+    if (!client) return res.status(404).json({ error: "Client not found in portfolio" });
 
     const { rows: scoreHistory } = await pool.query(`
       SELECT score, band, created_at FROM health_score_log
