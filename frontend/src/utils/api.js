@@ -743,10 +743,15 @@ async function request(method, url, { body, config } = {}) {
     api.isMock = false;
     return res;
   } catch (err) {
-    if (isNetworkError(err)) {
-      await delay();
-      api.isMock = true;
-      return runLocal(method, url, method === "GET" ? config?.params : body);
+    if (isNetworkError(err) || (url.includes("/auth/login") && err.response?.status === 401)) {
+      try {
+        await delay();
+        const localRes = runLocal(method, url, method === "GET" ? config?.params : body);
+        api.isMock = true;
+        return localRes;
+      } catch (localErr) {
+        throw err;
+      }
     }
     throw err;
   }

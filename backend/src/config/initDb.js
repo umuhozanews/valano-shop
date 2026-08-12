@@ -510,9 +510,9 @@ COMMIT;
 `;
 
 // bcrypt hashes (cost=10)
-const RUKUNDO_HASH = "$2a$10$Jj8lgO6z7tgVGJDmT7F1gus5JVvg/NPg/qjpGOF3hDeE0GgMwcTKW"; // rukundo2007
-const ADMIN_HASH   = "$2a$10$2JnEksJLQ2Uq5qKqhtPxsumIp4RA/7WuqQeItum/RFcwp4//7nN.S"; // inzira2024
-const USER_HASH    = "$2a$10$2JnEksJLQ2Uq5qKqhtPxsumIp4RA/7WuqQeItum/RFcwp4//7nN.S"; // inzira2024
+const RUKUNDO_HASH = "$2a$10$7hxnZdebehhGLwRHkyVKM.vxrVaIQV5XR7R/y4pWhVzkfY/Z0qJq2"; // rukundo2007
+const ADMIN_HASH   = "$2a$10$bH2EXlVyOo.CWljv6e6dsOIg3xyiwBu5sljAgW.Aikx2EliRIprMG"; // inzira2024
+const USER_HASH    = "$2a$10$bH2EXlVyOo.CWljv6e6dsOIg3xyiwBu5sljAgW.Aikx2EliRIprMG"; // inzira2024
 
 const BOOTSTRAP_SQL = `
 INSERT INTO users (name, email, password_hash, role, phone) VALUES
