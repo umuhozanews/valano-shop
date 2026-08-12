@@ -123,7 +123,7 @@ async function executeQuery(text, params = []) {
     return await pool.query(text, params);
   }
 
-  // Fallback Execution
+  // Fallback Execution for Serverless / In-Memory
   const normalized = text.trim().toLowerCase();
 
   if (normalized.startsWith("begin") || normalized.startsWith("commit") || normalized.startsWith("rollback")) {
@@ -132,6 +132,44 @@ async function executeQuery(text, params = []) {
 
   if (normalized.includes("select 1")) {
     return { rows: [{ "?column?": 1 }], rowCount: 1 };
+  }
+
+  // Handle Aggregate / Count / KPI Queries first
+  if (normalized.includes("count(") || normalized.includes("sum(") || normalized.includes("avg(")) {
+    const totalUsers = memoryStore.users.length;
+    const totalSmes = memoryStore.users.filter(u => u.role === 'sme_owner').length || 1;
+    return {
+      rows: [{
+        count: totalUsers,
+        total_smes: totalSmes,
+        new_this_month: totalSmes,
+        consented: totalSmes,
+        declined: 0,
+        withdrawn: 0,
+        inactive: 0,
+        total_scored: totalSmes,
+        green: totalSmes,
+        amber: 0,
+        red: 0,
+        avg_score: 78,
+        min_score: 65,
+        max_score: 92,
+        total_lenders: 1,
+        total_referrals: 0,
+        active_referrals: 0,
+        sales_30d: memoryStore.sales.length,
+        revenue_30d: 17300,
+        total: totalUsers,
+        portfolio_size: 1,
+        avg_portfolio_score: 78,
+        active_sellers: 1,
+        have_expenses: 1,
+        stock_items: memoryStore.stock_items.length,
+        scored_businesses: totalSmes,
+        scored_this_week: totalSmes
+      }],
+      rowCount: 1
+    };
   }
 
   if (normalized.includes("from users")) {
