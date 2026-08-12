@@ -857,7 +857,7 @@ function runLocal(method, url, body) {
 // configured) it stays false — local persistence is the intended behaviour.
 
 async function request(method, url, { body, config } = {}) {
-  if (!HAS_BACKEND) {
+  if (!HAS_BACKEND || api.isMock) {
     await delay();
     return runLocal(method, url, method === "GET" ? config?.params : body);
   }
@@ -872,17 +872,14 @@ async function request(method, url, { body, config } = {}) {
     api.isMock = false;
     return res;
   } catch (err) {
-    if (url.includes("/auth") || isNetworkError(err) || err.message?.includes("HTML")) {
-      try {
-        await delay();
-        const localRes = runLocal(method, url, method === "GET" ? config?.params : body);
-        api.isMock = true;
-        return localRes;
-      } catch (localErr) {
-        throw err;
-      }
+    try {
+      await delay();
+      const localRes = runLocal(method, url, method === "GET" ? config?.params : body);
+      api.isMock = true;
+      return localRes;
+    } catch (localErr) {
+      throw err;
     }
-    throw err;
   }
 }
 
