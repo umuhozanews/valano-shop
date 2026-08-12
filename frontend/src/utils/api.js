@@ -61,7 +61,7 @@ function isHtmlResponse(res) {
 function isNetworkError(err) {
   if (err.response) {
     if (isHtmlResponse(err.response)) return true;
-    if (err.response.status >= 500) return true;
+    if (err.response.status >= 404) return true;
     return false;
   }
   return true;
