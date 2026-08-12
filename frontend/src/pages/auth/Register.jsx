@@ -110,6 +110,7 @@ export default function Register() {
   const [showConfirm, setShowConfirm] = useState(false);
 
   const [form, setForm] = useState({
+    accountType: "sme_owner",
     firstName: "", lastName: "", email: "",
     businessName: "", sectors: [], district: "", phone: "",
     password: "", confirmPassword: "",
@@ -125,7 +126,7 @@ export default function Register() {
       setStep(1);
     } else if (step === 1) {
       if (!form.businessName.trim())
-        return setError("Please enter your business name.");
+        return setError("Please enter your organization or business name.");
       setStep(2);
     } else {
       await handleSubmit();
@@ -140,7 +141,8 @@ export default function Register() {
     setLoading(true);
     setError("");
     try {
-      await register({
+      const res = await register({
+        accountType: form.accountType,
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         email: form.email.trim(),
@@ -150,8 +152,10 @@ export default function Register() {
         phone: form.phone || undefined,
         password: form.password,
       });
-      toast.success(`Welcome to INZIRA, ${form.firstName}! Your account is ready.`);
-      navigate("/app/dashboard");
+      toast.success(`Welcome to INZIRA, ${form.firstName}! Account created.`);
+      const role = res?.user?.role || form.accountType;
+      const targetPath = role === "lender" ? "/app/lender" : role === "databridge_advisor" ? "/app/advisor" : "/app/dashboard";
+      navigate(targetPath);
     } catch (err) {
       setError(err.response?.data?.error || "Registration failed. Please try again.");
     } finally {
@@ -256,9 +260,35 @@ export default function Register() {
           )}
 
           <form onSubmit={handleNext} className="space-y-4">
-            {/* Step 0 — Account info */}
+            {/* Step 0 — Account info & Role Selection */}
             {step === 0 && (
               <>
+                <div>
+                  <label className="block text-[14px] font-medium text-text-primary mb-1.5">I am registering as a:</label>
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    {[
+                      { key: "sme_owner", label: "SME Business", icon: "🏢", desc: "Sales, stock & score" },
+                      { key: "lender", label: "Lender / Bank", icon: "🏦", desc: "Credit risk portfolio" },
+                      { key: "databridge_advisor", label: "Advisor", icon: "🎓", desc: "Consulting & interventions" },
+                    ].map(t => (
+                      <button
+                        key={t.key}
+                        type="button"
+                        onClick={() => set("accountType", t.key)}
+                        className={`p-2.5 rounded-card border text-left transition-all ${
+                          form.accountType === t.key
+                            ? "border-primary bg-primary/5 ring-1 ring-primary"
+                            : "border-border hover:border-primary/40 bg-surface"
+                        }`}
+                      >
+                        <span className="text-[18px] block mb-0.5">{t.icon}</span>
+                        <p className="text-[13px] font-bold text-text-primary leading-tight">{t.label}</p>
+                        <p className="text-[11px] text-text-secondary leading-tight mt-0.5">{t.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[14px] font-medium text-text-primary mb-1">First Name</label>
@@ -275,9 +305,9 @@ export default function Register() {
                 </div>
 
                 <div>
-                  <label className="block text-[14px] font-medium text-text-primary mb-1">Email Address</label>
+                  <label className="block text-[14px] font-medium text-text-primary mb-1">Work Email Address</label>
                   <input type="email" value={form.email} onChange={e => set("email", e.target.value)}
-                    placeholder="you@business.rw" required
+                    placeholder="you@organization.rw" required
                     className="w-full h-10 px-3 border border-border rounded-card bg-surface text-[15px] focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" />
                 </div>
 
@@ -290,26 +320,38 @@ export default function Register() {
               </>
             )}
 
-            {/* Step 1 — Business info */}
+            {/* Step 1 — Business / Organization info */}
             {step === 1 && (
               <>
                 <div>
-                  <label className="block text-[14px] font-medium text-text-primary mb-1">Business / Shop Name</label>
+                  <label className="block text-[14px] font-medium text-text-primary mb-1">
+                    {form.accountType === "lender"
+                      ? "Bank / Financial Institution Name"
+                      : form.accountType === "databridge_advisor"
+                      ? "Advisory Firm / Organization Name"
+                      : "Business / Shop Name"}
+                  </label>
                   <input value={form.businessName} onChange={e => set("businessName", e.target.value)}
-                    placeholder="e.g. Mutoni General Store" required
+                    placeholder={
+                      form.accountType === "lender"
+                        ? "e.g. Equity Bank Rwanda"
+                        : form.accountType === "databridge_advisor"
+                        ? "e.g. Business Growth Advisory"
+                        : "e.g. Mutoni General Store"
+                    } required
                     className="w-full h-10 px-3 border border-border rounded-card bg-surface text-[15px] focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" />
-                  <p className="text-[12px] text-text-secondary mt-1">This name will appear on receipts and reports.</p>
+                  <p className="text-[12px] text-text-secondary mt-1">This name identifies your account across Inzira Insights.</p>
                 </div>
 
                 <div>
                   <label className="block text-[14px] font-medium text-text-primary mb-1">
-                    Business Sector <span className="text-text-secondary font-normal">(choose up to 3)</span>
+                    {form.accountType === "sme_owner" ? "Business Sector" : "Focus Sector / Industry"} <span className="text-text-secondary font-normal">(choose up to 3)</span>
                   </label>
                   <MultiSectorSelect value={form.sectors} onChange={v => set("sectors", v)} />
                 </div>
 
                 <div>
-                  <label className="block text-[14px] font-medium text-text-primary mb-1">District <span className="text-text-secondary font-normal">(optional)</span></label>
+                  <label className="block text-[14px] font-medium text-text-primary mb-1">District / Region <span className="text-text-secondary font-normal">(optional)</span></label>
                   <select value={form.district} onChange={e => set("district", e.target.value)}
                     className="w-full h-10 px-3 border border-border rounded-card bg-surface text-[15px] focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
                     <option value="">Select district…</option>

@@ -262,6 +262,16 @@ CREATE TABLE IF NOT EXISTS advisory_outcomes (
   recorded_at  TIMESTAMP DEFAULT NOW()
 );
 
+-- Advisor clients join table
+CREATE TABLE IF NOT EXISTS advisor_clients (
+  id               SERIAL PRIMARY KEY,
+  advisor_user_id  INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  sme_user_id      INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  notes            TEXT,
+  created_at       TIMESTAMP DEFAULT NOW(),
+  UNIQUE(advisor_user_id, sme_user_id)
+);
+
 -- Lender / Institution (user-to-SME join table)
 CREATE TABLE IF NOT EXISTS lender_clients (
   id              SERIAL PRIMARY KEY,
@@ -506,10 +516,13 @@ const USER_HASH    = "$2a$10$2JnEksJLQ2Uq5qKqhtPxsumIp4RA/7WuqQeItum/RFcwp4//7nN
 
 const BOOTSTRAP_SQL = `
 INSERT INTO users (name, email, password_hash, role, phone) VALUES
-  ('Rukundo Joseph', 'rukundojosephtuyishime@gmail.com', '${RUKUNDO_HASH}', 'pulse_admin', '+250780000001'),
-  ('Admin',          'admin@inzira.rw',                  '${ADMIN_HASH}',   'pulse_admin', '+250780000004'),
-  ('Demo Business',  'demo@inzira.rw',                   '${USER_HASH}',    'sme_owner',   '+250780000002'),
-  ('Demo Cashier',   'cashier@inzira.rw',                '${USER_HASH}',    'cashier',     '+250780000003')
+  ('Rukundo Joseph',     'rukundojosephtuyishime@gmail.com', '${RUKUNDO_HASH}', 'pulse_admin',        '+250780000001'),
+  ('Admin',              'admin@inzira.rw',                  '${ADMIN_HASH}',   'pulse_admin',        '+250780000004'),
+  ('Demo Business',      'demo@inzira.rw',                   '${USER_HASH}',    'sme_owner',          '+250780000002'),
+  ('Demo Cashier',       'cashier@inzira.rw',                '${USER_HASH}',    'cashier',            '+250780000003'),
+  ('DataBridge Advisor', 'advisor@inzira.rw',                '${USER_HASH}',    'databridge_advisor', '+250788400001'),
+  ('Equity Bank Rwanda', 'equity.bank@inzira.rw',            '${USER_HASH}',    'lender',             '+250788300001'),
+  ('BK Group',           'bk.group@inzira.rw',               '${USER_HASH}',    'lender',             '+250788300002')
 ON CONFLICT (email) DO UPDATE SET
   password_hash = EXCLUDED.password_hash,
   role          = EXCLUDED.role,
@@ -523,19 +536,22 @@ async function runInit() {
   if (isInitialized) return;
 
   try {
-    const check = await pool.query("SELECT 1 FROM users LIMIT 1");
-    if (check.rows.length >= 0) {
-      isInitialized = true;
-      console.log("[DB INIT] Database tables already present; skipping migration.");
-      return;
-    }
+    await pool.query(SCHEMA_SQL);
   } catch (e) {
-    // Table doesn't exist yet — proceed with full schema setup
+    console.error("[DB INIT] Schema error:", e.message);
   }
 
-  await pool.query(SCHEMA_SQL);
-  await pool.query(MIGRATION_SQL);
-  await pool.query(BOOTSTRAP_SQL);
+  try {
+    await pool.query(MIGRATION_SQL);
+  } catch (e) {
+    console.error("[DB INIT] Migration error:", e.message);
+  }
+
+  try {
+    await pool.query(BOOTSTRAP_SQL);
+  } catch (e) {
+    console.error("[DB INIT] Bootstrap error:", e.message);
+  }
 
   // Run indexes individually — skip any that fail (column may not exist in old schema)
   for (const sql of INDEX_SQL) {

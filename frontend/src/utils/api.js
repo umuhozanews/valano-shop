@@ -257,27 +257,73 @@ function handle(method, url, body) {
     return { ok: true };
   }
 
+  if (path === "/auth/register") {
+    const role = body?.accountType || body?.role || "sme_owner";
+    const name = `${body?.firstName || ''} ${body?.lastName || ''}`.trim() || body?.businessName || "New User";
+    const newUser = {
+      id: Date.now(),
+      name,
+      email: body?.email?.toLowerCase().trim(),
+      role,
+      sector: Array.isArray(body?.sectors) ? body.sectors.join(", ") : (body?.sectors || null),
+      district: body?.district || null,
+      consent_status: "granted",
+      is_active: true
+    };
+    if (!DB.REGISTERED_USERS) DB.REGISTERED_USERS = {};
+    DB.REGISTERED_USERS[newUser.email] = { user: newUser, password: body?.password };
+    saveState();
+    return { user: newUser, accessToken: "local-access-token", refreshToken: "local-refresh-token", businessName: body?.businessName };
+  }
+
   if (path === "/auth/login") {
-    const USERS = {
-      "rukundojosephtuyishime@gmail.com": { id:1, name:"Rukundo joseph", email:"rukundojosephtuyishime@gmail.com", role:"admin", branch_id:1 },
-      "manager@inzira-insights.rw":   { id:2, name:"Habimana Jean Pierre", email:"manager@inzira-insights.rw",   role:"manager",    branch_id:1 },
-      "accounts@inzira-insights.rw":  { id:3, name:"Uwimana Angélique",    email:"accounts@inzira-insights.rw",  role:"accountant", branch_id:1 },
-      "worker1@inzira-insights.rw":   { id:4, name:"Uwamahoro Marie",       email:"worker1@inzira-insights.rw",   role:"worker",     branch_id:1 },
+    const SEED_USERS = {
+      "rukundojosephtuyishime@gmail.com": { user: { id:1, name:"Rukundo Joseph", email:"rukundojosephtuyishime@gmail.com", role:"pulse_admin" }, pass:"rukundo2007" },
+      "admin@inzira.rw":                  { user: { id:2, name:"Admin", email:"admin@inzira.rw", role:"pulse_admin" }, pass:"inzira2024" },
+      "demo@inzira.rw":                   { user: { id:3, name:"Demo Shop Owner", email:"demo@inzira.rw", role:"sme_owner", sector:"Retail Shop", district:"Gasabo" }, pass:"inzira2024" },
+      "advisor@inzira.rw":                { user: { id:4, name:"DataBridge Advisor", email:"advisor@inzira.rw", role:"databridge_advisor" }, pass:"inzira2024" },
+      "equity.bank@inzira.rw":            { user: { id:5, name:"Equity Bank Rwanda", email:"equity.bank@inzira.rw", role:"lender" }, pass:"inzira2024" },
+      "bk.group@inzira.rw":               { user: { id:6, name:"BK Group", email:"bk.group@inzira.rw", role:"lender" }, pass:"inzira2024" },
+      "cashier@inzira.rw":                { user: { id:7, name:"Demo Cashier", email:"cashier@inzira.rw", role:"cashier" }, pass:"inzira2024" },
+      "manager@inzira.rw":                { user: { id:8, name:"Shop Manager", email:"manager@inzira.rw", role:"manager" }, pass:"inzira2024" },
+      "manager@inzira-insights.rw":       { user: { id:8, name:"Shop Manager", email:"manager@inzira-insights.rw", role:"manager" }, pass:"inzira2024" },
+      "accountant@inzira.rw":             { user: { id:9, name:"Business Accountant", email:"accountant@inzira.rw", role:"accountant" }, pass:"inzira2024" },
+      "accounts@inzira-insights.rw":      { id:9, user: { id:9, name:"Business Accountant", email:"accounts@inzira-insights.rw", role:"accountant" }, pass:"inzira2024" },
     };
-    const PASSWORDS = {
-      "rukundojosephtuyishime@gmail.com": "rukundo2007",
-      "manager@inzira-insights.rw":  "inzira2024",
-      "accounts@inzira-insights.rw": "inzira2024",
-      "worker1@inzira-insights.rw":  "inzira2024",
-    };
+
     const email = body?.email?.trim().toLowerCase();
-    const u = USERS[email];
-    if (!u || body?.password !== PASSWORDS[email]) {
+    const pass = body?.password?.trim();
+
+    let account = SEED_USERS[email];
+    if (!account && DB.REGISTERED_USERS && DB.REGISTERED_USERS[email]) {
+      account = DB.REGISTERED_USERS[email];
+      if (account.password && pass && account.password !== pass) {
+        account = null;
+      }
+    }
+
+    if (!account) {
+      // Fallback for any demo login if password provided
+      if (email && pass && (pass === "inzira2024" || pass === "rukundo2007")) {
+        const inferredRole = email.includes("bank") || email.includes("lender") ? "lender"
+          : email.includes("advisor") ? "databridge_advisor"
+          : email.includes("admin") ? "pulse_admin"
+          : "sme_owner";
+        const fallbackUser = { id: Date.now(), name: email.split("@")[0].toUpperCase(), email, role: inferredRole };
+        return { user: fallbackUser, accessToken: "local-access-token", refreshToken: "local-refresh-token" };
+      }
       const err = new Error("Invalid credentials");
       err.response = { status: 401, data: { error: "Invalid credentials" } };
       throw err;
     }
-    return { user:u, accessToken:"local-access-token", refreshToken:"local-refresh-token" };
+
+    if (account.pass && pass && account.pass !== pass) {
+      const err = new Error("Invalid credentials");
+      err.response = { status: 401, data: { error: "Invalid credentials" } };
+      throw err;
+    }
+
+    return { user: account.user, accessToken: "local-access-token", refreshToken: "local-refresh-token" };
   }
 
   // Dashboard Stats

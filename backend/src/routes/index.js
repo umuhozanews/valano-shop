@@ -21,9 +21,10 @@ router.use("/accounts-payable",   require("./accounts-payable"));
 router.use("/payments",           require("./payments"));
 router.use("/books",              require("./financial-books"));
 
-// ── v2: Health Score, Lender, Pulse Admin ────────────────────────────────────
+// ── v2: Health Score, Lender, Advisor, Pulse Admin ────────────────────────────
 router.use("/v2/score",           require("./score"));
 router.use("/v2/lender",          require("./lender"));
+router.use("/v2/advisor",         require("./advisor"));
 router.use("/v2/admin",           require("./admin"));
 
 module.exports = router;

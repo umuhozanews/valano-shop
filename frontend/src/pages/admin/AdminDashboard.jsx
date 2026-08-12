@@ -37,31 +37,41 @@ export default function AdminDashboard() {
     try {
       const { data } = await api.get("/v2/admin/dashboard");
       setOverview(data);
-    } catch (err) { toast.error("Failed to load dashboard"); }
+    } catch (err) {
+      console.warn("Could not load admin overview dashboard", err);
+    }
   }
 
   async function loadSmes() {
     try {
       const { data } = await api.get("/v2/admin/smes", { params: { page: smePage, limit: 20, search: smeSearch || undefined } });
-      setSmes(data.smes || data.data || []); setSmeTotal(data.total || 0);
-    } catch { toast.error("Failed to load SMEs"); }
+      setSmes(Array.isArray(data.smes) ? data.smes : (Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : [])));
+      setSmeTotal(data.total || (Array.isArray(data.smes) ? data.smes.length : 0));
+    } catch (err) {
+      console.warn("Could not load SMEs", err);
+    }
   }
 
   async function loadLenders() {
     try {
       const { data } = await api.get("/v2/admin/lenders");
-      setLenders(data || []);
-    } catch { toast.error("Failed to load lenders"); }
+      setLenders(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.warn("Could not load lenders", err);
+    }
   }
 
   async function loadModel() {
     try {
       const [mRes, dqRes] = await Promise.all([
-        api.get("/v2/admin/model/performance"),
-        api.get("/v2/admin/data-quality"),
+        api.get("/v2/admin/model/performance").catch(() => ({ data: null })),
+        api.get("/v2/admin/data-quality").catch(() => ({ data: null })),
       ]);
-      setModel(mRes.data); setDq(dqRes.data);
-    } catch { toast.error("Failed to load model data"); }
+      if (mRes?.data) setModel(mRes.data);
+      if (dqRes?.data) setDq(dqRes.data);
+    } catch (err) {
+      console.warn("Could not load model data", err);
+    }
   }
 
   useEffect(() => {
@@ -92,6 +102,11 @@ export default function AdminDashboard() {
   const scores_kv  = overview?.scores  || {};
   const lenders_kv = overview?.lenders || {};
 
+  const totalSmesVal = smes_kv.total_smes ?? (smes.length > 0 ? smes.length : (smes_kv.id ? 1 : 0));
+  const totalScoredVal = scores_kv.total_scored ?? (scores_kv.count || 0);
+  const totalLendersVal = lenders_kv.total_lenders ?? (lenders.length > 0 ? lenders.length : 0);
+  const consentedVal = smes_kv.consented ?? (smes_kv.id ? 1 : 0);
+
   return (
     <PageWrapper
       title="Pulse Admin Dashboard"
@@ -117,14 +132,14 @@ export default function AdminDashboard() {
       {tab === "overview" && (
         <div className="space-y-4">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <KPI label="Total SMEs"       value={smes_kv.total_smes   || 0} />
-            <KPI label="Scored SMEs"      value={scores_kv.total_scored || 0} />
+            <KPI label="Total SMEs"       value={totalSmesVal} />
+            <KPI label="Scored SMEs"      value={totalScoredVal} />
             <KPI label="Avg Score"        value={scores_kv.avg_score != null ? Math.round(scores_kv.avg_score) : "—"} />
             <KPI label="At Risk (Red)"    value={scores_kv.red        || 0} color="text-danger" />
             <KPI label="Amber Band"       value={scores_kv.amber      || 0} color="text-warning" />
             <KPI label="Green Band"       value={scores_kv.green      || 0} color="text-success" />
-            <KPI label="Lenders"          value={lenders_kv.total_lenders || 0} />
-            <KPI label="Consent Granted"  value={smes_kv.consented    || 0} />
+            <KPI label="Lenders"          value={totalLendersVal} />
+            <KPI label="Consent Granted"  value={consentedVal} />
           </div>
 
           {/* Score trend */}

@@ -346,13 +346,21 @@ async function scoreAndSave(userId) {
 }
 
 async function seedAdvisorySession(businessId, advisorId, scoreResult) {
+  await pool.query(
+    `INSERT INTO advisor_clients (advisor_user_id, sme_user_id, notes)
+     VALUES ($1, $2, 'Advisory portfolio client')
+     ON CONFLICT (advisor_user_id, sme_user_id) DO NOTHING`,
+    [advisorId, businessId]
+  ).catch(() => {});
+
   const status = pick(["completed","scheduled","requested"]);
   const { rows: [session] } = await pool.query(
-    `INSERT INTO advisory_sessions (business_id, advisor_id, scheduled_at, status, notes, created_at)
-     VALUES ($1,$2,NOW()-INTERVAL '${rnd(1,14)} days',$3,$4,NOW()-INTERVAL '${rnd(15,30)} days')
+    `INSERT INTO advisory_sessions (business_id, advisor_id, scheduled_at, status, notes, action_plan, created_at)
+     VALUES ($1,$2,NOW()-INTERVAL '${rnd(1,14)} days',$3,$4,$5,NOW()-INTERVAL '${rnd(15,30)} days')
      RETURNING id`,
     [businessId, advisorId, status,
-     `Score ${scoreResult?.score}/100 (${scoreResult?.band}) — ${scoreResult?.recommendations?.[0]?.en || "Review recommended"}`]
+     `Score ${scoreResult?.score}/100 (${scoreResult?.band}) — ${scoreResult?.recommendations?.[0]?.en || "Review recommended"}`,
+     "Implement daily sales logging, review top 5 high-margin stock items, reduce credit extension to unverified buyers."]
   );
   if (status === "completed") {
     await pool.query(

@@ -107,14 +107,20 @@ export const NAV_ITEMS = [
     section: "ADMIN", tKey: "nav_admin",
     items: [
       { label: "Audit Log",   tKey: "audit_log",    icon: "Shield",   path: "/app/reports/audit", roles: ["pulse_admin","admin"] },
-      { label: "Settings",    tKey: "settings",     icon: "Settings", path: "/app/settings",      roles: OWNER_OPS },
+      { label: "Settings",    tKey: "settings",     icon: "Settings", path: "/app/settings",      roles: ["pulse_admin","sme_owner","admin","databridge_advisor","lender"] },
       { label: "Pulse Admin", tKey: "pulse_admin",  icon: "Activity", path: "/app/admin",         roles: ["pulse_admin"] },
+    ],
+  },
+  {
+    section: "ADVISOR", tKey: "nav_advisor",
+    items: [
+      { label: "Advisor Portal", tKey: "advisor_portal", icon: "Activity", path: "/app/advisor", roles: ["databridge_advisor","pulse_admin"] },
     ],
   },
   {
     section: "LENDER", tKey: "nav_lender",
     items: [
-      { label: "Portfolio", tKey: "portfolio", icon: "TrendingUp", path: "/app/lender", roles: ["lender","pulse_admin"] },
+      { label: "Lender Portfolio", tKey: "portfolio", icon: "TrendingUp", path: "/app/lender", roles: ["lender","pulse_admin"] },
     ],
   },
 ];

@@ -57,17 +57,19 @@ const TaxReport         = L(() => import("./pages/reports/TaxReport"));
 const HealthScore       = L(() => import("./pages/intelligence/HealthScore"));
 const NotificationsPage = L(() => import("./pages/notifications/NotificationsPage"));
 
-// Admin + Lender
+// Admin + Lender + Advisor
 const AdminDashboard    = L(() => import("./pages/admin/AdminDashboard"));
 const LenderDashboard   = L(() => import("./pages/lender/LenderDashboard"));
 const LenderSmeDetail   = L(() => import("./pages/lender/LenderSmeDetail"));
+const AdvisorDashboard  = L(() => import("./pages/advisor/AdvisorDashboard"));
+const AdvisorSmeDetail  = L(() => import("./pages/advisor/AdvisorSmeDetail"));
 const AdvisoryPublic    = L(() => import("./pages/intelligence/AdvisoryPublic"));
 
 // Settings
 const SettingsPage      = L(() => import("./pages/settings/SettingsPage"));
 
 // ── Role groups ───────────────────────────────────────────────────────────────
-const ALL    = ["pulse_admin","sme_owner","admin","manager","cashier","accountant","viewer","databridge_advisor"];
+const ALL    = ["pulse_admin","sme_owner","admin","manager","cashier","accountant","viewer","databridge_advisor","lender"];
 const OWNER  = ["pulse_admin","sme_owner","admin"];
 const STAFF  = ["pulse_admin","sme_owner","admin","manager","accountant","databridge_advisor"];
 const POS    = ["pulse_admin","sme_owner","admin","manager","cashier"];
@@ -75,8 +77,9 @@ const FIN    = ["pulse_admin","sme_owner","admin","accountant"];
 
 // Returns the home path for a given role — used for post-login redirect and fallback.
 export function roleHomePath(role) {
-  if (role === "pulse_admin")                           return "/app/admin";
-  if (role === "lender")                                return "/app/lender";
+  if (role === "pulse_admin")                          return "/app/admin";
+  if (role === "lender")                               return "/app/lender";
+  if (role === "databridge_advisor")                   return "/app/advisor";
   if (role === "cashier" || role === "manager" || role === "viewer") return "/app/sales/new";
   return "/app/dashboard";
 }
@@ -143,8 +146,12 @@ export default function App() {
           <Route path="/app/lender"           element={<P roles={["lender","pulse_admin"]}><LenderDashboard /></P>} />
           <Route path="/app/lender/sme/:id"   element={<P roles={["lender","pulse_admin"]}><LenderSmeDetail /></P>} />
 
+          {/* Advisor */}
+          <Route path="/app/advisor"          element={<P roles={["databridge_advisor","pulse_admin"]}><AdvisorDashboard /></P>} />
+          <Route path="/app/advisor/sme/:id"  element={<P roles={["databridge_advisor","pulse_admin"]}><AdvisorSmeDetail /></P>} />
+
           {/* Settings */}
-          <Route path="/app/settings"         element={<P roles={OWNER}><SettingsPage /></P>} />
+          <Route path="/app/settings"         element={<P roles={["pulse_admin","sme_owner","admin","databridge_advisor","lender"]}><SettingsPage /></P>} />
 
           <Route path="/app" element={<AppRoot />} />
           {/* Public advisory share link — no auth required */}

@@ -33,6 +33,21 @@ export default function Login() {
     }
   }
 
+  async function handleQuickLogin(demoEmail, demoPass = "inzira2024") {
+    setEmail(demoEmail);
+    setPassword(demoPass);
+    setError("");
+    setLoading(true);
+    try {
+      const u = await login(demoEmail, demoPass);
+      toast.success(`${t("welcome_back")}, ${u.name.split(" ")[0]}!`);
+    } catch (err) {
+      setError(err.response?.data?.error || t("login_failed"));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="min-h-screen flex relative">
       {/* Language Switcher */}
@@ -145,6 +160,62 @@ export default function Login() {
               {loading ? <><Loader2 size={15} className="animate-spin" /> {t("signing_in")}</> : t("sign_in")}
             </button>
           </form>
+
+          {/* Quick Demo Logins */}
+          <div className="mt-6 pt-4 border-t border-border">
+            <p className="text-[12px] font-bold uppercase tracking-wider text-text-secondary mb-2 text-center">
+              Quick Demo Sign In
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => handleQuickLogin("equity.bank@inzira.rw", "inzira2024")}
+                className="px-2.5 py-2 bg-surface border border-border rounded-[6px] text-[12.5px] font-medium text-text-primary hover:border-primary hover:bg-primary/5 text-left flex items-center gap-1.5 transition-colors"
+              >
+                <span>🏦</span>
+                <div className="min-w-0">
+                  <p className="font-semibold text-text-primary leading-tight truncate">Equity Bank</p>
+                  <p className="text-[11px] text-text-secondary leading-tight">Lender Account</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickLogin("advisor@inzira.rw", "inzira2024")}
+                className="px-2.5 py-2 bg-surface border border-border rounded-[6px] text-[12.5px] font-medium text-text-primary hover:border-primary hover:bg-primary/5 text-left flex items-center gap-1.5 transition-colors"
+              >
+                <span>🎓</span>
+                <div className="min-w-0">
+                  <p className="font-semibold text-text-primary leading-tight truncate">DataBridge</p>
+                  <p className="text-[11px] text-text-secondary leading-tight">Advisor Account</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickLogin("demo@inzira.rw", "inzira2024")}
+                className="px-2.5 py-2 bg-surface border border-border rounded-[6px] text-[12.5px] font-medium text-text-primary hover:border-primary hover:bg-primary/5 text-left flex items-center gap-1.5 transition-colors"
+              >
+                <span>🏢</span>
+                <div className="min-w-0">
+                  <p className="font-semibold text-text-primary leading-tight truncate">Demo Shop</p>
+                  <p className="text-[11px] text-text-secondary leading-tight">SME Owner</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickLogin("rukundojosephtuyishime@gmail.com", "rukundo2007")}
+                className="px-2.5 py-2 bg-surface border border-border rounded-[6px] text-[12.5px] font-medium text-text-primary hover:border-primary hover:bg-primary/5 text-left flex items-center gap-1.5 transition-colors"
+              >
+                <span>⚡</span>
+                <div className="min-w-0">
+                  <p className="font-semibold text-text-primary leading-tight truncate">Rukundo Admin</p>
+                  <p className="text-[11px] text-text-secondary leading-tight">Pulse Admin</p>
+                </div>
+              </button>
+            </div>
+          </div>
 
           <p className="text-center text-[14px] text-text-secondary mt-6">
             Don't have an account?{" "}

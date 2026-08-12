@@ -144,13 +144,21 @@ router.put("/me/profile", verifyToken, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ─── Register (SME self-service onboarding) ───────────────────────────────────
+// ─── Register (Self-service onboarding for SMEs, Lenders, and Advisors) ─────
 router.post("/register", async (req, res, next) => {
   try {
-    const { firstName, lastName, businessName, sectors, district, phone, email, password, language } = req.body;
+    const { firstName, lastName, businessName, accountType, role: reqRole, sectors, district, phone, email, password, language } = req.body;
 
-    if (!firstName || !lastName || !email || !password || !businessName)
-      return res.status(400).json({ error: "First name, last name, business name, email and password required" });
+    // Determine target role (default: sme_owner)
+    const targetRole = reqRole || accountType || 'sme_owner';
+    const allowedSelfReg = ['sme_owner', 'lender', 'databridge_advisor'];
+    if (!allowedSelfReg.includes(targetRole)) {
+      return res.status(400).json({ error: "Invalid account type. Allowed: SME Business, Lender, Advisor" });
+    }
+
+    const orgOrBusinessName = businessName || `${firstName || ''} ${lastName || ''}`.trim();
+    if (!firstName || !lastName || !email || !password || !orgOrBusinessName)
+      return res.status(400).json({ error: "First name, last name, organization/business name, email and password required" });
 
     if (!isValidEmail(email))
       return res.status(400).json({ error: "Invalid email format" });
@@ -165,16 +173,9 @@ router.post("/register", async (req, res, next) => {
     if (existing.length)
       return res.status(409).json({ error: "Email already registered" });
 
-    // Lazy migration: add owner_id to settings and owner_id to users
+    // Ensure columns exist
     await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS owner_id INT`);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS owner_id INT`);
-    await pool.query(`
-      DO $$ BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE tablename='settings' AND indexname='settings_owner_id_idx') THEN
-          CREATE UNIQUE INDEX settings_owner_id_idx ON settings(owner_id) WHERE owner_id IS NOT NULL;
-        END IF;
-      END $$
-    `);
 
     const fullName = `${firstName.trim()} ${lastName.trim()}`;
     const sectorStr = Array.isArray(sectors) && sectors.length ? sectors.join(", ") : (sectors || null);
@@ -182,27 +183,30 @@ router.post("/register", async (req, res, next) => {
     const hash = await bcrypt.hash(password, 10);
     const { rows: [user] } = await pool.query(
       `INSERT INTO users (name, email, password_hash, role, phone, language, sector, district, consent_status)
-       VALUES ($1,$2,$3,'sme_owner',$4,$5,$6,$7,'pending')
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'granted')
        RETURNING *`,
-      [fullName, email.toLowerCase().trim(), hash, phone || null, language || 'en', sectorStr, district || null]
+      [fullName, email.toLowerCase().trim(), hash, targetRole, phone || null, language || 'en', sectorStr, district || null]
     );
 
-    // Create user-scoped settings row so their business name shows up immediately
-    await pool.query(
-      `INSERT INTO settings (owner_id, shop_name, language)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (owner_id) DO UPDATE SET shop_name=EXCLUDED.shop_name`,
-      [user.id, businessName.trim(), language || 'en']
-    );
+    // Create settings row for SMEs or institution details
+    if (targetRole === 'sme_owner') {
+      await pool.query(
+        `INSERT INTO settings (owner_id, shop_name, language)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (owner_id) DO UPDATE SET shop_name=EXCLUDED.shop_name`,
+        [user.id, orgOrBusinessName.trim(), language || 'en']
+      );
+    }
 
-    const payload = { id: user.id, email: user.email, role: user.role, ownerId: user.id };
+    const ownerId = targetRole === 'sme_owner' ? user.id : null;
+    const payload = { id: user.id, email: user.email, role: user.role, ownerId };
     const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: "15m" });
     const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, { expiresIn: "7d" });
 
-    await logAudit(user.id, "REGISTER", "users", user.id, null, { email, businessName }, req.ip);
+    await logAudit(user.id, "REGISTER", "users", user.id, null, { email, role: targetRole, businessName: orgOrBusinessName }, req.ip);
 
     const { password_hash, otp_code, otp_expires_at, ...safe } = user;
-    res.status(201).json({ accessToken, refreshToken, user: safe, businessName: businessName.trim() });
+    res.status(201).json({ accessToken, refreshToken, user: safe, businessName: orgOrBusinessName.trim() });
   } catch (err) { next(err); }
 });
 

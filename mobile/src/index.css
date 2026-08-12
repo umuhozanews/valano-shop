@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #eae5d6;
+  font-family: "Inter", system-ui, sans-serif;
+  color: #1a2421;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Tabular numbers for money — figures line up in columns */
+.tabnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hide scrollbars on horizontal chip rows */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Big, comfortable tap targets for a shopkeeper at the counter */
+button,
+[role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@keyframes db-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.db-spin {
+  animation: db-spin 0.7s linear infinite;
+}
+
+@keyframes db-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.db-rise {
+  animation: db-rise 0.25s ease-out both;
+}
