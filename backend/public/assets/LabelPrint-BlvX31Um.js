@@ -1,0 +1,19 @@
+import{b as m,z as o,j as t}from"./index-PWTDhpIk.js";import{u as v,r as l}from"./react-vendor-C0R-jllJ.js";import{P as y}from"./PageWrapper-DDSRHP0V.js";import{B as c}from"./Button-CFO2LZpF.js";import{f as x}from"./formatters-kYs9z3nU.js";import{l as k,m as w}from"./icons-Dy7a1JV-.js";import"./utils-N84C0eGB.js";import"./constants-BcXCoDSG.js";function E(){const b=v(),[d,f]=l.useState([]),[n,p]=l.useState({}),[N,h]=l.useState(!0);l.useEffect(()=>{m.get("/stock",{params:{limit:100}}).then(e=>f(e.data.data)).catch(()=>o.error("Failed to load items")).finally(()=>h(!1))},[]);function u(e){p(s=>s[e]?(()=>{const a={...s};return delete a[e],a})():{...s,[e]:1})}function g(){const e=Object.keys(n).map(Number);if(!e.length)return o.error("Select at least one item");if(m.hasBackend){const r=`https://backend-chi-olive-97.vercel.app/api/stock/print-labels?ids=${e.join(",")}`;window.open(r,"_blank");return}const s=d.filter(r=>e.includes(r.id)),a=window.open("","_blank");if(!a)return o.error("Please allow pop-ups to print labels");const j=s.map(r=>`
+      <div class="label">
+        <div class="name">${r.name}</div>
+        <div class="meta">${[r.size,r.color].filter(Boolean).join(" · ")}</div>
+        <div class="code">${r.barcode||""}</div>
+        <div class="price">${x(r.sell_price_rwf)}</div>
+      </div>`).join("");a.document.write(`<!DOCTYPE html><html><head><title>Shelf Labels</title><style>
+      body{font-family:Inter,Arial,sans-serif;margin:16px;}
+      .sheet{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+      .label{border:1px solid #ccc;border-radius:8px;padding:12px;text-align:center;}
+      .name{font-weight:700;font-size:13px;}
+      .meta{color:#666;font-size:11px;margin:2px 0;}
+      .code{font-family:monospace;font-size:11px;margin-top:4px;}
+      .price{font-weight:700;color:#1e3a8a;margin-top:4px;font-size:15px;}
+      @media print{button{display:none;}}
+    </style></head><body>
+      <button onclick="window.print()" style="margin-bottom:12px;padding:8px 14px;">Print</button>
+      <div class="sheet">${j}</div>
+    </body></html>`),a.document.close()}const i=Object.keys(n).length;return t.jsxs(y,{title:"Label Printing",subtitle:"Select items to print shelf labels",breadcrumbs:[{label:"Stock",path:"/app/stock"},{label:"Print Labels",path:"/app/stock/labels"}],children:[t.jsx(c,{variant:"ghost",size:"sm",icon:k,onClick:()=>b("/app/stock"),className:"mb-4",children:"Back"}),t.jsxs("div",{className:"flex items-center justify-between mb-4",children:[t.jsxs("p",{className:"text-[14px] text-text-secondary",children:[i," item",i!==1?"s":""," selected"]}),t.jsxs("div",{className:"flex gap-2",children:[t.jsx(c,{variant:"secondary",size:"sm",onClick:()=>p({}),children:"Clear"}),t.jsxs(c,{variant:"primary",size:"sm",icon:w,onClick:g,disabled:i===0,children:["Print ",i>0?`(${i})`:""," Labels"]})]})]}),t.jsx("div",{className:"grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3",children:d.map(e=>{const s=!!n[e.id];return t.jsxs("div",{onClick:()=>u(e.id),className:`bg-surface border-2 rounded-card p-4 cursor-pointer transition-all ${s?"border-primary":"border-border"}`,children:[t.jsxs("div",{className:"flex items-start justify-between mb-2",children:[t.jsxs("div",{children:[t.jsx("p",{className:"text-[14px] font-semibold text-text-primary",children:e.name}),t.jsxs("p",{className:"text-[13px] text-text-secondary",children:[e.size," · ",e.color]})]}),t.jsx("div",{className:`w-5 h-5 rounded border-2 flex items-center justify-center ${s?"bg-primary border-primary":"border-border"}`,children:s&&t.jsx("span",{className:"text-white text-[12px]",children:"✓"})})]}),t.jsx("p",{className:"text-[14px] font-mono text-text-secondary text-[12px]",children:e.barcode}),t.jsx("p",{className:"text-[16px] font-bold text-primary mt-1",children:x(e.sell_price_rwf)})]},e.id)})})]})}export{E as default};

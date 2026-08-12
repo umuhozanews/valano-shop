@@ -180,6 +180,24 @@ function buildDefaults() {
     AUDIT: [
       { id:1,  user_name:"Rukundo joseph", action:"LOGIN", entity_type:"user", details:"Logged in", created_at:daysAgo(0) },
     ],
+    MOCK_LENDER_CLIENTS: [
+      { id:1, sme_user_id: 101, name: "Alliance Fashion Hub", email: "alliance@inzira.rw", phone: "+250788111222", sector: "Wholesale Clothing", score: 78, band: "green", calculated_at: daysAgo(1), notes: "Referred for working capital loan", referral_code: "REF-A1B2", referral_status: "active", created_at: daysAgo(30) },
+      { id:2, sme_user_id: 102, name: "Mutoni General Store", email: "mutoni@inzira.rw", phone: "+250788333444", sector: "Retail Shop", score: 62, band: "amber", calculated_at: daysAgo(2), notes: "Inventory financing application", referral_code: "REF-C3D4", referral_status: "pending", created_at: daysAgo(20) },
+      { id:3, sme_user_id: 103, name: "Kigali Textile Works", email: "textile@inzira.rw", phone: "+250788555666", sector: "Garment Manufacturing", score: 34, band: "red", calculated_at: daysAgo(3), notes: "Needs financial restructuring", referral_code: "REF-E5F6", referral_status: "active", created_at: daysAgo(15) },
+      { id:4, sme_user_id: 104, name: "Style Hub Kigali", email: "stylehub@inzira.rw", phone: "+250788777888", sector: "Boutique", score: 85, band: "green", calculated_at: daysAgo(1), notes: "Expansion credit line", referral_code: "REF-G7H8", referral_status: "active", created_at: daysAgo(10) },
+      { id:5, sme_user_id: 105, name: "Nyabugogo Garments", email: "nyabugogo@inzira.rw", phone: "+250788999000", sector: "Wholesale Clothing", score: 38, band: "red", calculated_at: daysAgo(4), notes: "At risk SME watch list", referral_code: "REF-I9J0", referral_status: "pending", created_at: daysAgo(5) },
+    ],
+    MOCK_ADVISOR_CLIENTS: [
+      { id:1, sme_user_id: 101, name: "Alliance Fashion Hub", email: "alliance@inzira.rw", phone: "+250788111222", sector: "Wholesale Clothing", district: "Gasabo", score: 78, band: "green", calculated_at: daysAgo(1), client_notes: "Growth advisory tier 1", advisory_token: "tok_adv_01", member_since: daysAgo(180) },
+      { id:2, sme_user_id: 102, name: "Mutoni General Store", email: "mutoni@inzira.rw", phone: "+250788333444", sector: "Retail Shop", district: "Nyarugenge", score: 62, band: "amber", calculated_at: daysAgo(2), client_notes: "Margin optimization consulting", advisory_token: "tok_adv_02", member_since: daysAgo(120) },
+      { id:3, sme_user_id: 103, name: "Kigali Textile Works", email: "textile@inzira.rw", phone: "+250788555666", sector: "Garment Manufacturing", district: "Kicukiro", score: 34, band: "red", calculated_at: daysAgo(3), client_notes: "Urgent cashflow turnaround intervention", advisory_token: "tok_adv_03", member_since: daysAgo(90) },
+      { id:4, sme_user_id: 105, name: "Nyabugogo Garments", email: "nyabugogo@inzira.rw", phone: "+250788999000", sector: "Wholesale Clothing", district: "Nyarugenge", score: 38, band: "red", calculated_at: daysAgo(4), client_notes: "Red band recovery program", advisory_token: "tok_adv_04", member_since: daysAgo(60) },
+    ],
+    MOCK_ADVISORY_SESSIONS: [
+      { id:1, sme_user_id: 103, sme_name: "Kigali Textile Works", scheduled_at: daysAgo(-2), status: "scheduled", notes: "Review raw material cost reduction strategy", action_plan: "Audit top 3 suppliers and switch to local cotton blend", follow_up_date: daysAgo(-10), created_at: daysAgo(5) },
+      { id:2, sme_user_id: 102, sme_name: "Mutoni General Store", scheduled_at: daysAgo(3), status: "completed", notes: "Completed inventory turnover breakdown. Identified 12 deadstock items.", action_plan: "Clear deadstock at 20% discount; set reorder thresholds to 5 units", follow_up_date: daysAgo(-14), created_at: daysAgo(10) },
+      { id:3, sme_user_id: 105, sme_name: "Nyabugogo Garments", scheduled_at: daysAgo(7), status: "completed", notes: "Initial consultation on working capital management.", action_plan: "Log daily sales electronically; enforce strict 7-day customer credit cap", follow_up_date: daysAgo(-7), created_at: daysAgo(14) },
+    ]
   };
 }
 
@@ -703,6 +721,124 @@ function handle(method, url, body) {
       branches: DB.MOCK_BRANCHES,
       exchangeRates: []
     };
+  }
+
+  // ─── LENDER V2 LOCAL HANDLERS ─────────────────────────────────────────────
+  if (r0 === "v2" && r1 === "lender") {
+    const list = DB.MOCK_LENDER_CLIENTS || [];
+    if (r2 === "dashboard") {
+      const total_clients = list.length;
+      const green_count = list.filter(x => x.band === "green").length;
+      const amber_count = list.filter(x => x.band === "amber").length;
+      const red_count = list.filter(x => x.band === "red").length;
+      const unscored = list.filter(x => !x.score).length;
+      const scores = list.filter(x => x.score).map(x => x.score);
+      const avg_score = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : null;
+      return {
+        overview: { total_clients, green_count, amber_count, red_count, unscored, avg_score },
+        recentlyScored: list.slice(0, 5),
+        atRisk: list.filter(x => x.band === "red")
+      };
+    }
+    if (r2 === "clients") {
+      if (r3) {
+        const item = list.find(x => String(x.sme_user_id) === String(r3) || String(x.id) === String(r3)) || list[0];
+        return {
+          ...item,
+          scoreHistory: [
+            { score: item.score - 10, band: "amber", created_at: daysAgo(90) },
+            { score: item.score - 5, band: item.band, created_at: daysAgo(60) },
+            { score: item.score, band: item.band, created_at: daysAgo(30) }
+          ]
+        };
+      }
+      return { data: list, total: list.length, page: 1, limit: 20 };
+    }
+    if (r2 === "referral" && method === "POST") {
+      const newRef = {
+        id: Date.now(),
+        sme_user_id: Date.now(),
+        name: body.sme_email ? body.sme_email.split("@")[0] : "Referred SME",
+        email: body.sme_email || "referred@inzira.rw",
+        phone: "+250788000999",
+        sector: "General Trading",
+        score: 65,
+        band: "amber",
+        notes: body.notes || "Referred client",
+        referral_code: "REF-" + Math.random().toString(36).substring(2,8).toUpperCase(),
+        referral_status: "pending",
+        created_at: nowIso()
+      };
+      if (!DB.MOCK_LENDER_CLIENTS) DB.MOCK_LENDER_CLIENTS = [];
+      DB.MOCK_LENDER_CLIENTS.unshift(newRef);
+      return newRef;
+    }
+  }
+
+  // ─── ADVISOR V2 LOCAL HANDLERS ────────────────────────────────────────────
+  if (r0 === "v2" && r1 === "advisor") {
+    const clients = DB.MOCK_ADVISOR_CLIENTS || [];
+    const sessions = DB.MOCK_ADVISORY_SESSIONS || [];
+
+    if (r2 === "dashboard") {
+      const total_clients = clients.length;
+      const green_clients = clients.filter(x => x.band === "green").length;
+      const amber_clients = clients.filter(x => x.band === "amber").length;
+      const red_clients = clients.filter(x => x.band === "red").length;
+      const scores = clients.filter(x => x.score).map(x => x.score);
+      const avg_score = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : null;
+      return {
+        overview: {
+          total_clients,
+          green_clients,
+          amber_clients,
+          red_clients,
+          avg_score,
+          scheduled_sessions: sessions.filter(s => s.status === "scheduled").length,
+          completed_sessions: sessions.filter(s => s.status === "completed").length
+        },
+        clientSmes: clients,
+        atRiskSmes: clients.filter(x => x.band === "red"),
+        upcomingSessions: sessions.filter(s => s.status === "scheduled")
+      };
+    }
+    if (r2 === "clients") {
+      if (r3) {
+        const item = clients.find(x => String(x.sme_user_id) === String(r3) || String(x.id) === String(r3)) || clients[0];
+        const clientSessions = sessions.filter(s => String(s.sme_user_id) === String(item.sme_user_id) || String(s.sme_user_id) === String(item.id));
+        return {
+          ...item,
+          stats: { revenue_30d: 4500000, expenses_30d: 2800000, net_cash_30d: 1700000, sales_count: 38, active_items: 24, low_stock_items: 2 },
+          factors: { positive: [{ key: "sales_growth", label_en: "Consistent daily sales recording", value: 12 }], negative: [{ key: "low_margin", label_en: "High proportion of low-margin sales", value: -8 }] },
+          scoreHistory: [
+            { score: item.score - 8, band: "amber", created_at: daysAgo(90) },
+            { score: item.score - 3, band: item.band, created_at: daysAgo(60) },
+            { score: item.score, band: item.band, created_at: daysAgo(30) }
+          ],
+          sessions: clientSessions
+        };
+      }
+      return { data: clients, total: clients.length, page: 1, limit: 20 };
+    }
+    if (r2 === "sessions") {
+      if (method === "GET") return { data: sessions, total: sessions.length };
+      if (method === "POST") {
+        const newSess = {
+          id: Date.now(),
+          sme_user_id: body.sme_user_id,
+          sme_name: clients.find(c => String(c.sme_user_id) === String(body.sme_user_id))?.name || "SME Client",
+          scheduled_at: body.scheduled_at || nowIso(),
+          status: body.status || "completed",
+          notes: body.notes || "Consultation session logged",
+          action_plan: body.action_plan || "Action plan assigned",
+          follow_up_date: body.follow_up_date || null,
+          created_at: nowIso()
+        };
+        if (!DB.MOCK_ADVISORY_SESSIONS) DB.MOCK_ADVISORY_SESSIONS = [];
+        DB.MOCK_ADVISORY_SESSIONS.unshift(newSess);
+        return newSess;
+      }
+    }
   }
 
   return { ok:true };
