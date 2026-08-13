@@ -93,8 +93,8 @@ router.get("/:id", async (req, res, next) => {
          LEFT JOIN users u ON u.id=s.user_id
          LEFT JOIN customers c ON c.id=s.customer_id
          LEFT JOIN invoices i ON i.sale_id=s.id
-         WHERE s.id=$1`,
-        [req.params.id]
+         WHERE s.id=$1 AND (s.owner_id=$2 OR $2 IS NULL)`,
+        [req.params.id, req.ownerId]
       ),
       pool.query(
         `SELECT si.*, stk.name as item_name, stk.barcode, stk.unit
@@ -102,7 +102,7 @@ router.get("/:id", async (req, res, next) => {
          WHERE si.sale_id=$1`,
         [req.params.id]
       ),
-      pool.query("SELECT * FROM accounts_receivable WHERE sale_id=$1 LIMIT 1", [req.params.id]),
+      pool.query("SELECT * FROM accounts_receivable WHERE sale_id=$1 AND (owner_id=$2 OR $2 IS NULL) LIMIT 1", [req.params.id, req.ownerId]),
     ]);
     if (!saleRes.rows[0]) return res.status(404).json({ error: "Sale not found" });
     res.json({ ...saleRes.rows[0], items: itemsRes.rows, receivable: arRes.rows[0] || null });
@@ -120,10 +120,34 @@ router.post("/", async (req, res, next) => {
       split_payments,
     } = req.body;
 
-    if (!items?.length) return res.status(400).json({ error: "No items" });
-    if (!payment_method) return res.status(400).json({ error: "Payment method required" });
+    const idempotencyKey = req.headers["idempotency-key"] || req.headers["x-idempotency-key"] || req.body.idempotency_key || req.body.idempotencyKey;
+    if (!idempotencyKey) return res.status(400).json({ error: "Idempotency-Key header is required" });
 
     await pool.query("BEGIN");
+
+    // Idempotency check inside transaction to eliminate race conditions
+    const existingSaleRes = await pool.query(
+      `SELECT s.*, i.invoice_number 
+       FROM sales s 
+       LEFT JOIN invoices i ON i.sale_id = s.id 
+       WHERE s.idempotency_key = $1 AND s.owner_id = $2 FOR UPDATE`,
+      [String(idempotencyKey), req.ownerId || 1]
+    );
+
+    if (existingSaleRes.rows.length > 0) {
+      const existingSale = existingSaleRes.rows[0];
+      const itemsRes = await pool.query(
+        "SELECT si.*, stk.name as item_name FROM sale_items si LEFT JOIN stock_items stk ON stk.id = si.stock_item_id WHERE si.sale_id = $1",
+        [existingSale.id]
+      );
+      await pool.query("COMMIT");
+      return res.status(200).json({
+        sale: { ...existingSale, items: itemsRes.rows },
+        invoice: { id: existingSale.id, invoice_number: existingSale.invoice_number, status: existingSale.payment_status },
+        receivable: null,
+        idempotent_replay: true
+      });
+    }
 
     // Batch-lock all numeric stock items in one query
     const stockItemIds = [
@@ -184,13 +208,14 @@ router.post("/", async (req, res, next) => {
     }
 
     const { rows: [sale] } = await pool.query(
-      `INSERT INTO sales (user_id, customer_id, payment_method, total_amount, is_offline, payment_reference, payment_status, owner_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      `INSERT INTO sales (user_id, customer_id, payment_method, total_amount, is_offline, payment_reference, payment_status, owner_id, idempotency_key)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
       [
         req.user.id, custId, payment_method, total,
         !!is_offline, payment_reference || null,
         payment_method === "credit" ? "pending" : "completed",
         req.ownerId || 1,
+        String(idempotencyKey),
       ]
     );
 
@@ -233,7 +258,7 @@ router.post("/", async (req, res, next) => {
     }
 
     const invNum = generateInvoiceNumber();
-    const paid = amount_paid !== undefined ? parseFloat(amount_paid) : (payment_method === "credit" ? 0 : total);
+    const paid = amount_paid !== undefined ? Math.round(Number(amount_paid) || 0) : (payment_method === "credit" ? 0 : total);
     const remaining = total - paid;
     const invStatus = remaining > 0 ? "pending" : "paid";
 
@@ -245,9 +270,9 @@ router.post("/", async (req, res, next) => {
     // Credit sale → create receivable
     if (remaining > 0 && custId) {
       await pool.query(
-        `INSERT INTO accounts_receivable (customer_id, sale_id, amount, due_date, notes)
-         VALUES ($1,$2,$3,$4,$5)`,
-        [custId, sale.id, remaining, due_date || null, `Invoice #${invNum}`]
+        `INSERT INTO accounts_receivable (customer_id, sale_id, amount, due_date, notes, owner_id)
+         VALUES ($1,$2,$3,$4,$5,$6)`,
+        [custId, sale.id, remaining, due_date || null, `Invoice #${invNum}`, req.ownerId || 1]
       );
     }
 
@@ -257,7 +282,7 @@ router.post("/", async (req, res, next) => {
         "SELECT COUNT(*) as orders, COALESCE(SUM(total_amount),0) as spent FROM sales WHERE customer_id=$1 AND is_voided=false",
         [custId]
       );
-      const seg = parseFloat(cs.spent) > 500000 ? "vip" : parseInt(cs.orders) >= 3 ? "regular" : "new";
+      const seg = parseInt(cs.spent || 0, 10) > 500000 ? "vip" : parseInt(cs.orders || 0, 10) >= 3 ? "regular" : "new";
       await pool.query("UPDATE customers SET segment=$1 WHERE id=$2", [seg, custId]);
     }
 
@@ -281,7 +306,7 @@ router.post("/:id/void", requireRole("admin", "sme_owner", "manager", "accountan
     const { void_reason } = req.body;
     if (!void_reason) return res.status(400).json({ error: "Void reason required" });
 
-    const { rows: [sale] } = await pool.query("SELECT * FROM sales WHERE id=$1", [req.params.id]);
+    const { rows: [sale] } = await pool.query("SELECT * FROM sales WHERE id=$1 AND (owner_id=$2 OR $2 IS NULL)", [req.params.id, req.ownerId]);
     if (!sale) return res.status(404).json({ error: "Sale not found" });
     if (sale.is_voided) return res.status(400).json({ error: "Already voided" });
 
@@ -299,8 +324,8 @@ router.post("/:id/void", requireRole("admin", "sme_owner", "manager", "accountan
     }
     await pool.query("COMMIT");
     journalForSaleVoid({
-      saleId: sale.id, total: parseFloat(sale.total_amount),
-      amountPaid: parseFloat(sale.total_amount),
+      saleId: sale.id, total: parseInt(sale.total_amount, 10),
+      amountPaid: parseInt(sale.total_amount, 10),
       paymentMethod: sale.payment_method, createdBy: req.user.id,
       ownerId: req.ownerId,
     });

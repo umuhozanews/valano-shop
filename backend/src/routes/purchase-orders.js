@@ -43,8 +43,8 @@ router.get("/:id", async (req, res, next) => {
   try {
     const { rows: [order] } = await pool.query(
       `SELECT po.*, s.name as supplier_name FROM purchase_orders po
-       LEFT JOIN suppliers s ON s.id=po.supplier_id WHERE po.id=$1`,
-      [req.params.id]
+       LEFT JOIN suppliers s ON s.id=po.supplier_id WHERE po.id=$1 AND (po.owner_id=$2 OR $2 IS NULL)`,
+      [req.params.id, req.ownerId]
     );
     if (!order) return res.status(404).json({ error: "Order not found" });
 
@@ -89,8 +89,8 @@ router.put("/:id/status", async (req, res, next) => {
       return res.status(400).json({ error: `Status must be one of: ${STATUS_FLOW.join(", ")}` });
 
     const { rows: [order] } = await pool.query(
-      `UPDATE purchase_orders SET status=$1 WHERE id=$2 RETURNING *`,
-      [status, req.params.id]
+      `UPDATE purchase_orders SET status=$1 WHERE id=$2 AND (owner_id=$3 OR $3 IS NULL) RETURNING *`,
+      [status, req.params.id, req.ownerId]
     );
     if (!order) return res.status(404).json({ error: "Order not found" });
 
@@ -102,8 +102,8 @@ router.put("/:id/status", async (req, res, next) => {
       );
       for (const item of items) {
         await pool.query(
-          "UPDATE stock_items SET quantity = quantity + $1 WHERE id=$2",
-          [item.quantity, item.stock_item_id]
+          "UPDATE stock_items SET quantity = quantity + $1 WHERE id=$2 AND (owner_id=$3 OR $3 IS NULL)",
+          [item.quantity, item.stock_item_id, req.ownerId]
         );
       }
     }
@@ -116,8 +116,8 @@ router.put("/:id/status", async (req, res, next) => {
 router.delete("/:id", requireRole("admin", "sme_owner", "pulse_admin"), async (req, res, next) => {
   try {
     const { rows: [order] } = await pool.query(
-      "DELETE FROM purchase_orders WHERE id=$1 AND status='ordered' RETURNING id",
-      [req.params.id]
+      "DELETE FROM purchase_orders WHERE id=$1 AND status='ordered' AND (owner_id=$2 OR $2 IS NULL) RETURNING id",
+      [req.params.id, req.ownerId]
     );
     if (!order) return res.status(404).json({ error: "Order not found or cannot be deleted" });
     await logAudit(req.user.id, "PO_DELETED", "purchase_orders", req.params.id, null, null, req.ip);

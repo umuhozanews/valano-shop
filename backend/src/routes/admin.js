@@ -5,7 +5,7 @@ const { verifyToken, requireRole } = require("../middleware/auth");
 const { logAudit } = require("../utils/helpers");
 
 router.use(verifyToken);
-router.use(requireRole("pulse_admin"));
+router.use(requireRole("admin", "pulse_admin"));
 
 // GET /v2/admin/dashboard — platform-wide KPIs
 router.get("/dashboard", async (req, res, next) => {

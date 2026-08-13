@@ -14,43 +14,126 @@ const VALID_ROLES = ['sme_owner','manager','cashier','accountant','databridge_ad
 // ─── Login ────────────────────────────────────────────────────────────────────
 router.post("/login", async (req, res, next) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password)
-      return res.status(400).json({ error: "Email and password required" });
+    const rawIdentifier = String(req.body.email || req.body.phone || req.body.identifier || "").trim();
+    const password = String(req.body.password || "").trim();
 
-    if (!isValidEmail(email))
-      return res.status(400).json({ error: "Invalid email format" });
+    if (!rawIdentifier || !password) {
+      return res.status(400).json({ error: "Email/Phone and password are required" });
+    }
 
+    const normalizedEmail = rawIdentifier.toLowerCase();
+    const cleanPhone = rawIdentifier.replace(/\s+/g, "");
+    const phoneFallbackEmail = `${cleanPhone.replace(/\D/g, "")}@inzira.rw`;
+
+    // Query user by normalized email, phone, or phone fallback email
     const { rows } = await pool.query(
-      "SELECT * FROM users WHERE email=$1 AND is_active=true",
-      [email.toLowerCase().trim()]
+      `SELECT * FROM users
+       WHERE LOWER(email) = $1 OR (phone IS NOT NULL AND phone = $2) OR email = $3`,
+      [normalizedEmail, cleanPhone, phoneFallbackEmail]
     );
     const user = rows[0];
 
+    // Generic error for security (do not disclose whether account exists)
     if (!user) {
-      await logAudit(null, "LOGIN_FAILED", "users", null, null, { email }, req.ip);
-      return res.status(401).json({ error: "Invalid credentials" });
+      await logAudit(null, "LOGIN_FAILED", "users", null, null, { identifier: rawIdentifier }, req.ip);
+      return res.status(401).json({ error: "Invalid email/phone or password" });
     }
 
+    // Explicit check for deactivated accounts
+    if (user.is_active === false) {
+      await logAudit(user.id, "LOGIN_BLOCKED", "users", user.id, null, { reason: "account_deactivated" }, req.ip);
+      return res.status(403).json({ error: "Your account has been deactivated. Please contact support." });
+    }
+
+    // Always compare using bcrypt against stored hash
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
-      await logAudit(null, "LOGIN_FAILED", "users", user.id, null, { email }, req.ip);
-      return res.status(401).json({ error: "Invalid credentials" });
+      await logAudit(user.id, "LOGIN_FAILED", "users", user.id, null, { identifier: rawIdentifier }, req.ip);
+      return res.status(401).json({ error: "Invalid email/phone or password" });
     }
 
     // For sme_owner: ownerId = own id. For workers: ownerId = their owner_id. For admin/pulse_admin: null
     const ownerId = ['pulse_admin','admin'].includes(user.role)
       ? null
       : (user.role === 'sme_owner' ? user.id : (user.owner_id || null));
+
     const payload = { id: user.id, email: user.email, role: user.role, ownerId };
     const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: "15m" });
     const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, { expiresIn: "7d" });
 
-    await logAudit(user.id, "LOGIN", "users", user.id, null, { email }, req.ip);
+    await logAudit(user.id, "LOGIN", "users", user.id, null, { identifier: rawIdentifier }, req.ip);
 
     sendLoginAlert(user.email, user.name, req.ip).catch(e => {
       console.error("[MAIL ERROR] Background email dispatch failed:", e.message);
     });
+
+    const { password_hash, otp_code, otp_expires_at, ...safeUser } = user;
+    res.json({ accessToken, refreshToken, user: safeUser });
+  } catch (err) { next(err); }
+});
+
+const { OAuth2Client } = require("google-auth-library");
+const { GOOGLE_CLIENT_ID } = require("../config/env");
+const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
+
+// ─── Google Authentication ───────────────────────────────────────────────────
+router.post("/google", async (req, res, next) => {
+  try {
+    const { idToken, credential } = req.body;
+    const tokenToVerify = idToken || credential;
+
+    if (!tokenToVerify) {
+      return res.status(401).json({ error: "Google ID Token (credential) is required" });
+    }
+
+    let payload;
+    try {
+      const ticket = await googleClient.verifyIdToken({
+        idToken: tokenToVerify,
+        audience: GOOGLE_CLIENT_ID || undefined,
+      });
+      payload = ticket.getPayload();
+    } catch (tokenErr) {
+      console.error("[AUTH ERROR] Google ID Token verification failed:", tokenErr.message);
+      return res.status(401).json({ error: "Invalid or unverified Google ID token" });
+    }
+
+    if (!payload || !payload.email || payload.email_verified !== true) {
+      return res.status(401).json({ error: "Google account email is unverified or missing" });
+    }
+
+    const cleanEmail = payload.email.toLowerCase().trim();
+    const googleName = (payload.name || cleanEmail.split("@")[0]).trim();
+
+    let { rows: [user] } = await pool.query("SELECT * FROM users WHERE email=$1", [cleanEmail]);
+
+    if (!user) {
+      const dummyPass = await bcrypt.hash("GoogleOAuth_" + Date.now(), 10);
+      const { rows: [created] } = await pool.query(
+        `INSERT INTO users (name, email, password_hash, role, consent_status)
+         VALUES ($1, $2, $3, 'sme_owner', 'granted') RETURNING *`,
+        [googleName, cleanEmail, dummyPass]
+      );
+      user = created;
+
+      await pool.query(
+        `INSERT INTO settings (owner_id, shop_name, language)
+         VALUES ($1, $2, 'en')
+         ON CONFLICT (owner_id) DO NOTHING`,
+        [user.id, `${googleName}'s Shop`]
+      );
+    }
+
+    if (user.is_active === false) {
+      return res.status(403).json({ error: "Your account has been deactivated. Please contact support." });
+    }
+
+    const ownerId = ['pulse_admin','admin'].includes(user.role) ? null : user.id;
+    const userPayload = { id: user.id, email: user.email, role: user.role, ownerId };
+    const accessToken = jwt.sign(userPayload, JWT_SECRET, { expiresIn: "15m" });
+    const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, { expiresIn: "7d" });
+
+    await logAudit(user.id, "LOGIN_GOOGLE", "users", user.id, null, { email: cleanEmail }, req.ip);
 
     const { password_hash, otp_code, otp_expires_at, ...safeUser } = user;
     res.json({ accessToken, refreshToken, user: safeUser });
@@ -86,6 +169,10 @@ router.post("/refresh", async (req, res, next) => {
 // ─── Logout ───────────────────────────────────────────────────────────────────
 router.post("/logout", verifyToken, async (req, res, next) => {
   try {
+    await pool.query(
+      "UPDATE users SET token_version = COALESCE(token_version, 0) + 1 WHERE id=$1",
+      [req.user.id]
+    ).catch(() => {});
     await logAudit(req.user.id, "LOGOUT", "users", req.user.id, null, null, req.ip);
     res.json({ message: "Logged out" });
   } catch (err) { next(err); }
@@ -144,57 +231,71 @@ router.put("/me/profile", verifyToken, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ─── Register (Self-service onboarding for SMEs, Lenders, and Advisors) ─────
-router.post("/register", async (req, res, next) => {
+const handleRegister = async (req, res, next) => {
   try {
-    const { firstName, lastName, businessName, accountType, role: reqRole, sectors, district, phone, email, password, language } = req.body;
+    const {
+      firstName, lastName, name,
+      businessName, shop_name,
+      accountType, role: reqRole,
+      sectors, businessType, district,
+      phone, email, password, language
+    } = req.body;
 
-    // Determine target role (default: sme_owner)
     const targetRole = reqRole || accountType || 'sme_owner';
     const allowedSelfReg = ['sme_owner', 'lender', 'databridge_advisor'];
     if (!allowedSelfReg.includes(targetRole)) {
       return res.status(400).json({ error: "Invalid account type. Allowed: SME Business, Lender, Advisor" });
     }
 
-    const orgOrBusinessName = businessName || `${firstName || ''} ${lastName || ''}`.trim();
-    if (!firstName || !lastName || !email || !password || !orgOrBusinessName)
-      return res.status(400).json({ error: "First name, last name, organization/business name, email and password required" });
+    const fullName = (name || `${firstName || ''} ${lastName || ''}`).trim();
+    const orgOrBusinessName = (shop_name || businessName || fullName).trim();
 
-    if (!isValidEmail(email))
+    const normalizedEmail = (email || (phone ? `${String(phone).replace(/\D/g, "")}@inzira.rw` : "")).toLowerCase().trim();
+
+    if (!fullName || !normalizedEmail || !password || !orgOrBusinessName) {
+      return res.status(400).json({ error: "Name, organization/business name, email/phone and password are required" });
+    }
+
+    if (!isValidEmail(normalizedEmail)) {
       return res.status(400).json({ error: "Invalid email format" });
+    }
 
     const strength = validatePasswordStrength(password);
-    if (!strength.valid)
+    if (!strength.valid) {
       return res.status(400).json({ error: strength.error });
+    }
 
     const { rows: existing } = await pool.query(
-      "SELECT id FROM users WHERE email=$1", [email.toLowerCase().trim()]
+      "SELECT id FROM users WHERE email=$1 OR (phone IS NOT NULL AND phone=$2)",
+      [normalizedEmail, phone ? String(phone).trim() : null]
     );
-    if (existing.length)
-      return res.status(409).json({ error: "Email already registered" });
+    if (existing.length) {
+      return res.status(409).json({ error: "An account with this email or phone is already registered" });
+    }
 
-    // Ensure columns exist
+    // Ensure schema columns exist
     await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS owner_id INT`);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS owner_id INT`);
 
-    const fullName = `${firstName.trim()} ${lastName.trim()}`;
-    const sectorStr = Array.isArray(sectors) && sectors.length ? sectors.join(", ") : (sectors || null);
+    const sectorStr = Array.isArray(sectors) && sectors.length
+      ? sectors.join(", ")
+      : (businessType || sectors || null);
 
     const hash = await bcrypt.hash(password, 10);
     const { rows: [user] } = await pool.query(
       `INSERT INTO users (name, email, password_hash, role, phone, language, sector, district, consent_status)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'granted')
        RETURNING *`,
-      [fullName, email.toLowerCase().trim(), hash, targetRole, phone || null, language || 'en', sectorStr, district || null]
+      [fullName, normalizedEmail, hash, targetRole, phone ? String(phone).trim() : null, language || 'en', sectorStr, district || null]
     );
 
-    // Create settings row for SMEs or institution details
+    // Create settings row for SMEs
     if (targetRole === 'sme_owner') {
       await pool.query(
         `INSERT INTO settings (owner_id, shop_name, language)
          VALUES ($1, $2, $3)
          ON CONFLICT (owner_id) DO UPDATE SET shop_name=EXCLUDED.shop_name`,
-        [user.id, orgOrBusinessName.trim(), language || 'en']
+        [user.id, orgOrBusinessName, language || 'en']
       );
     }
 
@@ -203,12 +304,15 @@ router.post("/register", async (req, res, next) => {
     const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: "15m" });
     const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, { expiresIn: "7d" });
 
-    await logAudit(user.id, "REGISTER", "users", user.id, null, { email, role: targetRole, businessName: orgOrBusinessName }, req.ip);
+    await logAudit(user.id, "REGISTER", "users", user.id, null, { email: normalizedEmail, role: targetRole, businessName: orgOrBusinessName }, req.ip);
 
     const { password_hash, otp_code, otp_expires_at, ...safe } = user;
-    res.status(201).json({ accessToken, refreshToken, user: safe, businessName: orgOrBusinessName.trim() });
+    res.status(201).json({ accessToken, refreshToken, user: safe, businessName: orgOrBusinessName });
   } catch (err) { next(err); }
-});
+};
+
+router.post("/register", handleRegister);
+router.post("/signup", handleRegister);
 
 // ─── OTP: send ────────────────────────────────────────────────────────────────
 router.post("/otp/send", async (req, res, next) => {

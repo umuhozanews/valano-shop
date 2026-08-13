@@ -28,8 +28,8 @@ router.get("/", requireRole("admin", "sme_owner", "manager", "accountant", "cash
          WHERE ${where} ORDER BY i.issued_at DESC
          LIMIT $${params.length-1} OFFSET $${params.length}`, params),
       pool.query(`SELECT COUNT(*) FROM invoices i JOIN sales s ON s.id=i.sale_id WHERE ${where}`, params.slice(0,-2)),
-      pool.query(`SELECT status, COUNT(*) as cnt, COALESCE(SUM(s.total_amount),0) as total
-         FROM invoices i JOIN sales s ON s.id=i.sale_id GROUP BY status`),
+      pool.query(`SELECT i.status, COUNT(*) as cnt, COALESCE(SUM(s.total_amount),0) as total
+         FROM invoices i JOIN sales s ON s.id=i.sale_id WHERE ${where} GROUP BY i.status`, params.slice(0,-2)),
     ]);
     res.json({ data: data.rows, total: parseInt(cnt.rows[0].count), summary: summary.rows });
   } catch (err) { next(err); }
@@ -38,7 +38,7 @@ router.get("/", requireRole("admin", "sme_owner", "manager", "accountant", "cash
 router.get("/:id", requireRole("admin", "manager", "accountant"), async (req, res, next) => {
   try {
     const { rows: [inv] } = await pool.query(
-      `SELECT i.*, s.* FROM invoices i JOIN sales s ON s.id=i.sale_id WHERE i.id=$1`, [req.params.id]
+      `SELECT i.*, s.* FROM invoices i JOIN sales s ON s.id=i.sale_id WHERE i.id=$1 AND (s.owner_id=$2 OR $2 IS NULL)`, [req.params.id, req.ownerId]
     );
     if (!inv) return res.status(404).json({ error: "Invoice not found" });
     res.json(inv);
@@ -48,27 +48,39 @@ router.get("/:id", requireRole("admin", "manager", "accountant"), async (req, re
 router.get("/:id/pdf", async (req, res, next) => {
   try {
     const { rows: [invoice] } = await pool.query(
-      `SELECT i.*, s.total_amount, s.payment_method FROM invoices i JOIN sales s ON s.id=i.sale_id WHERE i.id=$1`,
-      [req.params.id]
+      `SELECT i.*, s.total_amount, s.payment_method, s.customer_name, s.user_id, s.owner_id
+       FROM invoices i JOIN sales s ON s.id=i.sale_id
+       WHERE i.id=$1 AND (s.owner_id=$2 OR $2 IS NULL)`,
+      [req.params.id, req.ownerId]
     );
     if (!invoice) return res.status(404).json({ error: "Invoice not found" });
 
-    const [items, branch, customer, settings, debtRes] = await Promise.all([
+    const ownerId = invoice.owner_id || invoice.user_id;
+
+    const [items, customer, settings, smeUser, debtRes] = await Promise.all([
       pool.query(`SELECT si.*, stk.name as item_name FROM sale_items si
         JOIN stock_items stk ON stk.id=si.stock_item_id WHERE si.sale_id=$1`, [invoice.sale_id]),
-      Promise.resolve({ rows: [{}] }),
       pool.query(`SELECT c.* FROM sales s LEFT JOIN customers c ON c.id=s.customer_id WHERE s.id=$1`, [invoice.sale_id]),
-      pool.query("SELECT * FROM settings LIMIT 1"),
+      pool.query("SELECT * FROM settings WHERE owner_id=$1 LIMIT 1", [ownerId]).catch(() => ({ rows: [] })),
+      pool.query("SELECT id, name, email, phone, sector FROM users WHERE id=$1 LIMIT 1", [ownerId]).catch(() => ({ rows: [] })),
       pool.query("SELECT * FROM accounts_receivable WHERE sale_id=$1", [invoice.sale_id]),
     ]);
+
+    const activeSettings = settings.rows[0] || {};
+    const ownerProfile = smeUser.rows[0] || {};
 
     createInvoicePDF(res, {
       invoice,
       sale: invoice,
       items: items.rows,
-      branch: branch.rows[0],
       customer: customer.rows[0],
-      settings: settings.rows[0],
+      settings: {
+        ...activeSettings,
+        shop_name: activeSettings.shop_name || (ownerProfile.name ? `${ownerProfile.name}'s Shop` : "Inzira SME Store"),
+        shop_address: activeSettings.shop_address || (ownerProfile.sector ? `${ownerProfile.sector}, Rwanda` : "Kigali, Rwanda"),
+        shop_phone: activeSettings.shop_phone || ownerProfile.phone || "",
+        shop_email: activeSettings.shop_email || ownerProfile.email || "",
+      },
       debt: debtRes.rows[0] || null,
     });
   } catch (err) { next(err); }
@@ -78,15 +90,15 @@ router.put("/:id/status", requireRole("admin", "manager", "accountant"), async (
   try {
     const { status } = req.body;
     const { rows: [inv] } = await pool.query(
-      "UPDATE invoices SET status=$1, paid_at=CASE WHEN $1='paid' THEN NOW() ELSE paid_at END WHERE id=$2 RETURNING *",
-      [status, req.params.id]
+      "UPDATE invoices SET status=$1, paid_at=CASE WHEN $1='paid' THEN NOW() ELSE paid_at END WHERE id=$2 AND (owner_id=$3 OR $3 IS NULL) RETURNING *",
+      [status, req.params.id, req.ownerId]
     );
 
     // Sync: If the invoice is marked as 'paid', mark any corresponding receivable as 'paid'
     if (status === "paid" && inv) {
       await pool.query(
-        "UPDATE accounts_receivable SET status = 'paid' WHERE sale_id = $1",
-        [inv.sale_id]
+        "UPDATE accounts_receivable SET status = 'paid' WHERE sale_id = $1 AND (owner_id=$2 OR $2 IS NULL)",
+        [inv.sale_id, req.ownerId]
       );
     }
 

@@ -9,11 +9,19 @@ const connectionString = (
   ""
 ).trim();
 
-const cleanConnStr = connectionString.replace(/[?&]sslmode=[^&]*/gi, "").replace(/\?$/, "");
-const isLocal = /localhost|127\.0\.0\.1/.test(cleanConnStr);
+const isLocalDevMode = process.env.LOCAL_DEV_MODE === "true";
+
+if (!connectionString && !isLocalDevMode) {
+  const errMsg = "FATAL: Database connection string missing. Set DATABASE_URL or POSTGRES_URL in environment variables (or set LOCAL_DEV_MODE=true for explicit offline testing).";
+  console.error(`[DB FATAL ERROR] ${errMsg}`);
+  throw new Error(errMsg);
+}
 
 let pool = null;
-if (cleanConnStr) {
+if (connectionString) {
+  const cleanConnStr = connectionString.replace(/[?&]sslmode=[^&]*/gi, "").replace(/\?$/, "");
+  const isLocal = /localhost|127\.0\.0\.1/.test(cleanConnStr);
+
   try {
     pool = new Pool({
       connectionString: cleanConnStr,
@@ -27,6 +35,7 @@ if (cleanConnStr) {
       console.error("[PG POOL ERROR]", err.message);
     });
   } catch (e) {
+    console.error("[PG POOL INITIALIZATION FAILED]", e.message);
     pool = null;
   }
 }
@@ -120,10 +129,28 @@ const memoryStore = {
 
 async function executeQuery(text, params = []) {
   if (pool) {
-    return await pool.query(text, params);
+    try {
+      return await pool.query(text, params);
+    } catch (err) {
+      console.error("[PG QUERY ERROR]", err.message);
+      const dbErr = new Error(`Database query failed: ${err.message}`);
+      dbErr.status = 503;
+      dbErr.code = err.code || "DB_UNAVAILABLE";
+      dbErr.expose = true;
+      throw dbErr;
+    }
   }
 
-  // Fallback Execution for Serverless / In-Memory
+  if (!isLocalDevMode) {
+    console.error("[DB ERROR] Database pool uninitialized and LOCAL_DEV_MODE is false.");
+    const err = new Error("Database unavailable. Please check database configuration.");
+    err.status = 503;
+    err.code = "DB_UNAVAILABLE";
+    err.expose = true;
+    throw err;
+  }
+
+  // Explicit LOCAL_DEV_MODE offline mock fallback
   const normalized = text.trim().toLowerCase();
 
   if (normalized.startsWith("begin") || normalized.startsWith("commit") || normalized.startsWith("rollback")) {

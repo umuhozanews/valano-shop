@@ -12,21 +12,23 @@ function createInvoicePDF(res, { invoice, sale, items, settings, branch, custome
   const dark = "#191C1D";
   const gray = "#6C7A71";
 
-  const tinNumber = settings?.tin_number || "103777856";
+  const shopName = settings?.shop_name || sale?.shop_name || "INZIRA SME STORE";
+  const shopAddress = settings?.shop_address || sale?.shop_address || "Kigali, Rwanda";
+  const shopPhone = settings?.shop_phone || sale?.shop_phone || "";
+  const shopEmail = settings?.shop_email || sale?.shop_email || "";
+  const tinNumber = settings?.tin_number || "TIN Pending";
   const sdcId = settings?.sdc_id || "SDC010013000";
   const mrcNumber = settings?.mrc_number || "MIS00013705";
-  const shopEmail = settings?.shop_email || "andrenikobatuye@gmail.com";
-  const cashierName = sale?.cashier_name || "Andre Nikobatuye";
-  const cashierTin = settings?.cashier_tin || tinNumber;
+  const cashierName = sale?.cashier_name || sale?.done_by || "Store Manager";
 
   // Header bar
   doc.rect(0, 0, doc.page.width, 85).fill(emerald);
-  doc.fillColor("white").fontSize(20).font("Helvetica-Bold")
-     .text(settings?.shop_name || "KIGALI GASABO GISOZI GAKINJIRO", 50, 18);
+  doc.fillColor("white").fontSize(18).font("Helvetica-Bold")
+     .text(shopName.toUpperCase(), 50, 18);
   doc.fontSize(9).font("Helvetica")
-     .text(settings?.shop_address || "KIGALI GASABO GISOZI GAKINJIRO", 50, 42)
-     .text(`TEL: ${settings?.shop_phone || "0788862708"} | EMAIL: ${shopEmail}`, 50, 54)
-     .text(`TIN: ${tinNumber} | CASHIER: ${cashierName} (${cashierTin})`, 50, 66);
+     .text(shopAddress, 50, 42)
+     .text(`TEL: ${shopPhone}${shopEmail ? ` | EMAIL: ${shopEmail}` : ''}`, 50, 54)
+     .text(`TIN: ${tinNumber} | CASHIER: ${cashierName}`, 50, 66);
 
   doc.fillColor(dark);
 
@@ -38,10 +40,14 @@ function createInvoicePDF(res, { invoice, sale, items, settings, branch, custome
   doc.fillColor(dark).text(invoice?.invoice_number || `${sale?.id}/CS`, 160, y + 24);
   doc.fillColor(gray).text("Date & Time:", 50, y + 38);
   doc.fillColor(dark).text(new Date(invoice?.issued_at || sale?.created_at || Date.now()).toLocaleString("en-RW"), 160, y + 38);
-  doc.fillColor(gray).text("CLIENT TIN:", 50, y + 52);
-  doc.fillColor(dark).text(customer?.tin_number || sale?.customer_tin || "781055845", 160, y + 52);
+  
+  if (customer?.tin_number || sale?.customer_tin) {
+    doc.fillColor(gray).text("CLIENT TIN:", 50, y + 52);
+    doc.fillColor(dark).text(customer?.tin_number || sale?.customer_tin, 160, y + 52);
+  }
+  
   doc.fillColor(gray).text("CLIENT NAME:", 50, y + 66);
-  doc.fillColor(dark).text(customer?.name || sale?.customer_name || "Regis", 160, y + 66);
+  doc.fillColor(dark).text(customer?.name || sale?.customer_name || "Walk-in Customer", 160, y + 66);
   doc.fillColor(gray).text("Payment Method:", 50, y + 80);
   doc.fillColor(dark).text((sale?.payment_method || "CASH").replace("_", " ").toUpperCase(), 160, y + 80);
 

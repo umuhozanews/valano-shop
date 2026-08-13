@@ -77,7 +77,7 @@ router.post("/:id/payment", async (req, res, next) => {
       return res.status(400).json({ error: "Valid payment amount required" });
 
     const { rows: [existing] } = await pool.query(
-      "SELECT * FROM accounts_payable WHERE id=$1", [req.params.id]
+      "SELECT * FROM accounts_payable WHERE id=$1 AND (owner_id=$2 OR $2 IS NULL)", [req.params.id, req.ownerId]
     );
     if (!existing) return res.status(404).json({ error: "Record not found" });
 
@@ -85,8 +85,8 @@ router.post("/:id/payment", async (req, res, next) => {
     const newStatus = newPaid >= existing.amount ? "paid" : "partial";
 
     const { rows: [ap] } = await pool.query(
-      `UPDATE accounts_payable SET amount_paid=$1, status=$2 WHERE id=$3 RETURNING *`,
-      [newPaid, newStatus, req.params.id]
+      `UPDATE accounts_payable SET amount_paid=$1, status=$2 WHERE id=$3 AND (owner_id=$4 OR $4 IS NULL) RETURNING *`,
+      [newPaid, newStatus, req.params.id, req.ownerId]
     );
     await logAudit(req.user.id, "AP_PAYMENT", "accounts_payable", ap.id, null, { amount, newPaid, newStatus }, req.ip);
     res.json(ap);

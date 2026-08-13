@@ -327,6 +327,7 @@ const INDEX_SQL = [
   "CREATE INDEX IF NOT EXISTS idx_sales_customer      ON sales(customer_id)",
   "CREATE INDEX IF NOT EXISTS idx_expenses_date       ON expenses(expense_date DESC)",
   "CREATE INDEX IF NOT EXISTS idx_sales_payment       ON sales(payment_method)",
+  "CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_idempotency ON sales(idempotency_key) WHERE idempotency_key IS NOT NULL",
 ];
 
 // Migration SQL: safely evolves existing databases
@@ -381,6 +382,7 @@ ALTER TABLE sales ADD COLUMN IF NOT EXISTS is_offline        BOOLEAN DEFAULT fal
 ALTER TABLE sales ADD COLUMN IF NOT EXISTS synced_at         TIMESTAMP;
 ALTER TABLE sales ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(100);
 ALTER TABLE sales ADD COLUMN IF NOT EXISTS payment_status    VARCHAR(20) DEFAULT 'completed';
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS idempotency_key    VARCHAR(128);
 -- Widen payment_method constraint to include all methods used by the app
 ALTER TABLE sales DROP CONSTRAINT IF EXISTS sales_payment_method_check;
 ALTER TABLE sales ADD CONSTRAINT sales_payment_method_check

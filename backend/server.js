@@ -27,11 +27,10 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(logger);
 
-// Serve uploaded files & compiled static web app
+// Serve compiled static web app
 const fs = require("fs");
 const publicPath = path.join(__dirname, "public");
 app.use(express.static(publicPath));
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.get("/api/health", async (req, res) => {
   const pool = require("./src/config/db");

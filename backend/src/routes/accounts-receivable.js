@@ -83,8 +83,8 @@ router.get("/:id", async (req, res, next) => {
   try {
     const { rows: [ar] } = await pool.query(
       `SELECT ar.*, c.name as customer_name FROM accounts_receivable ar
-       LEFT JOIN customers c ON c.id=ar.customer_id WHERE ar.id=$1`,
-      [req.params.id]
+       LEFT JOIN customers c ON c.id=ar.customer_id WHERE ar.id=$1 AND (ar.owner_id=$2 OR $2 IS NULL)`,
+      [req.params.id, req.ownerId]
     );
     if (!ar) return res.status(404).json({ error: "Record not found" });
     res.json(ar);
@@ -116,7 +116,7 @@ router.post("/:id/payment", async (req, res, next) => {
       return res.status(400).json({ error: "Valid payment amount required" });
 
     const { rows: [existing] } = await pool.query(
-      "SELECT * FROM accounts_receivable WHERE id=$1", [req.params.id]
+      "SELECT * FROM accounts_receivable WHERE id=$1 AND (owner_id=$2 OR $2 IS NULL)", [req.params.id, req.ownerId]
     );
     if (!existing) return res.status(404).json({ error: "Record not found" });
 
@@ -124,8 +124,8 @@ router.post("/:id/payment", async (req, res, next) => {
     const newStatus = newPaid >= existing.amount ? "paid" : "partial";
 
     const { rows: [ar] } = await pool.query(
-      `UPDATE accounts_receivable SET amount_paid=$1, status=$2 WHERE id=$3 RETURNING *`,
-      [newPaid, newStatus, req.params.id]
+      `UPDATE accounts_receivable SET amount_paid=$1, status=$2 WHERE id=$3 AND (owner_id=$4 OR $4 IS NULL) RETURNING *`,
+      [newPaid, newStatus, req.params.id, req.ownerId]
     );
     await logAudit(req.user.id, "AR_PAYMENT", "accounts_receivable", ar.id, null, { amount, newPaid, newStatus }, req.ip);
     res.json(ar);

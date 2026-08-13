@@ -6,18 +6,10 @@ const { logAudit, paginate, notifyAdminsAndManagers } = require("../utils/helper
 const { journalForExpense } = require("../utils/journal");
 const { ensureTenantColumns, addOwnerFilter } = require("../utils/tenant");
 const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
+const { uploadToCloudinary } = require("../utils/cloudinary");
 
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => {
-      const dir = path.join(__dirname, "../../uploads/receipts");
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      cb(null, dir);
-    },
-    filename: (req, file, cb) => cb(null, `receipt-${Date.now()}${path.extname(file.originalname)}`),
-  }),
+  storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith("image/") || file.mimetype === "application/pdf") cb(null, true);
     else cb(new Error("Images and PDFs only"));
@@ -126,10 +118,10 @@ router.post("/", async (req, res, next) => {
 router.post("/:id/receipt", upload.single("receipt"), async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-    const url = `/uploads/receipts/${req.file.filename}`;
+    const url = await uploadToCloudinary(req.file.buffer, "inzira_receipts");
     const { rows: [exp] } = await pool.query(
-      "UPDATE expenses SET receipt_url=$1 WHERE id=$2 RETURNING *",
-      [url, req.params.id]
+      "UPDATE expenses SET receipt_url=$1 WHERE id=$2 AND (owner_id=$3 OR $3 IS NULL) RETURNING *",
+      [url, req.params.id, req.ownerId]
     );
     if (!exp) return res.status(404).json({ error: "Expense not found" });
     res.json({ url, expense: exp });
@@ -141,8 +133,8 @@ router.put("/:id", async (req, res, next) => {
     const { category, amount, description, expense_date, supplier_id } = req.body;
     const { rows: [exp] } = await pool.query(
       `UPDATE expenses SET category=$1, amount=$2, description=$3, expense_date=$4, supplier_id=$5
-       WHERE id=$6 RETURNING *`,
-      [category, amount, description, expense_date, supplier_id || null, req.params.id]
+       WHERE id=$6 AND (owner_id=$7 OR $7 IS NULL) RETURNING *`,
+      [category, amount, description, expense_date, supplier_id || null, req.params.id, req.ownerId]
     );
     if (!exp) return res.status(404).json({ error: "Expense not found" });
     res.json(exp);
@@ -151,7 +143,7 @@ router.put("/:id", async (req, res, next) => {
 
 router.delete("/:id", requireRole("admin", "sme_owner", "accountant", "pulse_admin"), async (req, res, next) => {
   try {
-    await pool.query("DELETE FROM expenses WHERE id=$1", [req.params.id]);
+    await pool.query("DELETE FROM expenses WHERE id=$1 AND (owner_id=$2 OR $2 IS NULL)", [req.params.id, req.ownerId]);
     res.json({ message: "Expense deleted" });
   } catch (err) { next(err); }
 });
@@ -167,8 +159,8 @@ async function checkExpenseSpike(userId, ownerId) {
       FROM expenses${oWhere}`,
       oParam
     );
-    const thisMonth = parseFloat(rows[0].this_month || 0);
-    const lastMonth = parseFloat(rows[0].last_month || 0);
+    const thisMonth = parseInt(rows[0].this_month || 0, 10);
+    const lastMonth = parseInt(rows[0].last_month || 0, 10);
     if (lastMonth > 0 && thisMonth > lastMonth * 1.5) {
       await notifyAdminsAndManagers(
         "EXPENSE_SPIKE",
