@@ -1,0 +1,22 @@
+{
+  "short_name": "DataBridge",
+  "name": "DataBridge — SME Mobile",
+  "description": "Clean, mobile-first SME Owner app by Inzira Insights",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#1F5C4E",
+  "theme_color": "#1F5C4E",
+  "display": "standalone",
+  "orientation": "portrait"
+}

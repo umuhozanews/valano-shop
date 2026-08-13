@@ -24,7 +24,11 @@ router.post("/initiate", verifyToken, async (req, res, next) => {
     if (!sale_id || !amount || !payment_method)
       return res.status(400).json({ error: "sale_id, amount and payment_method required" });
 
-    const { rows: [sale] } = await pool.query("SELECT * FROM sales WHERE id=$1", [sale_id]);
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "owner_id=$2";
+    const queryParams = isAdmin ? [sale_id] : [sale_id, req.ownerId];
+
+    const { rows: [sale] } = await pool.query(`SELECT * FROM sales WHERE id=$1 AND ${ownerWhere}`, queryParams);
     if (!sale) return res.status(404).json({ error: "Sale not found" });
 
     const tx_ref = `INZ-${sale_id}-${Date.now()}`;
@@ -217,7 +221,11 @@ router.post("/split", verifyToken, async (req, res, next) => {
     if (!sale_id || !payments?.length)
       return res.status(400).json({ error: "sale_id and payments array required" });
 
-    const { rows: [sale] } = await pool.query("SELECT * FROM sales WHERE id=$1", [sale_id]);
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "owner_id=$2";
+    const queryParams = isAdmin ? [sale_id] : [sale_id, req.ownerId];
+
+    const { rows: [sale] } = await pool.query(`SELECT * FROM sales WHERE id=$1 AND ${ownerWhere}`, queryParams);
     if (!sale) return res.status(404).json({ error: "Sale not found" });
 
     const totalPaid = payments.reduce((s, p) => s + Number(p.amount), 0);

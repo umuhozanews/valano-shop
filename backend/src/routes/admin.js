@@ -1,393 +1,606 @@
 const express = require("express");
 const router = express.Router();
+const bcrypt = require("bcryptjs");
 const pool = require("../config/db");
 const { verifyToken, requireRole } = require("../middleware/auth");
 const { logAudit } = require("../utils/helpers");
+const { validatePasswordStrength } = require("../utils/validation");
 
 router.use(verifyToken);
 router.use(requireRole("admin", "pulse_admin"));
 
-// GET /v2/admin/dashboard — platform-wide KPIs
-router.get("/dashboard", async (req, res, next) => {
+// ─── 1. Platform Overview KPIs ────────────────────────────────────────────────
+router.get(["/overview", "/dashboard", "/kpis"], async (req, res, next) => {
   try {
-    const [smeStats, scoreStats, lenderStats, activityStats] = await Promise.all([
+    const [smeStats, salesStats, scoreStats, activityStats, recentSignups, sectorStats, districtStats] = await Promise.all([
+      // Total SMEs, new this week, new this month, active vs inactive
       pool.query(`
         SELECT
           COUNT(*) AS total_smes,
-          COUNT(*) FILTER (WHERE created_at >= NOW()-INTERVAL '30 days') AS new_this_month,
-          COUNT(*) FILTER (WHERE consent_status='consented') AS consented,
-          COUNT(*) FILTER (WHERE consent_status='declined') AS declined,
-          COUNT(*) FILTER (WHERE consent_status='withdrawn') AS withdrawn,
-          COUNT(*) FILTER (WHERE is_active=false) AS inactive
-        FROM users WHERE role='sme_owner'`),
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days') AS new_this_week,
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days') AS new_this_month,
+          COUNT(*) FILTER (WHERE is_active = true) AS active_smes,
+          COUNT(*) FILTER (WHERE is_active = false) AS deactivated_smes,
+          COUNT(*) FILTER (WHERE consent_status = 'consented') AS consented_smes
+        FROM users WHERE role = 'sme_owner'
+      `),
 
+      // Platform-wide GMV sales volume across ALL SMEs combined
       pool.query(`
         SELECT
-          COUNT(*) AS total_scored,
-          COUNT(*) FILTER (WHERE band='green') AS green,
-          COUNT(*) FILTER (WHERE band='amber')  AS amber,
-          COUNT(*) FILTER (WHERE band='red')    AS red,
-          ROUND(AVG(score),1) AS avg_score,
+          COALESCE(SUM(total_amount), 0)::bigint AS all_time_volume,
+          COUNT(*)::integer AS all_time_transactions,
+          COALESCE(SUM(total_amount) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days'), 0)::bigint AS volume_30d,
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days')::integer AS transactions_30d,
+          COALESCE(SUM(total_amount) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days'), 0)::bigint AS volume_7d,
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days')::integer AS transactions_7d,
+          COALESCE(AVG(total_amount), 0)::bigint AS avg_transaction_size
+        FROM sales WHERE is_voided = false
+      `),
+
+      // Platform-wide health / SACCO credit score distribution
+      pool.query(`
+        SELECT
+          COUNT(*)::integer AS total_scored,
+          COUNT(*) FILTER (WHERE band = 'green')::integer AS green_count,
+          COUNT(*) FILTER (WHERE band = 'amber')::integer AS amber_count,
+          COUNT(*) FILTER (WHERE band = 'red')::integer AS red_count,
+          ROUND(AVG(score), 1) AS avg_score,
           MIN(score) AS min_score,
           MAX(score) AS max_score
-        FROM credit_scores`),
+        FROM credit_scores
+      `),
 
+      // Active vs Inactive / Churned SMEs (Active = made sale or expense in last 30d)
       pool.query(`
-        SELECT COUNT(DISTINCT lender_user_id) AS total_lenders,
-               COUNT(*) AS total_referrals,
-               COUNT(*) FILTER (WHERE status='active') AS active_referrals
-        FROM referrals`),
+        SELECT
+          COUNT(DISTINCT u.id) FILTER (
+            WHERE s.id IS NOT NULL OR e.id IS NOT NULL
+          )::integer AS active_merchants_30d,
+          COUNT(DISTINCT u.id) FILTER (
+            WHERE s.id IS NULL AND e.id IS NULL AND u.created_at < NOW() - INTERVAL '30 days'
+          )::integer AS churned_merchants
+        FROM users u
+        LEFT JOIN sales s ON s.owner_id = u.id AND s.created_at >= NOW() - INTERVAL '30 days' AND s.is_voided = false
+        LEFT JOIN expenses e ON e.owner_id = u.id AND e.expense_date >= CURRENT_DATE - 30
+        WHERE u.role = 'sme_owner'
+      `),
 
+      // Recent 10 Signups Feed
       pool.query(`
-        SELECT COUNT(*) AS sales_30d,
-               COALESCE(SUM(total_amount),0) AS revenue_30d
-        FROM sales WHERE is_voided=false AND created_at >= NOW()-INTERVAL '30 days'`),
+        SELECT u.id, u.name, u.email, u.phone, u.sector, u.district, u.created_at, u.is_active,
+               COALESCE(sett.shop_name, u.name || '''s Shop') AS shop_name
+        FROM users u
+        LEFT JOIN settings sett ON sett.owner_id = u.id
+        WHERE u.role = 'sme_owner'
+        ORDER BY u.created_at DESC LIMIT 10
+      `),
+
+      // Sector Breakdown
+      pool.query(`
+        SELECT COALESCE(u.sector, 'General Retail') AS sector,
+               COUNT(u.id)::integer AS count,
+               COALESCE(SUM(s.total_amount), 0)::bigint AS total_volume
+        FROM users u
+        LEFT JOIN sales s ON s.owner_id = u.id AND s.is_voided = false
+        WHERE u.role = 'sme_owner'
+        GROUP BY 1 ORDER BY count DESC LIMIT 8
+      `),
+
+      // District Breakdown
+      pool.query(`
+        SELECT COALESCE(u.district, 'Kigali (Gasabo)') AS district,
+               COUNT(u.id)::integer AS count
+        FROM users u
+        WHERE u.role = 'sme_owner'
+        GROUP BY 1 ORDER BY count DESC LIMIT 8
+      `),
     ]);
 
-    const { rows: scoreTrend } = await pool.query(`
-      SELECT DATE(created_at) as day,
-             ROUND(AVG(score),1) as avg_score,
-             COUNT(*) as scored
-      FROM health_score_log
-      WHERE created_at >= NOW()-INTERVAL '30 days'
-      GROUP BY DATE(created_at) ORDER BY day`);
+    const smes = smeStats.rows[0] || {};
+    const sales = salesStats.rows[0] || {};
+    const scores = scoreStats.rows[0] || {};
+    const activity = activityStats.rows[0] || {};
 
-    const { rows: sectorBreakdown } = await pool.query(`
-      SELECT COALESCE(sector,'other') as sector, COUNT(*) as count,
-             ROUND(AVG(cs.score),1) as avg_score
-      FROM users u LEFT JOIN credit_scores cs ON cs.user_id=u.id
-      WHERE u.role='sme_owner'
-      GROUP BY sector ORDER BY count DESC`);
+    // Estimated Platform Revenue (e.g. 5,000 RWF/mo per active SME + 0.5% transaction commission)
+    const activeCount = parseInt(activity.active_merchants_30d || smes.active_smes || 0, 10);
+    const volume30d = parseInt(sales.volume_30d || 0, 10);
+    const estimatedSubscriptionRevenue = activeCount * 5000;
+    const estimatedCommissionRevenue = Math.round(volume30d * 0.005);
+    const estimatedTotalRevenue = estimatedSubscriptionRevenue + estimatedCommissionRevenue;
 
     res.json({
-      smes: smeStats.rows[0],
-      scores: scoreStats.rows[0],
-      lenders: lenderStats.rows[0],
-      activity: activityStats.rows[0],
-      scoreTrend,
-      sectorBreakdown,
+      smes: {
+        total: parseInt(smes.total_smes || 0, 10),
+        new_this_week: parseInt(smes.new_this_week || 0, 10),
+        new_this_month: parseInt(smes.new_this_month || 0, 10),
+        active: parseInt(smes.active_smes || 0, 10),
+        deactivated: parseInt(smes.deactivated_smes || 0, 10),
+        consented: parseInt(smes.consented_smes || 0, 10),
+        active_30d: activeCount,
+        churned: parseInt(activity.churned_merchants || 0, 10),
+      },
+      sales: {
+        all_time_volume: parseInt(sales.all_time_volume || 0, 10),
+        all_time_transactions: parseInt(sales.all_time_transactions || 0, 10),
+        volume_30d: volume30d,
+        transactions_30d: parseInt(sales.transactions_30d || 0, 10),
+        volume_7d: parseInt(sales.volume_7d || 0, 10),
+        transactions_7d: parseInt(sales.transactions_7d || 0, 10),
+        avg_transaction_size: parseInt(sales.avg_transaction_size || 0, 10),
+      },
+      estimatedRevenue: {
+        monthlySubscription: estimatedSubscriptionRevenue,
+        commissionFee: estimatedCommissionRevenue,
+        totalMonthly: estimatedTotalRevenue,
+        currency: "RWF",
+      },
+      scores: {
+        total_scored: parseInt(scores.total_scored || 0, 10),
+        green: parseInt(scores.green_count || 0, 10),
+        amber: parseInt(scores.amber_count || 0, 10),
+        red: parseInt(scores.red_count || 0, 10),
+        avg_score: scores.avg_score ? parseFloat(scores.avg_score) : 74,
+      },
+      recentSignups: recentSignups.rows,
+      sectorBreakdown: sectorStats.rows,
+      districtBreakdown: districtStats.rows,
     });
   } catch (err) { next(err); }
 });
 
-// GET /v2/admin/smes — list all SMEs with their scores
+// ─── 2. SME Directory (List, Search & Filter) ─────────────────────────────────
 router.get("/smes", async (req, res, next) => {
   try {
-    const { band, sector, consent, page = 1, limit = 50, search } = req.query;
+    const { search, status, sector, district, band, page = 1, limit = 50 } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    const conditions = ["u.role='sme_owner'"];
+    const conditions = ["u.role = 'sme_owner'"];
     const params = [];
 
-    if (band) { params.push(band); conditions.push(`cs.band=$${params.length}`); }
-    if (sector) { params.push(sector); conditions.push(`u.sector=$${params.length}`); }
-    if (consent) { params.push(consent); conditions.push(`u.consent_status=$${params.length}`); }
     if (search) {
       params.push(`%${search}%`);
-      conditions.push(`(u.name ILIKE $${params.length} OR u.email ILIKE $${params.length})`);
+      conditions.push(`(
+        u.name ILIKE $${params.length} OR
+        u.email ILIKE $${params.length} OR
+        u.phone ILIKE $${params.length} OR
+        sett.shop_name ILIKE $${params.length} OR
+        u.district ILIKE $${params.length} OR
+        u.sector ILIKE $${params.length}
+      )`);
     }
 
-    const where = conditions.join(" AND ");
+    if (status === "active") {
+      conditions.push("u.is_active = true");
+    } else if (status === "deactivated" || status === "suspended") {
+      conditions.push("u.is_active = false");
+    }
 
-    const { rows } = await pool.query(`
-      SELECT u.id, u.name, u.email, u.phone, u.sector, u.district,
-             u.consent_status, u.is_active, u.created_at,
-             cs.score, cs.band, cs.calculated_at
-      FROM users u
-      LEFT JOIN credit_scores cs ON cs.user_id = u.id
-      WHERE ${where}
-      ORDER BY u.created_at DESC
-      LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
-      [...params, parseInt(limit), offset]);
+    if (sector && sector !== "all") {
+      params.push(sector);
+      conditions.push(`u.sector = $${params.length}`);
+    }
 
-    const { rows: [cnt] } = await pool.query(
-      `SELECT COUNT(*) FROM users u LEFT JOIN credit_scores cs ON cs.user_id=u.id WHERE ${where}`,
-      params
+    if (district && district !== "all") {
+      params.push(district);
+      conditions.push(`u.district = $${params.length}`);
+    }
+
+    if (band && band !== "all") {
+      params.push(band);
+      conditions.push(`cs.band = $${params.length}`);
+    }
+
+    const whereClause = conditions.join(" AND ");
+
+    const [dataRes, countRes] = await Promise.all([
+      pool.query(`
+        SELECT
+          u.id, u.name, u.email, u.phone, u.sector, u.district, u.currency,
+          u.is_active, u.consent_status, u.created_at,
+          COALESCE(sett.shop_name, u.name || '''s Shop') AS shop_name,
+          sett.shop_address, sett.shop_phone, sett.tin_number,
+          cs.score, cs.band, cs.calculated_at,
+          COALESCE(stk.items_count, 0)::integer AS items_count,
+          COALESCE(sls.total_sales, 0)::bigint AS total_sales,
+          COALESCE(sls.sales_count, 0)::integer AS sales_count,
+          GREATEST(u.created_at, sls.last_sale, exp.last_expense, stk.last_stock) AS last_activity_at
+        FROM users u
+        LEFT JOIN settings sett ON sett.owner_id = u.id
+        LEFT JOIN credit_scores cs ON cs.user_id = u.id
+        LEFT JOIN (
+          SELECT owner_id, COUNT(id) AS items_count, MAX(created_at) AS last_stock
+          FROM stock_items WHERE is_active = true GROUP BY owner_id
+        ) stk ON stk.owner_id = u.id
+        LEFT JOIN (
+          SELECT owner_id, SUM(total_amount) AS total_sales, COUNT(id) AS sales_count, MAX(created_at) AS last_sale
+          FROM sales WHERE is_voided = false GROUP BY owner_id
+        ) sls ON sls.owner_id = u.id
+        LEFT JOIN (
+          SELECT owner_id, MAX(created_at) AS last_expense
+          FROM expenses GROUP BY owner_id
+        ) exp ON exp.owner_id = u.id
+        WHERE ${whereClause}
+        ORDER BY u.created_at DESC
+        LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+      `, [...params, parseInt(limit), offset]),
+
+      pool.query(`
+        SELECT COUNT(DISTINCT u.id) AS total
+        FROM users u
+        LEFT JOIN settings sett ON sett.owner_id = u.id
+        LEFT JOIN credit_scores cs ON cs.user_id = u.id
+        WHERE ${whereClause}
+      `, params),
+    ]);
+
+    res.json({
+      smes: dataRes.rows,
+      total: parseInt(countRes.rows[0]?.total || 0, 10),
+      page: parseInt(page),
+      limit: parseInt(limit),
+    });
+  } catch (err) { next(err); }
+});
+
+// ─── 3. "Visit Shop" — View Individual SME Data (READ-ONLY, Audited) ─────────
+router.get("/smes/:id/shop-view", async (req, res, next) => {
+  try {
+    const smeId = parseInt(req.params.id, 10);
+    if (!smeId) return res.status(400).json({ error: "Valid SME ID required" });
+
+    // 1. Fetch SME user profile
+    const { rows: [smeUser] } = await pool.query(
+      "SELECT id, name, email, phone, role, is_active, sector, district, currency, created_at FROM users WHERE id=$1",
+      [smeId]
+    );
+    if (!smeUser) return res.status(404).json({ error: "SME business account not found" });
+
+    // 2. CRITICAL: Traceable Audit Log
+    await logAudit(
+      req.user.id,
+      "ADMIN_VIEWED_SME_DATA",
+      "users",
+      smeId,
+      null,
+      {
+        sme_id: smeId,
+        sme_name: smeUser.name,
+        sme_email: smeUser.email,
+        admin_id: req.user.id,
+        admin_email: req.user.email,
+        access_type: "READ_ONLY_SHOP_MONITORING",
+      },
+      req.ip
     );
 
-    res.json({ smes: rows, total: parseInt(cnt.count), page: parseInt(page), limit: parseInt(limit) });
+    // 3. Parallel fetch of all business data for this SME
+    const [settingsRes, stockRes, salesRes, customersRes, expensesRes, scoreRes, arRes, pnlRes] = await Promise.all([
+      // Settings
+      pool.query("SELECT * FROM settings WHERE owner_id=$1 LIMIT 1", [smeId]),
+
+      // Stock items (up to 100)
+      pool.query(
+        `SELECT id, name, name_rw, category, unit, quantity, cost_price_rwf, sell_price_rwf, low_stock_threshold, is_active, created_at
+         FROM stock_items WHERE owner_id=$1 ORDER BY created_at DESC LIMIT 100`,
+        [smeId]
+      ),
+
+      // Sales & Invoices (up to 100)
+      pool.query(
+        `SELECT s.id, s.total_amount, s.payment_method, s.payment_status, s.is_voided, s.created_at,
+                c.name AS customer_name, i.invoice_number, i.status AS invoice_status,
+                (SELECT COUNT(*) FROM sale_items si WHERE si.sale_id=s.id) AS items_count
+         FROM sales s
+         LEFT JOIN customers c ON c.id = s.customer_id
+         LEFT JOIN invoices i ON i.sale_id = s.id
+         WHERE s.owner_id=$1 ORDER BY s.created_at DESC LIMIT 100`,
+        [smeId]
+      ),
+
+      // Customers
+      pool.query(
+        `SELECT c.id, c.name, c.phone, c.location, c.type, c.segment, c.created_at,
+                COUNT(s.id) AS total_orders,
+                COALESCE(SUM(s.total_amount), 0) AS total_spent
+         FROM customers c
+         LEFT JOIN sales s ON s.customer_id = c.id AND s.is_voided = false
+         WHERE c.owner_id=$1
+         GROUP BY c.id ORDER BY total_spent DESC LIMIT 50`,
+        [smeId]
+      ),
+
+      // Expenses
+      pool.query(
+        `SELECT id, category, amount, description, expense_date, created_at
+         FROM expenses WHERE owner_id=$1 ORDER BY expense_date DESC LIMIT 50`,
+        [smeId]
+      ),
+
+      // Credit Score & Health
+      pool.query(
+        `SELECT score, band, factors, calculated_at, advisory_token
+         FROM credit_scores WHERE user_id=$1 LIMIT 1`,
+        [smeId]
+      ),
+
+      // Accounts Receivable
+      pool.query(
+        `SELECT ar.id, ar.amount, ar.amount_paid, ar.status, ar.due_date, c.name AS customer_name
+         FROM accounts_receivable ar
+         LEFT JOIN customers c ON c.id = ar.customer_id
+         WHERE ar.owner_id=$1 ORDER BY ar.created_at DESC LIMIT 20`,
+        [smeId]
+      ),
+
+      // Quick P&L snapshot for this SME
+      pool.query(
+        `SELECT
+          COALESCE(SUM(s.total_amount), 0)::bigint AS total_revenue,
+          COALESCE(SUM(si.quantity * stk.cost_price_rwf), 0)::bigint AS total_cogs,
+          (SELECT COALESCE(SUM(amount), 0)::bigint FROM expenses WHERE owner_id=$1) AS total_expenses
+         FROM sales s
+         LEFT JOIN sale_items si ON si.sale_id = s.id
+         LEFT JOIN stock_items stk ON stk.id = si.stock_item_id
+         WHERE s.owner_id=$1 AND s.is_voided = false`,
+        [smeId]
+      ),
+    ]);
+
+    const pnl = pnlRes.rows[0] || {};
+    const rev = parseInt(pnl.total_revenue || 0, 10);
+    const cogs = parseInt(pnl.total_cogs || 0, 10);
+    const exp = parseInt(pnl.total_expenses || 0, 10);
+    const grossProfit = rev - cogs;
+    const netProfit = grossProfit - exp;
+
+    res.json({
+      readOnly: true,
+      auditedAccess: true,
+      sme: smeUser,
+      settings: settingsRes.rows[0] || { shop_name: `${smeUser.name}'s Shop` },
+      stock: stockRes.rows,
+      sales: salesRes.rows,
+      customers: customersRes.rows,
+      expenses: expensesRes.rows,
+      receivables: arRes.rows,
+      score: scoreRes.rows[0] || null,
+      financialSummary: {
+        revenue: rev,
+        costOfGoods: cogs,
+        grossProfit,
+        expenses: exp,
+        netProfit,
+        grossMargin: rev > 0 ? Math.round((grossProfit / rev) * 100) : 0,
+        netMargin: rev > 0 ? Math.round((netProfit / rev) * 100) : 0,
+      },
+    });
   } catch (err) { next(err); }
 });
 
-// GET /v2/admin/lenders — list all lender accounts
-router.get("/lenders", async (req, res, next) => {
+// ─── 4. Account Management & Moderation ───────────────────────────────────────
+
+// 4a. Deactivate / Reactivate SME Account
+router.put("/smes/:id/status", async (req, res, next) => {
   try {
-    const { rows } = await pool.query(`
-      SELECT u.id, u.name, u.email, u.created_at,
-             COUNT(DISTINCT lc.sme_user_id) AS portfolio_size,
-             COUNT(DISTINCT ref.id) FILTER (WHERE ref.status='active') AS active_referrals,
-             ROUND(AVG(cs.score),1) AS avg_portfolio_score
-      FROM users u
-      LEFT JOIN lender_clients lc ON lc.lender_user_id=u.id
-      LEFT JOIN referrals ref ON ref.lender_user_id=u.id
-      LEFT JOIN credit_scores cs ON cs.user_id=lc.sme_user_id
-      WHERE u.role='lender'
-      GROUP BY u.id, u.name, u.email, u.created_at
-      ORDER BY portfolio_size DESC`);
-
-    res.json(rows);
-  } catch (err) { next(err); }
-});
-
-// GET /v2/admin/model/performance — distribution and quality metrics
-router.get("/model/performance", async (req, res, next) => {
-  try {
-    const { rows: distribution } = await pool.query(`
-      SELECT
-        COUNT(*) FILTER (WHERE score BETWEEN 0  AND 19)  AS "0-19",
-        COUNT(*) FILTER (WHERE score BETWEEN 20 AND 39)  AS "20-39",
-        COUNT(*) FILTER (WHERE score BETWEEN 40 AND 54)  AS "40-54",
-        COUNT(*) FILTER (WHERE score BETWEEN 55 AND 64)  AS "55-64",
-        COUNT(*) FILTER (WHERE score BETWEEN 65 AND 79)  AS "65-79",
-        COUNT(*) FILTER (WHERE score BETWEEN 80 AND 100) AS "80-100"
-      FROM credit_scores`);
-
-    const { rows: byModel } = await pool.query(`
-      SELECT model_version, COUNT(*) as runs, ROUND(AVG(score),1) as avg_score
-      FROM health_score_log GROUP BY model_version ORDER BY model_version`);
-
-    const { rows: overTime } = await pool.query(`
-      SELECT DATE_TRUNC('week', created_at)::date as week,
-             COUNT(*) as scored,
-             ROUND(AVG(score),1) as avg
-      FROM health_score_log
-      WHERE created_at >= NOW()-INTERVAL '90 days'
-      GROUP BY DATE_TRUNC('week', created_at) ORDER BY week`);
-
-    res.json({ distribution: distribution[0], byModel, overTime });
-  } catch (err) { next(err); }
-});
-
-// GET /v2/admin/data-quality — coverage metrics
-router.get("/data-quality", async (req, res, next) => {
-  try {
-    const { rows: [quality] } = await pool.query(`
-      SELECT
-        (SELECT COUNT(*) FROM users WHERE role='sme_owner') AS total_smes,
-        (SELECT COUNT(*) FROM users WHERE role='sme_owner' AND consent_status='consented') AS consented,
-        (SELECT COUNT(DISTINCT user_id) FROM sales WHERE created_at >= NOW()-INTERVAL '30 days') AS active_sellers,
-        (SELECT COUNT(DISTINCT user_id) FROM expenses WHERE expense_date::date >= CURRENT_DATE-30) AS have_expenses,
-        (SELECT COUNT(*) FROM stock_items WHERE is_active=true) AS stock_items,
-        (SELECT COUNT(*) FROM credit_scores) AS scored_businesses,
-        (SELECT COUNT(*) FROM health_score_log WHERE created_at >= NOW()-INTERVAL '7 days') AS scored_this_week
-    `);
-
-    res.json(quality);
-  } catch (err) { next(err); }
-});
-
-// PUT /v2/admin/users/:id/role — change a user's role
-router.put("/users/:id/role", async (req, res, next) => {
-  try {
-    const { role } = req.body;
-    const allowed = ["sme_owner", "manager", "accountant", "cashier", "lender", "databridge_advisor", "viewer", "admin"];
-    if (!allowed.includes(role)) return res.status(400).json({ error: "Invalid role" });
-
-    const { rows: [before] } = await pool.query("SELECT role FROM users WHERE id=$1", [req.params.id]);
-    if (!before) return res.status(404).json({ error: "User not found" });
-
-    await pool.query("UPDATE users SET role=$1 WHERE id=$2", [role, req.params.id]);
-
-    await logAudit(req.user.id, "ROLE_CHANGED", "users", req.params.id, { role: before.role }, { role }, req.ip);
-
-    res.json({ message: "Role updated", old_role: before.role, new_role: role });
-  } catch (err) { next(err); }
-});
-
-// PUT /v2/admin/users/:id/activate — activate or deactivate
-router.put("/users/:id/activate", async (req, res, next) => {
-  try {
+    const smeId = parseInt(req.params.id, 10);
     const { is_active } = req.body;
-    await pool.query("UPDATE users SET is_active=$1 WHERE id=$2", [!!is_active, req.params.id]);
-    await logAudit(req.user.id, is_active ? "USER_ACTIVATED" : "USER_DEACTIVATED", "users", req.params.id, null, null, req.ip);
-    res.json({ message: `User ${is_active ? "activated" : "deactivated"}` });
+    if (typeof is_active !== "boolean") {
+      return res.status(400).json({ error: "is_active (boolean) is required" });
+    }
+
+    const { rows: [updated] } = await pool.query(
+      "UPDATE users SET is_active=$1 WHERE id=$2 RETURNING id, name, email, is_active",
+      [is_active, smeId]
+    );
+    if (!updated) return res.status(404).json({ error: "SME user not found" });
+
+    await logAudit(
+      req.user.id,
+      is_active ? "ADMIN_USER_ACTIVATED" : "ADMIN_USER_DEACTIVATED",
+      "users",
+      smeId,
+      null,
+      { is_active, target_email: updated.email, admin_id: req.user.id },
+      req.ip
+    );
+
+    res.json({
+      message: `Account "${updated.name}" successfully ${is_active ? "activated" : "deactivated"}.`,
+      user: updated,
+    });
   } catch (err) { next(err); }
 });
 
-// GET /v2/admin/audit — platform audit log
+// 4b. Admin Password Reset for Locked-out Merchant
+router.post("/smes/:id/reset-password", async (req, res, next) => {
+  try {
+    const smeId = parseInt(req.params.id, 10);
+    const { new_password } = req.body;
+
+    const passwordToSet = new_password && new_password.trim().length >= 6
+      ? new_password.trim()
+      : `Inzira@${Math.floor(100000 + Math.random() * 900000)}`;
+
+    const strength = validatePasswordStrength(passwordToSet);
+    if (!strength.valid) {
+      return res.status(400).json({ error: strength.error });
+    }
+
+    const hash = await bcrypt.hash(passwordToSet, 10);
+
+    const { rows: [user] } = await pool.query(
+      "UPDATE users SET password_hash=$1, is_active=true WHERE id=$2 RETURNING id, name, email",
+      [hash, smeId]
+    );
+    if (!user) return res.status(404).json({ error: "SME user not found" });
+
+    await logAudit(
+      req.user.id,
+      "ADMIN_PASSWORD_RESET",
+      "users",
+      smeId,
+      null,
+      { target_email: user.email, admin_id: req.user.id },
+      req.ip
+    );
+
+    res.json({
+      message: `Password reset successfully for ${user.email}`,
+      temporaryPassword: passwordToSet,
+      user,
+    });
+  } catch (err) { next(err); }
+});
+
+// 4c. Specific Audit Log for this SME
+router.get("/smes/:id/audit", async (req, res, next) => {
+  try {
+    const smeId = parseInt(req.params.id, 10);
+    const { limit = 50 } = req.query;
+
+    const { rows } = await pool.query(
+      `SELECT al.*, u.name AS user_name, u.email AS user_email
+       FROM audit_log al
+       LEFT JOIN users u ON u.id = al.user_id
+       WHERE al.user_id = $1 OR al.target_id = $1
+       ORDER BY al.created_at DESC LIMIT $2`,
+      [smeId, parseInt(limit)]
+    );
+
+    res.json({ audit: rows, count: rows.length });
+  } catch (err) { next(err); }
+});
+
+// ─── 5. Platform-Wide Analytics ───────────────────────────────────────────────
+router.get("/analytics", async (req, res, next) => {
+  try {
+    const [dailyTrends, monthlyTrends, topSmes, sectorShares, signupVelocity] = await Promise.all([
+      // Combined Daily Sales Trend across all SMEs (last 30 days)
+      pool.query(`
+        WITH dates AS (
+          SELECT generate_series(CURRENT_DATE - INTERVAL '29 days', CURRENT_DATE, '1 day')::date AS day
+        ),
+        daily_s AS (
+          SELECT DATE(created_at) AS day,
+                 COALESCE(SUM(total_amount), 0)::bigint AS volume,
+                 COUNT(*)::integer AS transactions
+          FROM sales WHERE is_voided = false AND created_at >= CURRENT_DATE - INTERVAL '30 days'
+          GROUP BY 1
+        )
+        SELECT d.day::text,
+               COALESCE(s.volume, 0)::bigint AS volume,
+               COALESCE(s.transactions, 0)::integer AS transactions
+        FROM dates d
+        LEFT JOIN daily_s s ON s.day = d.day
+        ORDER BY d.day ASC
+      `),
+
+      // Monthly Trend (last 12 months)
+      pool.query(`
+        SELECT
+          TO_CHAR(DATE_TRUNC('month', created_at), 'Mon YYYY') AS month_label,
+          DATE_TRUNC('month', created_at)::date AS month_date,
+          COALESCE(SUM(total_amount), 0)::bigint AS volume,
+          COUNT(*)::integer AS transactions,
+          COUNT(DISTINCT owner_id)::integer AS active_merchants
+        FROM sales
+        WHERE is_voided = false AND created_at >= NOW() - INTERVAL '12 months'
+        GROUP BY 1, 2 ORDER BY 2 ASC
+      `),
+
+      // Top-Performing SMEs Leaderboard
+      pool.query(`
+        SELECT u.id, u.name, u.email, u.phone, u.sector, u.district,
+               COALESCE(sett.shop_name, u.name || '''s Shop') AS shop_name,
+               COALESCE(SUM(s.total_amount), 0)::bigint AS total_volume,
+               COUNT(s.id)::integer AS total_transactions,
+               COALESCE(cs.score, 75) AS health_score,
+               COALESCE(cs.band, 'green') AS health_band
+        FROM users u
+        LEFT JOIN settings sett ON sett.owner_id = u.id
+        LEFT JOIN sales s ON s.owner_id = u.id AND s.is_voided = false
+        LEFT JOIN credit_scores cs ON cs.user_id = u.id
+        WHERE u.role = 'sme_owner'
+        GROUP BY u.id, u.name, u.email, u.phone, u.sector, u.district, sett.shop_name, cs.score, cs.band
+        ORDER BY total_volume DESC LIMIT 10
+      `),
+
+      // Sector & District Market Share
+      pool.query(`
+        SELECT COALESCE(u.sector, 'Retail') AS sector,
+               COUNT(DISTINCT u.id)::integer AS merchant_count,
+               COALESCE(SUM(s.total_amount), 0)::bigint AS total_sales
+        FROM users u
+        LEFT JOIN sales s ON s.owner_id = u.id AND s.is_voided = false
+        WHERE u.role = 'sme_owner'
+        GROUP BY 1 ORDER BY total_sales DESC
+      `),
+
+      // New Signups Growth Velocity
+      pool.query(`
+        SELECT DATE_TRUNC('month', created_at)::date AS month,
+               COUNT(*)::integer AS signups
+        FROM users WHERE role = 'sme_owner' AND created_at >= NOW() - INTERVAL '12 months'
+        GROUP BY 1 ORDER BY 1 ASC
+      `),
+    ]);
+
+    res.json({
+      dailyTrends: dailyTrends.rows,
+      monthlyTrends: monthlyTrends.rows,
+      topSmes: topSmes.rows,
+      sectorShares: sectorShares.rows,
+      signupVelocity: signupVelocity.rows,
+    });
+  } catch (err) { next(err); }
+});
+
+// ─── 6. Master Audit Log Search ───────────────────────────────────────────────
 router.get("/audit", async (req, res, next) => {
   try {
-    const { page = 1, limit = 50, action, user_id } = req.query;
+    const { action, search, page = 1, limit = 50 } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     const conditions = [];
     const params = [];
-    if (action) { params.push(`%${action}%`); conditions.push(`al.action ILIKE $${params.length}`); }
-    if (user_id) { params.push(user_id); conditions.push(`al.user_id=$${params.length}`); }
+
+    if (action) {
+      params.push(`%${action}%`);
+      conditions.push(`al.action ILIKE $${params.length}`);
+    }
+
+    if (search) {
+      params.push(`%${search}%`);
+      conditions.push(`(u.name ILIKE $${params.length} OR u.email ILIKE $${params.length} OR al.action ILIKE $${params.length} OR al.entity_type ILIKE $${params.length})`);
+    }
 
     const where = conditions.length ? "WHERE " + conditions.join(" AND ") : "";
 
-    const { rows } = await pool.query(`
-      SELECT al.*, u.name as user_name, u.email, u.role
-      FROM audit_log al JOIN users u ON u.id=al.user_id
-      ${where} ORDER BY al.created_at DESC
-      LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
-      [...params, parseInt(limit), offset]);
+    const [auditRes, countRes] = await Promise.all([
+      pool.query(`
+        SELECT al.*, u.name AS user_name, u.email AS user_email, u.role AS user_role
+        FROM audit_log al
+        LEFT JOIN users u ON u.id = al.user_id
+        ${where}
+        ORDER BY al.created_at DESC
+        LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+      `, [...params, parseInt(limit), offset]),
 
-    res.json({ audit: rows, page: parseInt(page), limit: parseInt(limit) });
-  } catch (err) { next(err); }
-});
+      pool.query(`
+        SELECT COUNT(*) AS total
+        FROM audit_log al
+        LEFT JOIN users u ON u.id = al.user_id
+        ${where}
+      `, params),
+    ]);
 
-// POST /v2/admin/seed-mock-data — seed demo/mock data into the production DB
-// Protected: pulse_admin only. Idempotent (safe to run multiple times).
-router.post("/seed-mock-data", async (req, res, next) => {
-  try {
-    const { seedFast } = require("../../scripts/seedMockDataFast");
-    const result = await seedFast();
     res.json({
-      ok: true,
-      message: "Mock data seeded successfully",
-      accounts: result.allAccounts,
-      log: result.log,
+      audit: auditRes.rows,
+      total: parseInt(countRes.rows[0]?.total || 0, 10),
+      page: parseInt(page),
+      limit: parseInt(limit),
     });
-  } catch (err) {
-    res.status(500).json({
-      ok: false,
-      error: err.message,
-      code: err.code,
-      detail: err.detail,
-    });
-  }
-});
-
-// POST /v2/admin/backfill-journal — bulk-create journal entries for existing sales + expenses
-router.post("/backfill-journal", async (req, res, next) => {
-  try {
-    const { ensureJournalTables } = require("../utils/journal");
-    const pool = require("../config/db");
-    await ensureJournalTables();
-
-    // Map payment method to account code
-    const pmToCode = { cash:"1000", mtn_momo:"1010", airtel:"1010", card:"1010", bank_transfer:"1010", credit:"1100" };
-
-    // Get account IDs we'll need
-    const { rows: accounts } = await pool.query(
-      "SELECT id, code FROM chart_of_accounts WHERE code IN ('1000','1010','1100','4000','5000','6000','6001','6002','6003','6004','6005','6006','6007','6008')"
-    );
-    const accId = Object.fromEntries(accounts.map(a => [a.code, a.id]));
-
-    const EXPENSE_MAP = { Rent:"6001", Utilities:"6002", Salaries:"6003", Transport:"6004", Marketing:"6005", Maintenance:"6006", "Loan Repayment":"6007", Supplies:"6008" };
-
-    // --- SALES (bulk) ---
-    const { rows: sales } = await pool.query(`
-      SELECT s.id, s.total_amount, s.payment_method, s.created_at,
-             i.invoice_number,
-             s.total_amount - COALESCE(ar.amount, 0) as amount_paid
-      FROM sales s
-      LEFT JOIN invoices i ON i.sale_id = s.id
-      LEFT JOIN accounts_receivable ar ON ar.sale_id = s.id AND ar.status != 'paid'
-      WHERE s.is_voided = false
-        AND NOT EXISTS (SELECT 1 FROM journal_entries je WHERE je.reference_type='sale' AND je.reference_id=s.id)
-      LIMIT 200
-    `);
-
-    let saleCount = 0;
-    if (sales.length) {
-      // Bulk insert journal_entries for all sales
-      const entryValues = sales.map((s, i) => {
-        const label = `Sale ${s.invoice_number || '#' + s.id} — ${(s.payment_method || 'cash').replace(/_/g,' ')}`;
-        return `($${i*5+1},$${i*5+2},'sale',$${i*5+3},$${i*5+4},$${i*5+5})`;
-      });
-      const entryParams = sales.flatMap(s => [
-        s.created_at, `Sale ${s.invoice_number || '#' + s.id} — ${(s.payment_method || 'cash').replace(/_/g,' ')}`,
-        s.id, null, s.created_at,
-      ]);
-      const { rows: entries } = await pool.query(
-        `INSERT INTO journal_entries (entry_date, description, reference_type, reference_id, created_at) VALUES ${entryValues.join(",")} RETURNING id, reference_id`,
-        entryParams
-      );
-      saleCount = entries.length;
-
-      // Build journal_lines for each entry
-      const lineValues = []; const lineParams = [];
-      for (const entry of entries) {
-        const sale = sales.find(s => s.id === entry.reference_id);
-        if (!sale) continue;
-        const total  = parseFloat(sale.total_amount);
-        const paid   = parseFloat(sale.amount_paid ?? total);
-        const unpaid = Math.max(0, total - paid);
-        const cashCode = pmToCode[sale.payment_method] || "1000";
-        const lines = [];
-        if (paid > 0) lines.push([entry.id, accId[cashCode], paid, 0]);
-        if (unpaid > 0.01) lines.push([entry.id, accId["1100"], unpaid, 0]);
-        lines.push([entry.id, accId["4000"], 0, total]);
-        for (const [eid, aid, dr, cr] of lines) {
-          const base = lineParams.length;
-          lineValues.push(`($${base+1},$${base+2},$${base+3},$${base+4})`);
-          lineParams.push(eid, aid, dr, cr);
-        }
-      }
-      if (lineValues.length) {
-        await pool.query(
-          `INSERT INTO journal_lines (entry_id, account_id, debit, credit) VALUES ${lineValues.join(",")}`,
-          lineParams
-        );
-      }
-    }
-
-    // --- EXPENSES (bulk) ---
-    const { rows: expenses } = await pool.query(`
-      SELECT id, amount, category, description, expense_date, recorded_by FROM expenses
-      WHERE NOT EXISTS (SELECT 1 FROM journal_entries je WHERE je.reference_type='expense' AND je.reference_id=expenses.id)
-      LIMIT 200
-    `);
-
-    let expenseCount = 0;
-    if (expenses.length) {
-      const eValues = expenses.map((e, i) => `($${i*4+1},$${i*4+2},'expense',$${i*4+3},$${i*4+4})`);
-      const eParams = expenses.flatMap(e => [e.expense_date, `Expense: ${e.description || e.category}`, e.id, e.recorded_by]);
-      const { rows: eEntries } = await pool.query(
-        `INSERT INTO journal_entries (entry_date, description, reference_type, reference_id, created_by) VALUES ${eValues.join(",")} RETURNING id, reference_id`,
-        eParams
-      );
-      expenseCount = eEntries.length;
-
-      const lValues = []; const lParams = [];
-      for (const entry of eEntries) {
-        const exp = expenses.find(e => e.id === entry.reference_id);
-        if (!exp) continue;
-        const expCode = EXPENSE_MAP[exp.category] || "6000";
-        const amt = parseFloat(exp.amount);
-        [[entry.id, accId[expCode], amt, 0],[entry.id, accId["1000"], 0, amt]].forEach(([eid,aid,dr,cr]) => {
-          const base = lParams.length;
-          lValues.push(`($${base+1},$${base+2},$${base+3},$${base+4})`);
-          lParams.push(eid, aid, dr, cr);
-        });
-      }
-      if (lValues.length) {
-        await pool.query(`INSERT INTO journal_lines (entry_id, account_id, debit, credit) VALUES ${lValues.join(",")}`, lParams);
-      }
-    }
-
-    res.json({ ok: true, sales: saleCount, expenses: expenseCount });
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-// POST /v2/admin/backfill-owners — assigns all NULL owner_id rows to the first sme_owner
-router.post("/backfill-owners", async (req, res, next) => {
-  try {
-    const allTables = ['stock_items','sales','expenses','customers','suppliers','invoices','journal_entries','accounts_receivable','accounts_payable','purchase_orders'];
-    for (const t of allTables) {
-      await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS owner_id INT`).catch(() => {});
-    }
-
-    // Find the first/original sme_owner (lowest ID, excluding newly registered ones)
-    const { rows: [original] } = await pool.query(
-      `SELECT id FROM users WHERE role='sme_owner' ORDER BY id ASC LIMIT 1`
-    );
-    if (!original) return res.json({ ok: true, message: "No sme_owner found to assign to" });
-
-    const oid = original.id;
-    const results = {};
-    for (const t of allTables) {
-      const { rowCount } = await pool.query(
-        `UPDATE ${t} SET owner_id=$1 WHERE owner_id IS NULL`, [oid]
-      );
-      results[t] = rowCount;
-    }
-    res.json({ ok: true, assignedTo: oid, updated: results });
   } catch (err) { next(err); }
 });
 

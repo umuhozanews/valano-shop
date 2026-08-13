@@ -102,7 +102,7 @@ router.get("/clients/:sme_id", async (req, res, next) => {
       FROM users u
       LEFT JOIN lender_clients lc ON lc.sme_user_id = u.id AND lc.lender_user_id = $1
       LEFT JOIN credit_scores cs ON cs.user_id = u.id
-      WHERE u.id=$2`, [lenderId, sme_id]);
+      WHERE u.id=$2 AND (lc.id IS NOT NULL OR $3 = 'pulse_admin')`, [lenderId, sme_id, req.user.role]);
 
     if (!client) return res.status(404).json({ error: "Client not found in portfolio" });
 

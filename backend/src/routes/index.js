@@ -26,5 +26,6 @@ router.use("/v2/score",           require("./score"));
 router.use("/v2/lender",          require("./lender"));
 router.use("/v2/advisor",         require("./advisor"));
 router.use("/v2/admin",           require("./admin"));
+router.use("/admin",              require("./admin"));
 
 module.exports = router;

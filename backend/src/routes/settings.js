@@ -20,14 +20,14 @@ router.use(verifyToken);
 router.get("/", async (req, res, next) => {
   try {
     let settings = null;
-    if (req.user.role === 'sme_owner') {
-      // Try user-scoped row first (column may not exist yet before first registration)
+    const ownerId = req.ownerId || (['sme_owner'].includes(req.user.role) ? req.user.id : null);
+    if (ownerId) {
       const result = await pool.query(
-        "SELECT * FROM settings WHERE owner_id=$1 LIMIT 1", [req.user.id]
+        "SELECT * FROM settings WHERE owner_id=$1 LIMIT 1", [ownerId]
       ).catch(() => ({ rows: [] }));
       settings = result.rows[0] || null;
     }
-    if (!settings) {
+    if (!settings && ['pulse_admin', 'admin'].includes(req.user.role)) {
       const { rows: [global] } = await pool.query(
         "SELECT * FROM settings WHERE id=1 LIMIT 1"
       ).catch(() => pool.query("SELECT * FROM settings LIMIT 1"));
@@ -47,8 +47,9 @@ router.put("/", requireRole("admin", "sme_owner", "pulse_admin"), async (req, re
       tin_number, sdc_id, mrc_number, shop_email, cashier_tin, vat_rate,
     } = req.body;
 
+    const ownerId = req.ownerId || (req.user.role === 'sme_owner' ? req.user.id : null);
     let s;
-    if (req.user.role === 'sme_owner') {
+    if (ownerId) {
       // Upsert user-scoped settings row
       const { rows: [row] } = await pool.query(
         `INSERT INTO settings (owner_id, shop_name, shop_address, shop_phone,
@@ -62,7 +63,7 @@ router.put("/", requireRole("admin", "sme_owner", "pulse_admin"), async (req, re
            tin_number=$10, sdc_id=$11, mrc_number=$12, shop_email=$13, cashier_tin=$14, vat_rate=$15
          RETURNING *`,
         [shop_name, shop_address, shop_phone, default_low_stock_threshold, invoice_footer_text,
-         language || 'en', sector_default || null, district_default || null, req.user.id,
+         language || 'en', sector_default || null, district_default || null, ownerId,
          tin_number || '103777856', sdc_id || 'SDC010013000', mrc_number || 'MIS00013705',
          shop_email || 'andrenikobatuye@gmail.com', cashier_tin || '103777856', parseFloat(vat_rate) || 18.0]
       );
@@ -92,7 +93,16 @@ router.post("/logo", requireRole("admin", "sme_owner", "pulse_admin"), upload.si
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
     const url = await uploadToCloudinary(req.file.buffer, "inzira_logos");
-    await pool.query("UPDATE settings SET logo_url=$1 WHERE id=1", [url]);
+    const ownerId = req.ownerId || (req.user.role === 'sme_owner' ? req.user.id : null);
+    if (ownerId) {
+      await pool.query(
+        `INSERT INTO settings (owner_id, logo_url) VALUES ($1, $2)
+         ON CONFLICT (owner_id) DO UPDATE SET logo_url=$2`,
+        [ownerId, url]
+      );
+    } else {
+      await pool.query("UPDATE settings SET logo_url=$1 WHERE id=1", [url]);
+    }
     res.json({ url });
   } catch (err) { next(err); }
 });

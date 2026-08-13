@@ -268,8 +268,8 @@ router.post("/", async (req, res, next) => {
     const invStatus = remaining > 0 ? "pending" : "paid";
 
     const { rows: [invoice] } = await pool.query(
-      "INSERT INTO invoices (sale_id, invoice_number, status) VALUES ($1,$2,$3) RETURNING *",
-      [sale.id, invNum, invStatus]
+      "INSERT INTO invoices (sale_id, invoice_number, status, owner_id) VALUES ($1,$2,$3,$4) RETURNING *",
+      [sale.id, invNum, invStatus, req.ownerId]
     );
 
     // Credit sale → create receivable
@@ -349,7 +349,11 @@ router.post("/:id/void", requireRole("admin", "sme_owner", "manager", "accountan
 
 router.get("/:id/receipt-pdf", async (req, res, next) => {
   try {
-    const [saleRes, itemsRes, settingsRes] = await Promise.all([
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "s.owner_id=$2";
+    const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
+
+    const [saleRes, itemsRes] = await Promise.all([
       pool.query(
         `SELECT s.*, u.name as cashier_name, c.name as customer_name, c.phone as customer_phone, c.tin_number as customer_tin,
           i.invoice_number, i.issued_at
@@ -357,24 +361,29 @@ router.get("/:id/receipt-pdf", async (req, res, next) => {
          LEFT JOIN users u ON u.id=s.user_id
          LEFT JOIN customers c ON c.id=s.customer_id
          LEFT JOIN invoices i ON i.sale_id=s.id
-         WHERE s.id=$1`,
-        [req.params.id]
+         WHERE s.id=$1 AND ${ownerWhere}`,
+        queryParams
       ),
       pool.query(
         `SELECT si.*, stk.name as item_name, stk.unit FROM sale_items si
          JOIN stock_items stk ON stk.id=si.stock_item_id WHERE si.sale_id=$1`,
         [req.params.id]
       ),
-      pool.query("SELECT * FROM settings LIMIT 1"),
     ]);
     const sale = saleRes.rows[0];
     if (!sale) return res.status(404).json({ error: "Sale not found" });
+
+    const ownerId = sale.owner_id || req.ownerId;
+    const { rows: settingsRows } = await pool.query(
+      "SELECT * FROM settings WHERE owner_id=$1 LIMIT 1", [ownerId]
+    ).catch(() => ({ rows: [] }));
+    const settings = settingsRows[0] || {};
 
     createInvoicePDF(res, {
       invoice: { invoice_number: sale.invoice_number || `INV-${sale.id}`, issued_at: sale.issued_at || sale.created_at },
       sale,
       items: itemsRes.rows,
-      settings: settingsRes.rows[0] || {},
+      settings,
       customer: { name: sale.customer_name, tin_number: sale.customer_tin, phone: sale.customer_phone },
     });
   } catch (err) { next(err); }
@@ -382,7 +391,11 @@ router.get("/:id/receipt-pdf", async (req, res, next) => {
 
 router.get("/:id/pdf", async (req, res, next) => {
   try {
-    const [saleRes, itemsRes, settingsRes] = await Promise.all([
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "s.owner_id=$2";
+    const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
+
+    const [saleRes, itemsRes] = await Promise.all([
       pool.query(
         `SELECT s.*, u.name as cashier_name, c.name as customer_name, c.phone as customer_phone, c.tin_number as customer_tin,
           i.invoice_number, i.issued_at
@@ -390,24 +403,29 @@ router.get("/:id/pdf", async (req, res, next) => {
          LEFT JOIN users u ON u.id=s.user_id
          LEFT JOIN customers c ON c.id=s.customer_id
          LEFT JOIN invoices i ON i.sale_id=s.id
-         WHERE s.id=$1`,
-        [req.params.id]
+         WHERE s.id=$1 AND ${ownerWhere}`,
+        queryParams
       ),
       pool.query(
         `SELECT si.*, stk.name as item_name, stk.unit FROM sale_items si
          JOIN stock_items stk ON stk.id=si.stock_item_id WHERE si.sale_id=$1`,
         [req.params.id]
       ),
-      pool.query("SELECT * FROM settings LIMIT 1"),
     ]);
     const sale = saleRes.rows[0];
     if (!sale) return res.status(404).json({ error: "Sale not found" });
+
+    const ownerId = sale.owner_id || req.ownerId;
+    const { rows: settingsRows } = await pool.query(
+      "SELECT * FROM settings WHERE owner_id=$1 LIMIT 1", [ownerId]
+    ).catch(() => ({ rows: [] }));
+    const settings = settingsRows[0] || {};
 
     createInvoicePDF(res, {
       invoice: { invoice_number: sale.invoice_number || `INV-${sale.id}`, issued_at: sale.issued_at || sale.created_at },
       sale,
       items: itemsRes.rows,
-      settings: settingsRes.rows[0] || {},
+      settings,
       customer: { name: sale.customer_name, tin_number: sale.customer_tin, phone: sale.customer_phone },
     });
   } catch (err) { next(err); }

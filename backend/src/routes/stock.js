@@ -165,8 +165,9 @@ router.get("/print-labels", async (req, res, next) => {
       `SELECT * FROM stock_items WHERE id=ANY($1::int[]) AND ${ownerWhere} AND is_active=true`, queryParams
     );
 
-    const PDFDocument = require("pdfkit");
-    const { rows: [settings] } = await pool.query("SELECT shop_name FROM settings LIMIT 1");
+    const sOwnerWhere = isAdmin ? "1=1" : "owner_id=$1";
+    const sParams = isAdmin ? [] : [req.ownerId];
+    const { rows: [settings] } = await pool.query(`SELECT shop_name FROM settings WHERE ${sOwnerWhere} LIMIT 1`, sParams);
     const shopName = settings?.shop_name || "Inzira Insights";
 
     const doc = new PDFDocument({ margin: 10, size: [170, 100] });

@@ -2,20 +2,143 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Inzira Insights</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#1F5C4E" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="DataBridge" />
+    <link rel="icon" type="image/png" href="/logo-round.png" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <title>DataBridge — by Inzira Insights</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Bebas+Neue&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="/assets/index-VSPncPIY.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/react-vendor-C0R-jllJ.js">
-    <link rel="modulepreload" crossorigin href="/assets/utils-N84C0eGB.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-DLfTxDrg.css">
+    <style>
+      #app-preloader {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(185deg, #F4FBE4 0%, #FFFFFF 60%, #F9FAFB 100%);
+        font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+        -webkit-user-select: none;
+           -moz-user-select: none;
+                user-select: none;
+      }
+      .preloader-logo-wrap {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 104px;
+        height: 104px;
+      }
+      .preloader-ring {
+        position: absolute;
+        inset: -6px;
+        border-radius: 50%;
+        border: 3px solid transparent;
+        border-top-color: #D4F06B;
+        border-right-color: #D4F06B;
+        animation: spinRing 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+      }
+      .preloader-glow {
+        position: absolute;
+        inset: -8px;
+        border-radius: 50%;
+        background: rgba(212, 240, 107, 0.45);
+        filter: blur(16px);
+        animation: pulseGlow 2s infinite ease-in-out;
+      }
+      .preloader-img {
+        position: relative;
+        width: 90px;
+        height: 90px;
+        border-radius: 50%;
+        -o-object-fit: cover;
+           object-fit: cover;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.08), 0 0 0 3px #ffffff;
+        background: #ffffff;
+      }
+      .preloader-title {
+        margin-top: 22px;
+        font-size: 20px;
+        font-weight: 900;
+        letter-spacing: -0.02em;
+        color: #111827;
+      }
+      .preloader-subtitle {
+        margin-top: 4px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #6B7280;
+      }
+      .preloader-bar-bg {
+        margin-top: 20px;
+        width: 140px;
+        height: 4px;
+        background: rgba(209, 213, 219, 0.6);
+        border-radius: 999px;
+        overflow: hidden;
+        position: relative;
+      }
+      .preloader-bar-fill {
+        width: 100%;
+        height: 100%;
+        background: #111827;
+        border-radius: 999px;
+        animation: shimmerFill 1.5s infinite ease-in-out;
+      }
+      @keyframes spinRing {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      @keyframes pulseGlow {
+        0%, 100% { transform: scale(1); opacity: 0.5; }
+        50% { transform: scale(1.18); opacity: 0.85; }
+      }
+      @keyframes shimmerFill {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+      }
+    </style>
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for (let registration of registrations) { registration.unregister(); }
+        });
+      }
+    </script>
+    <script type="module" crossorigin src="/assets/index-CHJbFMW7.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/react-vendor-DR68Xfqr.js">
+    <link rel="modulepreload" crossorigin href="/assets/icons-DGopDrvB.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-j9VJiRCE.css">
   </head>
-  <body class="bg-background font-sans text-text-primary antialiased">
-    <div id="root"></div>
+  <body>
+    <div id="root">
+      <div id="app-preloader">
+        <div class="preloader-logo-wrap">
+          <div class="preloader-glow"></div>
+          <div class="preloader-ring"></div>
+          <img src="/logo-round.png" alt="Inzira Logo" class="preloader-img" />
+        </div>
+        <h1 class="preloader-title">INZIRA SYSTEM</h1>
+        <p class="preloader-subtitle">DataBridge Mobile Suite</p>
+        <div class="preloader-bar-bg">
+          <div class="preloader-bar-fill"></div>
+        </div>
+      </div>
+    </div>
   </body>
 </html>

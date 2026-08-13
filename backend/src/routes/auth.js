@@ -8,7 +8,7 @@ const { JWT_SECRET, JWT_REFRESH_SECRET } = require("../config/env");
 const { verifyToken } = require("../middleware/auth");
 const { logAudit } = require("../utils/helpers");
 const { isValidEmail, validatePasswordStrength } = require("../utils/validation");
-const { sendLoginAlert, sendWelcomeEmail } = require("../utils/mailer");
+const { sendLoginAlert, sendWelcomeEmail, sendAdminSignupAlert, sendTestEmail } = require("../utils/mailer");
 
 const VALID_ROLES = ['sme_owner','manager','cashier','accountant','databridge_advisor','lender','pulse_admin','admin'];
 
@@ -186,8 +186,19 @@ router.post("/google", async (req, res, next) => {
 
     // Dispatch automated welcome or login confirmation email to the verified Google email
     if (isNewRegistration) {
-      sendWelcomeEmail(cleanEmail, googleName, `${googleName}'s Shop`).catch(e => {
+      sendWelcomeEmail(cleanEmail, googleName, `${googleName}'s Shop`, { sector: "Google Sign-In" }).catch(e => {
         console.error("[MAIL ERROR] Background Google welcome email failed:", e.message);
+      });
+      sendAdminSignupAlert({
+        name: googleName,
+        email: cleanEmail,
+        phone: "Google Auth",
+        shop_name: `${googleName}'s Shop`,
+        sector: "Google Sign-In",
+        role: user.role || "sme_owner",
+        ip: req.ip,
+      }).catch(e => {
+        console.error("[MAIL ERROR] Background Google admin alert email failed:", e.message);
       });
     } else {
       sendLoginAlert(cleanEmail, googleName, req.ip).catch(e => {
@@ -332,12 +343,60 @@ const handleRegister = async (req, res, next) => {
       return res.status(400).json({ error: strength.error });
     }
 
-    const { rows: existing } = await pool.query(
-      "SELECT id FROM users WHERE email=$1 OR (phone IS NOT NULL AND phone=$2)",
-      [normalizedEmail, phone ? String(phone).trim() : null]
+    // Clean and normalize phone number for robust duplicate matching across formats
+    const rawPhone = phone ? String(phone).trim() : "";
+    const cleanPhoneDigits = rawPhone.replace(/\D/g, "");
+    const last9PhoneDigits = cleanPhoneDigits.length >= 9 ? cleanPhoneDigits.slice(-9) : cleanPhoneDigits;
+    const phoneFallbackEmail = cleanPhoneDigits ? `${cleanPhoneDigits}@inzira.rw` : "";
+    const last9FallbackEmail = last9PhoneDigits ? `${last9PhoneDigits}@inzira.rw` : "";
+
+    // Query existing accounts matching either normalized email or phone number in any format
+    const { rows: existingUsers } = await pool.query(
+      `SELECT id, email, phone FROM users
+       WHERE LOWER(email) = $1
+          OR (phone IS NOT NULL AND phone = $2)
+          OR ($3 <> '' AND RIGHT(REGEXP_REPLACE(COALESCE(phone, ''), '\\D', 'g'), 9) = $3)
+          OR (email IS NOT NULL AND email = $4)
+          OR (email IS NOT NULL AND email = $5)`,
+      [normalizedEmail, rawPhone || null, last9PhoneDigits, phoneFallbackEmail, last9FallbackEmail]
     );
-    if (existing.length) {
-      return res.status(409).json({ error: "An account with this email or phone is already registered" });
+
+    if (existingUsers.length > 0) {
+      const emailMatches = existingUsers.some(u => u.email && u.email.toLowerCase() === normalizedEmail);
+      const phoneMatches = rawPhone && existingUsers.some(u => {
+        const uDigits = (u.phone || "").replace(/\D/g, "");
+        const uLast9 = uDigits.length >= 9 ? uDigits.slice(-9) : uDigits;
+        return (u.phone && u.phone === rawPhone) || (last9PhoneDigits && uLast9 === last9PhoneDigits);
+      });
+
+      if (emailMatches && phoneMatches) {
+        return res.status(409).json({
+          error: "An account with this email address and phone number is already registered. Please log in.",
+          code: "ACCOUNT_EXISTS",
+          field: "both",
+        });
+      }
+
+      if (emailMatches) {
+        return res.status(409).json({
+          error: "This email address is already registered. Please log in or use a different email.",
+          code: "EMAIL_EXISTS",
+          field: "email",
+        });
+      }
+
+      if (phoneMatches) {
+        return res.status(409).json({
+          error: "This phone number is already registered to an account. Please log in with your phone number.",
+          code: "PHONE_EXISTS",
+          field: "phone",
+        });
+      }
+
+      return res.status(409).json({
+        error: "An account with this email or phone is already registered. Please log in.",
+        code: "ACCOUNT_EXISTS",
+      });
     }
 
     // Ensure schema columns exist
@@ -349,12 +408,40 @@ const handleRegister = async (req, res, next) => {
       : (businessType || sectors || null);
 
     const hash = await bcrypt.hash(password, 10);
-    const { rows: [user] } = await pool.query(
-      `INSERT INTO users (name, email, password_hash, role, phone, language, sector, district, consent_status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'granted')
-       RETURNING *`,
-      [fullName, normalizedEmail, hash, targetRole, phone ? String(phone).trim() : null, language || 'en', sectorStr, district || null]
-    );
+    let user;
+    try {
+      const { rows: [createdUser] } = await pool.query(
+        `INSERT INTO users (name, email, password_hash, role, phone, language, sector, district, consent_status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'granted')
+         RETURNING *`,
+        [fullName, normalizedEmail, hash, targetRole, rawPhone || null, language || 'en', sectorStr, district || null]
+      );
+      user = createdUser;
+    } catch (insertErr) {
+      // Handle race-condition unique violations (PostgreSQL error code 23505)
+      if (insertErr.code === "23505") {
+        const detail = (insertErr.detail || "").toLowerCase();
+        if (detail.includes("email") || insertErr.constraint?.includes("email")) {
+          return res.status(409).json({
+            error: "This email address is already registered. Please log in.",
+            code: "EMAIL_EXISTS",
+            field: "email",
+          });
+        }
+        if (detail.includes("phone") || insertErr.constraint?.includes("phone")) {
+          return res.status(409).json({
+            error: "This phone number is already registered. Please log in.",
+            code: "PHONE_EXISTS",
+            field: "phone",
+          });
+        }
+        return res.status(409).json({
+          error: "An account with these details is already registered. Please log in.",
+          code: "ACCOUNT_EXISTS",
+        });
+      }
+      throw insertErr;
+    }
 
     // Create settings row for SMEs
     if (targetRole === 'sme_owner') {
@@ -374,8 +461,30 @@ const handleRegister = async (req, res, next) => {
     await logAudit(user.id, "REGISTER", "users", user.id, null, { email: normalizedEmail, role: targetRole, businessName: orgOrBusinessName }, req.ip);
 
     // Send Welcome & Confirmation Email to user's registered email address
-    sendWelcomeEmail(normalizedEmail, fullName, orgOrBusinessName).catch(e => {
+    sendWelcomeEmail(normalizedEmail, fullName, orgOrBusinessName, {
+      currency: req.body.currency,
+      sector: sectorStr,
+      district,
+      phone: phone ? String(phone).trim() : null,
+    }).catch(e => {
       console.error("[MAIL ERROR] Background welcome email dispatch failed:", e.message);
+    });
+
+    // Send immediate Admin Alert Email about the new registration
+    sendAdminSignupAlert({
+      name: fullName,
+      email: normalizedEmail,
+      phone: phone ? String(phone).trim() : "N/A",
+      shop_name: orgOrBusinessName,
+      sector: sectorStr,
+      district: district || null,
+      location: req.body.location || district || null,
+      currency: req.body.currency || "RWF",
+      referralCode: req.body.referralCode || "DIRECT",
+      role: targetRole,
+      ip: req.ip,
+    }).catch(e => {
+      console.error("[MAIL ERROR] Background admin signup alert dispatch failed:", e.message);
     });
 
     const { password_hash, otp_code, otp_expires_at, ...safe } = user;
@@ -388,12 +497,39 @@ router.post("/signup", handleRegister);
 
 router.post("/send-welcome-email", async (req, res, next) => {
   try {
-    const { email, name, shop_name } = req.body;
+    const { email, name, shop_name, ...rest } = req.body;
     if (!email || !isValidEmail(email)) {
       return res.status(400).json({ error: "Valid email required" });
     }
-    await sendWelcomeEmail(email.toLowerCase().trim(), name || "Merchant", shop_name || "My Business");
-    res.json({ message: "Welcome email dispatched" });
+    const result = await sendWelcomeEmail(email.toLowerCase().trim(), name || "Merchant", shop_name || "My Business", rest);
+    res.json({ message: "Welcome email dispatched", result });
+  } catch (err) { next(err); }
+});
+
+router.post("/send-test-email", async (req, res, next) => {
+  try {
+    const targetEmail = req.body.email ? String(req.body.email).trim() : undefined;
+    const result = await sendTestEmail(targetEmail);
+    res.json({ message: "Test email dispatched successfully", result });
+  } catch (err) { next(err); }
+});
+
+router.post("/test-admin-alert", async (req, res, next) => {
+  try {
+    const sampleData = {
+      name: req.body.name || "Test Merchant",
+      email: req.body.email || "merchant@example.com",
+      phone: req.body.phone || "+250 788 123 456",
+      shop_name: req.body.shop_name || "Kigali Test Mart",
+      sector: req.body.sector || "Retail & Supermarket",
+      location: req.body.location || "Kigali, Rwanda",
+      currency: req.body.currency || "RWF",
+      referralCode: req.body.referralCode || "TEST_FLOW",
+      role: "sme_owner",
+      ip: req.ip,
+    };
+    const result = await sendAdminSignupAlert(sampleData);
+    res.json({ message: "Admin alert test dispatched successfully", result });
   } catch (err) { next(err); }
 });
 
