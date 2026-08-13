@@ -46,7 +46,7 @@ export default function FinishedGoods() {
         </div>
         <div>
           <p className="font-medium text-text-primary">{v}</p>
-          <p className="text-[13px] text-text-secondary">{r.category} • {r.size}</p>
+          <p className="text-[11px] text-text-secondary">{r.category} • {r.size}</p>
         </div>
       </div>
     )},
@@ -76,7 +76,7 @@ export default function FinishedGoods() {
           <div className="relative w-64">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder={`${t("search")}…`}
-              className="w-full h-9 pl-9 pr-3 border border-border rounded-card text-[14px] focus:outline-none focus:ring-1 focus:ring-primary bg-surface" />
+              className="w-full h-9 pl-9 pr-3 border border-border rounded-card text-[11px] focus:outline-none focus:ring-1 focus:ring-primary bg-surface" />
           </div>
           <Button icon={Plus} size="sm" onClick={() => setShowModal(true)}>{t("add")}</Button>
         </div>

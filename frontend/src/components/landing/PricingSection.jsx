@@ -78,7 +78,7 @@ export function PricingSection() {
               Basic Plan
             </h3>
             <p className="mt-1 text-xs leading-relaxed" style={{ color: "#6b6b80" }}>
-              Full access to INZIRA system. Manage your business operations with ease and full control.
+              Full access to KNOTY system. Manage your business operations with ease and full control.
             </p>
             <p
               className="mt-4 text-2xl font-extrabold"
@@ -98,7 +98,7 @@ export function PricingSection() {
           </Link>
 
           <div className="mt-7">
-            <p className="mb-3 text-[12px] font-semibold uppercase tracking-widest" style={{ color: "#9090a8" }}>
+            <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest" style={{ color: "#9090a8" }}>
               Get Started With
             </p>
             <ul className="space-y-3">
@@ -123,7 +123,7 @@ export function PricingSection() {
               Extended Plan
             </h3>
             <p className="mt-1 text-xs leading-relaxed" style={{ color: "#6b6b80" }}>
-              INZIRA connected with EBM (tax machine). Best for companies requiring full fiscal compliance.
+              KNOTY connected with EBM (tax machine). Best for companies requiring full fiscal compliance.
             </p>
             <div className="mt-4 flex items-baseline gap-1">
               <span
@@ -145,7 +145,7 @@ export function PricingSection() {
           </Link>
 
           <div className="mt-7">
-            <p className="mb-3 text-[12px] font-semibold uppercase tracking-widest" style={{ color: "#9090a8" }}>
+            <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest" style={{ color: "#9090a8" }}>
               Everything In Starter
             </p>
             <ul className="space-y-3">
@@ -166,7 +166,7 @@ export function PricingSection() {
               Daily Maintenance
             </h3>
             <p className="mt-1 text-xs leading-relaxed" style={{ color: "#6b6b80" }}>
-              Keep your INZIRA system running smoothly with our daily monitoring and maintenance service.
+              Keep your KNOTY system running smoothly with our daily monitoring and maintenance service.
             </p>
             <div className="mt-4 flex items-baseline gap-1">
               <span
@@ -188,7 +188,7 @@ export function PricingSection() {
           </Link>
 
           <div className="mt-7">
-            <p className="mb-3 text-[12px] font-semibold uppercase tracking-widest" style={{ color: "#9090a8" }}>
+            <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest" style={{ color: "#9090a8" }}>
               Includes Per Month
             </p>
             <ul className="space-y-3">

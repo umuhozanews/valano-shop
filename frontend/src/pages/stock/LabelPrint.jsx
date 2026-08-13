@@ -71,7 +71,7 @@ export default function LabelPrint() {
       <Button variant="ghost" size="sm" icon={ArrowLeft} onClick={() => navigate("/app/stock")} className="mb-4">Back</Button>
 
       <div className="flex items-center justify-between mb-4">
-        <p className="text-[14px] text-text-secondary">{count} item{count!==1?"s":""} selected</p>
+        <p className="text-[11px] text-text-secondary">{count} item{count!==1?"s":""} selected</p>
         <div className="flex gap-2">
           <Button variant="secondary" size="sm" onClick={() => setSelected({})}>Clear</Button>
           <Button variant="primary" size="sm" icon={Printer} onClick={printLabels} disabled={count===0}>
@@ -88,15 +88,15 @@ export default function LabelPrint() {
               className={`bg-surface border-2 rounded-card p-4 cursor-pointer transition-all ${sel ? "border-primary" : "border-border"}`}>
               <div className="flex items-start justify-between mb-2">
                 <div>
-                  <p className="text-[14px] font-semibold text-text-primary">{item.name}</p>
-                  <p className="text-[13px] text-text-secondary">{item.size} · {item.color}</p>
+                  <p className="text-[11px] font-semibold text-text-primary">{item.name}</p>
+                  <p className="text-[11px] text-text-secondary">{item.size} · {item.color}</p>
                 </div>
                 <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${sel?"bg-primary border-primary":"border-border"}`}>
-                  {sel && <span className="text-white text-[12px]">✓</span>}
+                  {sel && <span className="text-white text-[11px]">✓</span>}
                 </div>
               </div>
-              <p className="text-[14px] font-mono text-text-secondary text-[12px]">{item.barcode}</p>
-              <p className="text-[16px] font-bold text-primary mt-1">{formatRWF(item.sell_price_rwf)}</p>
+              <p className="text-[11px] font-mono text-text-secondary text-[11px]">{item.barcode}</p>
+              <p className="text-[11px] font-bold text-primary mt-1">{formatRWF(item.sell_price_rwf)}</p>
             </div>
           );
         })}

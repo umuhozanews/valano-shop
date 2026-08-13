@@ -60,13 +60,13 @@ export default function Tenants() {
     { key: "name", label: t("name"), render: (v, r) => (
       <div>
         <p className="font-medium text-text-primary">{v}</p>
-        <p className="text-[13px] text-text-secondary">{r.phone}</p>
+        <p className="text-[11px] text-text-secondary">{r.phone}</p>
       </div>
     )},
     { key: "property", label: t("properties"), render: (v, r) => (
       <div>
-        <p className="text-[14px] text-text-primary">{v}</p>
-        <p className="text-[13px] text-text-secondary">{r.unit}</p>
+        <p className="text-[11px] text-text-primary">{v}</p>
+        <p className="text-[11px] text-text-secondary">{r.unit}</p>
       </div>
     )},
     { key: "paid", label: t("rent_status"), render: v => (
@@ -85,7 +85,7 @@ export default function Tenants() {
     <PageWrapper title={t("tenants")} subtitle="Manage relationships with your tenants"
       breadcrumbs={[{ label: t("real_estate"), path: "/app/properties" }, { label: t("tenants"), path: "/app/tenants" }]}>
       
-      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2.5 text-blue-800 text-[14px] shadow-sm">
+      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2.5 text-blue-800 text-[11px] shadow-sm">
         <Info size={16} className="text-blue-600 shrink-0" />
         <div>
           <span className="font-semibold">Frontend Prototype:</span> This Tenants management feature is a design preview. Changes are stored in-memory and will reset when you refresh or reopen the app.
@@ -98,7 +98,7 @@ export default function Tenants() {
           <input 
             value={search} onChange={e => setSearch(e.target.value)}
             placeholder={`${t("search")}...`}
-            className="w-full h-9 pl-9 pr-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-1 focus:ring-primary" 
+            className="w-full h-9 pl-9 pr-3 border border-border rounded-card text-[11px] bg-surface focus:outline-none focus:ring-1 focus:ring-primary" 
           />
         </div>
         <Button icon={Plus} size="sm" onClick={() => { setEditItem(null); setForm({ name: "", property: "", unit: "", phone: "", email: "", status: "active", paid: true }); setShowModal(true); }}>{t("add")}</Button>
@@ -122,15 +122,15 @@ export default function Tenants() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[14px] font-medium text-text-primary mb-1">{t("rent_status")}</label>
-              <select value={form.paid} onChange={e => setForm({ ...form, paid: e.target.value === "true" })} className="w-full h-9 px-3 border border-border rounded-card text-[14px] bg-surface">
+              <label className="block text-[11px] font-medium text-text-primary mb-1">{t("rent_status")}</label>
+              <select value={form.paid} onChange={e => setForm({ ...form, paid: e.target.value === "true" })} className="w-full h-9 px-3 border border-border rounded-card text-[11px] bg-surface">
                 <option value="true">{t("paid")}</option>
                 <option value="false">{t("pending")}</option>
               </select>
             </div>
             <div>
-              <label className="block text-[14px] font-medium text-text-primary mb-1">{t("status")}</label>
-              <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="w-full h-9 px-3 border border-border rounded-card text-[14px] bg-surface">
+              <label className="block text-[11px] font-medium text-text-primary mb-1">{t("status")}</label>
+              <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="w-full h-9 px-3 border border-border rounded-card text-[11px] bg-surface">
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
                 <option value="evicted">Evicted</option>

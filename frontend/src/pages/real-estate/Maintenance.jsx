@@ -64,7 +64,7 @@ export default function Maintenance() {
         </div>
         <div>
           <p className="font-medium text-text-primary">{v}</p>
-          <p className="text-[13px] text-text-secondary">{r.property} • {r.unit}</p>
+          <p className="text-[11px] text-text-secondary">{r.property} • {r.unit}</p>
         </div>
       </div>
     )},
@@ -83,7 +83,7 @@ export default function Maintenance() {
     <PageWrapper title={t("maintenance")} subtitle="Track repairs across your properties"
       breadcrumbs={[{ label: t("real_estate"), path: "/app/properties" }, { label: t("maintenance"), path: "/app/maintenance" }]}>
 
-      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2.5 text-blue-800 text-[14px] shadow-sm">
+      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2.5 text-blue-800 text-[11px] shadow-sm">
         <Info size={16} className="text-blue-600 shrink-0" />
         <div>
           <span className="font-semibold">Frontend Prototype:</span> This Maintenance feature is a design preview. Changes are stored in-memory and reset on refresh.
@@ -96,7 +96,7 @@ export default function Maintenance() {
           <input
             value={search} onChange={e => setSearch(e.target.value)}
             placeholder={`${t("search")}...`}
-            className="w-full h-9 pl-9 pr-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full h-9 pl-9 pr-3 border border-border rounded-card text-[11px] bg-surface focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
         <Button icon={Plus} size="sm" onClick={() => { setEditItem(null); setForm({ title: "", property: "", unit: "", priority: "medium", status: "pending", date: new Date().toISOString().slice(0, 10) }); setShowModal(true); }}>
@@ -118,16 +118,16 @@ export default function Maintenance() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[14px] font-medium text-text-primary mb-1">Priority</label>
-              <select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })} className="w-full h-9 px-3 border border-border rounded-card text-[14px] bg-surface">
+              <label className="block text-[11px] font-medium text-text-primary mb-1">Priority</label>
+              <select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })} className="w-full h-9 px-3 border border-border rounded-card text-[11px] bg-surface">
                 <option value="high">High</option>
                 <option value="medium">Medium</option>
                 <option value="low">Low</option>
               </select>
             </div>
             <div>
-              <label className="block text-[14px] font-medium text-text-primary mb-1">{t("status")}</label>
-              <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="w-full h-9 px-3 border border-border rounded-card text-[14px] bg-surface">
+              <label className="block text-[11px] font-medium text-text-primary mb-1">{t("status")}</label>
+              <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="w-full h-9 px-3 border border-border rounded-card text-[11px] bg-surface">
                 <option value="pending">Pending</option>
                 <option value="in_progress">In Progress</option>
                 <option value="completed">Completed</option>

@@ -31,19 +31,19 @@ export default class ErrorBoundary extends Component {
         <div className="flex h-screen items-center justify-center bg-background flex-col gap-4 p-8 text-center">
           <div className="text-4xl">⚠️</div>
           <h1 className="text-lg font-semibold text-text-primary">Something went wrong</h1>
-          <p className="text-text-secondary text-[14px] max-w-sm">
+          <p className="text-text-secondary text-[11px] max-w-sm">
             {this.state.error?.message || "An unexpected error occurred."}
           </p>
           <div className="flex gap-2 mt-2">
             <button
               onClick={() => window.location.reload()}
-              className="px-4 py-2 border border-border text-text-primary rounded-btn text-[14px] font-medium"
+              className="px-4 py-2 border border-border text-text-primary rounded-btn text-[11px] font-medium"
             >
               Reload
             </button>
             <button
               onClick={this.handleReset}
-              className="px-4 py-2 bg-primary text-white rounded-btn text-[14px] font-medium"
+              className="px-4 py-2 bg-primary text-white rounded-btn text-[11px] font-medium"
             >
               Go to Login
             </button>

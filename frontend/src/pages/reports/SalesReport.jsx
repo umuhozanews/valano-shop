@@ -67,8 +67,8 @@ export default function SalesReport() {
       breadcrumbs={[{label: t("reports"), path:"/app/reports/sales"}, {label: reportTitle, path:"/app/reports/sales"}]}>
 
       <div className="flex flex-wrap gap-3 mb-4 items-center">
-        <input type="date" value={filters.start_date} onChange={e=>setFilters(f=>({...f,start_date:e.target.value}))} className="h-9 px-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary font-medium" />
-        <input type="date" value={filters.end_date} onChange={e=>setFilters(f=>({...f,end_date:e.target.value}))} className="h-9 px-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary font-medium" />
+        <input type="date" value={filters.start_date} onChange={e=>setFilters(f=>({...f,start_date:e.target.value}))} className="h-9 px-3 border border-border rounded-card text-[11px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary font-medium" />
+        <input type="date" value={filters.end_date} onChange={e=>setFilters(f=>({...f,end_date:e.target.value}))} className="h-9 px-3 border border-border rounded-card text-[11px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary font-medium" />
         <div className="flex gap-2 ml-auto">
           {data.sales?.length > 0 && (
             <>

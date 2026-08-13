@@ -48,7 +48,7 @@ export default function Header({ onMenuClick, title, subtitle, breadcrumbs = [],
 
       {/* Title + breadcrumbs */}
       <div className="flex-1 min-w-0">
-        <nav className="flex items-center gap-1 text-[13px] text-text-secondary mb-0.5">
+        <nav className="flex items-center gap-1 text-[12px] text-text-secondary mb-0.5">
           {crumbs.map((crumb, i) => (
             <span key={crumb.path} className="flex items-center gap-1">
               {i === 0 && <Home size={11} />}
@@ -71,7 +71,7 @@ export default function Header({ onMenuClick, title, subtitle, breadcrumbs = [],
             {title}
           </h1>
           {subtitle && (
-            <p className="text-[14px] text-text-secondary hidden sm:block truncate">
+            <p className="text-[11px] text-text-secondary hidden sm:block truncate">
               {subtitle}
             </p>
           )}
@@ -87,7 +87,7 @@ export default function Header({ onMenuClick, title, subtitle, breadcrumbs = [],
         <Link to="/app/notifications" className="relative text-text-secondary hover:text-text-primary p-1.5 rounded transition-colors">
           <Bell size={18} />
           {notificationCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-danger rounded-full flex items-center justify-center text-[11px] font-bold text-white">
+            <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-danger rounded-full flex items-center justify-center text-[9px] font-bold text-white">
               {notificationCount > 9 ? "9+" : notificationCount}
             </span>
           )}
@@ -100,11 +100,11 @@ export default function Header({ onMenuClick, title, subtitle, breadcrumbs = [],
               onClick={() => setShowUserMenu(v => !v)}
               className="flex items-center gap-2.5 hover:bg-background rounded-card px-2 py-1.5 transition-colors"
             >
-              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white text-[14px] font-bold shrink-0">
+              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white text-[11px] font-bold shrink-0">
                 {user.name?.charAt(0).toUpperCase() || "U"}
               </div>
               <div className="hidden sm:block text-left">
-                <p className="text-[14px] font-medium text-text-primary leading-tight">
+                <p className="text-[11px] font-medium text-text-primary leading-tight">
                   {user.name}
                 </p>
                 <Badge status={ROLE_STATUS[user.role] || "neutral"} label={user.role} />
@@ -115,12 +115,12 @@ export default function Header({ onMenuClick, title, subtitle, breadcrumbs = [],
             {showUserMenu && (
               <div className="absolute right-0 top-full mt-1 w-44 bg-surface border border-border rounded-card shadow-lg py-1 z-50">
                 <div className="px-3 py-2 border-b border-border">
-                  <p className="text-[13px] font-semibold text-text-primary truncate">{user.name}</p>
-                  <p className="text-[13px] text-text-secondary truncate">{user.email}</p>
+                  <p className="text-[12px] font-semibold text-text-primary truncate">{user.name}</p>
+                  <p className="text-[11px] text-text-secondary truncate">{user.email}</p>
                 </div>
                 <button
                   onClick={handleLogout}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-[14px] text-danger hover:bg-danger/5 transition-colors"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-[11px] text-danger hover:bg-danger/5 transition-colors"
                 >
                   <LogOut size={14} />
                   {t("sign_in")} (Out)

@@ -72,14 +72,14 @@ export default function Properties() {
         </div>
         <div>
           <p className="font-medium text-text-primary">{v}</p>
-          <p className="text-[13px] text-text-secondary">{r.type}</p>
+          <p className="text-[11px] text-text-secondary">{r.type}</p>
         </div>
       </div>
     )},
     { key: "address", label: t("address_label"), render: v => (
       <div className="flex items-center gap-1 text-text-secondary">
         <MapPin size={12} />
-        <span className="text-[13px]">{v}</span>
+        <span className="text-[12px]">{v}</span>
       </div>
     )},
     { key: "units", label: "Units", render: v => <span className="font-medium">{v}</span> },
@@ -98,7 +98,7 @@ export default function Properties() {
     <PageWrapper title={t("properties")} subtitle="Manage your real estate portfolio"
       breadcrumbs={[{ label: t("real_estate"), path: "/app/properties" }, { label: t("properties"), path: "/app/properties" }]}>
       
-      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2.5 text-blue-800 text-[14px] shadow-sm">
+      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2.5 text-blue-800 text-[11px] shadow-sm">
         <Info size={16} className="text-blue-600 shrink-0" />
         <div>
           <span className="font-semibold">Frontend Prototype:</span> This Properties management feature is a design preview. Changes are stored in-memory and will reset when you refresh or reopen the app.
@@ -111,7 +111,7 @@ export default function Properties() {
           <input 
             value={search} onChange={e => setSearch(e.target.value)}
             placeholder={`${t("search")}...`}
-            className="w-full h-9 pl-9 pr-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-1 focus:ring-primary" 
+            className="w-full h-9 pl-9 pr-3 border border-border rounded-card text-[11px] bg-surface focus:outline-none focus:ring-1 focus:ring-primary" 
           />
         </div>
         <Button icon={Plus} size="sm" onClick={() => { setEditItem(null); setForm({ name: "", address: "", units: "", type: "Apartment", status: "vacant" }); setShowModal(true); }}>{t("add")}</Button>
@@ -129,8 +129,8 @@ export default function Properties() {
           <div className="grid grid-cols-2 gap-3">
             <Input label="Units" type="number" value={form.units} onChange={e => setForm({ ...form, units: e.target.value })} />
             <div>
-              <label className="block text-[14px] font-medium text-text-primary mb-1">Type</label>
-              <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="w-full h-9 px-3 border border-border rounded-card text-[14px] bg-surface">
+              <label className="block text-[11px] font-medium text-text-primary mb-1">Type</label>
+              <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="w-full h-9 px-3 border border-border rounded-card text-[11px] bg-surface">
                 <option>Apartment</option>
                 <option>Commercial</option>
                 <option>Industrial</option>
@@ -139,8 +139,8 @@ export default function Properties() {
             </div>
           </div>
           <div>
-            <label className="block text-[14px] font-medium text-text-primary mb-1">{t("status")}</label>
-            <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="w-full h-9 px-3 border border-border rounded-card text-[14px] bg-surface">
+            <label className="block text-[11px] font-medium text-text-primary mb-1">{t("status")}</label>
+            <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="w-full h-9 px-3 border border-border rounded-card text-[11px] bg-surface">
               <option value="occupied">{t("occupied")}</option>
               <option value="partial">{t("partial")}</option>
               <option value="vacant">{t("vacant")}</option>

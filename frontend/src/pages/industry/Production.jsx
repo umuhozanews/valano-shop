@@ -67,14 +67,14 @@ export default function Production() {
     { key: "name", label: t("production_nav"), render: (v, r) => (
       <div>
         <p className="font-medium text-text-primary">{v}</p>
-        <p className="text-[13px] text-text-secondary">{r.item}</p>
+        <p className="text-[11px] text-text-secondary">{r.item}</p>
       </div>
     )},
     { key: "quantity", label: t("quantity"), render: v => <span className="font-semibold">{v}</span> },
     { key: "progress", label: "Progress", render: v => (
       <div className="w-32">
         <div className="flex justify-between mb-1">
-          <span className="text-[12px] text-text-secondary">{v}%</span>
+          <span className="text-[11px] text-text-secondary">{v}%</span>
         </div>
         <div className="h-1.5 w-full bg-border rounded-full overflow-hidden">
           <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${v}%` }} />
@@ -96,7 +96,7 @@ export default function Production() {
     <PageWrapper title={t("production_nav")} subtitle={t("production_nav")}
       breadcrumbs={[{ label: t("production_nav"), path: "/app/production" }]}>
       
-      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2.5 text-blue-800 text-[14px] shadow-sm">
+      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2.5 text-blue-800 text-[11px] shadow-sm">
         <Info size={16} className="text-blue-600 shrink-0" />
         <div>
           <span className="font-semibold">Frontend Prototype:</span> This Production Run feature is a design preview. Changes are stored in-memory and will reset when you refresh or reopen the app.
@@ -109,7 +109,7 @@ export default function Production() {
           <input 
             value={search} onChange={e => setSearch(e.target.value)}
             placeholder={`${t("search")}...`}
-            className="w-full h-9 pl-9 pr-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-1 focus:ring-primary" 
+            className="w-full h-9 pl-9 pr-3 border border-border rounded-card text-[11px] bg-surface focus:outline-none focus:ring-1 focus:ring-primary" 
           />
         </div>
         <Button icon={Plus} size="sm" onClick={() => { setEditItem(null); setForm({ name: "", item: "", quantity: "", status: "planned", progress: 0 }); setShowModal(true); }}>{t("add")}</Button>
@@ -129,8 +129,8 @@ export default function Production() {
             <Input label="Progress (%)" type="number" min="0" max="100" value={form.progress} onChange={e => setForm({ ...form, progress: e.target.value })} />
           </div>
           <div>
-            <label className="block text-[14px] font-medium text-text-primary mb-1">{t("status")}</label>
-            <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="w-full h-9 px-3 border border-border rounded-card text-[14px] bg-surface">
+            <label className="block text-[11px] font-medium text-text-primary mb-1">{t("status")}</label>
+            <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="w-full h-9 px-3 border border-border rounded-card text-[11px] bg-surface">
               <option value="planned">{t("planned")}</option>
               <option value="in_progress">{t("in_progress")}</option>
               <option value="completed">{t("completed")}</option>

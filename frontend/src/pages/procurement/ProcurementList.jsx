@@ -117,9 +117,9 @@ export default function ProcurementList() {
         {step === 1 && (
           <div className="space-y-3">
             <div>
-              <label className="block text-[14px] font-medium text-text-primary mb-1">Supplier</label>
+              <label className="block text-[11px] font-medium text-text-primary mb-1">Supplier</label>
               <select value={form.supplier_id} onChange={e=>setForm(f=>({...f,supplier_id:e.target.value}))}
-                className="w-full h-9 px-3 border border-border rounded-card text-[14px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface">
+                className="w-full h-9 px-3 border border-border rounded-card text-[11px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface">
                 <option value="">Select supplier…</option>
                 {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
@@ -128,9 +128,9 @@ export default function ProcurementList() {
               <Input label="Order Date" type="date" value={form.order_date} onChange={e=>setForm(f=>({...f,order_date:e.target.value}))} />
               <Input label="Expected Arrival" type="date" value={form.arrival_date} onChange={e=>setForm(f=>({...f,arrival_date:e.target.value}))} />
               <div>
-                <label className="block text-[14px] font-medium text-text-primary mb-1">Currency</label>
+                <label className="block text-[11px] font-medium text-text-primary mb-1">Currency</label>
                 <select value={form.currency} onChange={e=>setForm(f=>({...f,currency:e.target.value}))}
-                  className="w-full h-9 px-3 border border-border rounded-card text-[14px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface">
+                  className="w-full h-9 px-3 border border-border rounded-card text-[11px] focus:outline-none focus:ring-2 focus:ring-primary bg-surface">
                   <option>CNY</option><option>USD</option><option>EUR</option>
                 </select>
               </div>
@@ -148,23 +148,23 @@ export default function ProcurementList() {
               {form.items.map((item, i) => (
                 <div key={i} className="grid grid-cols-6 gap-2 items-end">
                   <input placeholder="Item name" value={item.item_name} onChange={e=>updateItem(i,"item_name",e.target.value)}
-                    className="col-span-2 h-8 px-2 border border-border rounded text-[13px] focus:outline-none focus:ring-1 focus:ring-primary" />
+                    className="col-span-2 h-8 px-2 border border-border rounded text-[12px] focus:outline-none focus:ring-1 focus:ring-primary" />
                   <input placeholder="Size" value={item.size} onChange={e=>updateItem(i,"size",e.target.value)}
-                    className="h-8 px-2 border border-border rounded text-[13px] focus:outline-none focus:ring-1 focus:ring-primary" />
+                    className="h-8 px-2 border border-border rounded text-[12px] focus:outline-none focus:ring-1 focus:ring-primary" />
                   <input placeholder="Color" value={item.color} onChange={e=>updateItem(i,"color",e.target.value)}
-                    className="h-8 px-2 border border-border rounded text-[13px] focus:outline-none focus:ring-1 focus:ring-primary" />
+                    className="h-8 px-2 border border-border rounded text-[12px] focus:outline-none focus:ring-1 focus:ring-primary" />
                   <input type="number" placeholder="Qty" value={item.quantity} onChange={e=>updateItem(i,"quantity",e.target.value)}
-                    className="h-8 px-2 border border-border rounded text-[13px] focus:outline-none focus:ring-1 focus:ring-primary" />
+                    className="h-8 px-2 border border-border rounded text-[12px] focus:outline-none focus:ring-1 focus:ring-primary" />
                   <div className="flex gap-1">
                     <input type="number" placeholder="Cost" value={item.unit_cost} onChange={e=>updateItem(i,"unit_cost",e.target.value)}
-                      className="flex-1 h-8 px-2 border border-border rounded text-[13px] focus:outline-none focus:ring-1 focus:ring-primary" />
+                      className="flex-1 h-8 px-2 border border-border rounded text-[12px] focus:outline-none focus:ring-1 focus:ring-primary" />
                     <button onClick={() => removeItem(i)} className="text-danger hover:text-red-700">×</button>
                   </div>
                 </div>
               ))}
             </div>
             <Button variant="secondary" size="sm" onClick={addItem}>+ Add Item</Button>
-            <p className="text-[14px] text-text-secondary mt-3">Items total: <strong>{itemsTotal.toFixed(2)} {form.currency}</strong></p>
+            <p className="text-[11px] text-text-secondary mt-3">Items total: <strong>{itemsTotal.toFixed(2)} {form.currency}</strong></p>
           </div>
         )}
 
@@ -177,16 +177,16 @@ export default function ProcurementList() {
               ["Customs", formatRWF(form.customs_cost)],
             ].map(([l,v]) => (
               <div key={l} className="flex justify-between py-1 border-b border-border">
-                <span className="text-[14px] text-text-secondary">{l}</span>
-                <span className="text-[14px] font-medium text-text-primary">{v}</span>
+                <span className="text-[11px] text-text-secondary">{l}</span>
+                <span className="text-[11px] font-medium text-text-primary">{v}</span>
               </div>
             ))}
             <div className="flex justify-between py-2">
               <span className="font-semibold text-text-primary">TOTAL LANDED</span>
-              <span className="font-bold text-[17px] text-primary">{formatRWF(totalRWF)}</span>
+              <span className="font-bold text-[12px] text-primary">{formatRWF(totalRWF)}</span>
             </div>
             {form.items.length > 0 && (
-              <p className="text-[13px] text-text-secondary">Avg cost per unit: {formatRWF(Math.round(totalRWF / form.items.reduce((s,i) => s+(parseInt(i.quantity)||0), 0)))}</p>
+              <p className="text-[12px] text-text-secondary">Avg cost per unit: {formatRWF(Math.round(totalRWF / form.items.reduce((s,i) => s+(parseInt(i.quantity)||0), 0)))}</p>
             )}
           </div>
         )}

@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Navigate, Link } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { roleHomePath } from "../../App";
-import { Mail, Eye, EyeOff, Loader2, Globe } from "lucide-react";
+import { Mail, Eye, EyeOff, Store, Loader2, Globe } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
-import { useLanguage, LANGUAGES } from "../../context/LanguageContext";
+import { useLanguage } from "../../context/LanguageContext";
 import toast from "react-hot-toast";
 
 export default function Login() {
@@ -24,22 +24,7 @@ export default function Login() {
     setError("");
     setLoading(true);
     try {
-      const u = await login(email.trim(), password.trim());
-      toast.success(`${t("welcome_back")}, ${u.name.split(" ")[0]}!`);
-    } catch (err) {
-      setError(err.response?.data?.error || t("login_failed"));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleQuickLogin(demoEmail, demoPass = "inzira2024") {
-    setEmail(demoEmail);
-    setPassword(demoPass);
-    setError("");
-    setLoading(true);
-    try {
-      const u = await login(demoEmail, demoPass);
+      const u = await login(email, password);
       toast.success(`${t("welcome_back")}, ${u.name.split(" ")[0]}!`);
     } catch (err) {
       setError(err.response?.data?.error || t("login_failed"));
@@ -51,13 +36,14 @@ export default function Login() {
   return (
     <div className="min-h-screen flex relative">
       {/* Language Switcher */}
-      <div className="absolute top-6 right-6 z-50 flex items-center gap-1 bg-surface border border-border rounded-badge px-2 py-1">
-        {LANGUAGES.map(l => (
-          <button key={l.code} onClick={() => switchLanguage(l.code)}
-            className={`px-2 py-0.5 rounded text-[13px] font-medium transition-colors ${lang === l.code ? "bg-primary text-white" : "text-text-secondary hover:text-text-primary"}`}>
-            {l.label}
-          </button>
-        ))}
+      <div className="absolute top-6 right-6 z-50">
+        <button 
+          onClick={() => switchLanguage(lang === "en" ? "rw" : "en")}
+          className="flex items-center gap-2 px-3 py-1.5 bg-surface border border-border rounded-badge text-[11px] font-medium text-text-primary hover:bg-background transition-colors"
+        >
+          <Globe size={14} />
+          {lang === "en" ? "Kinyarwanda" : "English"}
+        </button>
       </div>
 
       {/* Left panel */}
@@ -71,28 +57,27 @@ export default function Login() {
         </div>
 
         <div className="relative">
-          <div className="flex items-center gap-4 mb-3">
-            <img src="/inzira-logo.jpg" alt="Inzira Insight" className="h-16 w-16 rounded-full object-cover border-2 border-white/30" />
-            <div>
-              <span className="text-white text-[26px] font-bold tracking-tight block leading-tight">INZIRA</span>
-              <span className="text-white/80 text-[18px] font-light tracking-wide block">Insight</span>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 bg-white/20 rounded-btn flex items-center justify-center">
+              <Store size={20} className="text-white" />
             </div>
+            <span className="text-white text-[24px] font-bold tracking-tight">INZIRA INSIGHTS</span>
           </div>
-          <p className="text-white/70 text-[15px]">Business Management System</p>
+          <p className="text-white/70 text-[12px]">Business Management System</p>
         </div>
 
         <div className="relative">
-          <p className="text-white text-[30px] font-bold leading-tight mb-3">
+          <p className="text-white text-[24px] font-bold leading-tight mb-3">
             Manage your clothing business from one place.
           </p>
-          <p className="text-white/60 text-[15px] leading-relaxed">
+          <p className="text-white/60 text-[12px] leading-relaxed">
             Track stock, record sales, manage workers, and generate reports — all designed for Kigali's fast-moving wholesale market.
           </p>
         </div>
 
         <div className="relative flex gap-3">
           {["Stock", "Sales", "Reports"].map((tag) => (
-            <span key={tag} className="px-3 py-1.5 bg-white/10 rounded-badge text-white/80 text-[13px] font-medium">
+            <span key={tag} className="px-3 py-1.5 bg-white/10 rounded-badge text-white/80 text-[12px] font-medium">
               {tag}
             </span>
           ))}
@@ -104,42 +89,43 @@ export default function Login() {
         <div className="w-full max-w-[380px]">
           {/* Mobile logo */}
           <div className="flex items-center gap-2 mb-8 lg:hidden">
-            <img src="/inzira-logo.jpg" alt="Inzira Insight" className="h-10 w-10 rounded-full object-cover" />
-            <div>
-              <span className="text-[15px] font-bold text-primary block leading-tight">INZIRA</span>
-              <span className="text-[12px] text-text-secondary block leading-tight">Insight</span>
+            <div className="w-8 h-8 bg-primary rounded-btn flex items-center justify-center">
+              <Store size={16} className="text-white" />
             </div>
+            <span className="text-[12px] font-bold text-text-primary">INZIRA INSIGHTS</span>
           </div>
 
           <h2 className="text-[26px] font-bold text-text-primary mb-1">{t("welcome_back")}</h2>
-          <p className="text-[15px] text-text-secondary mb-8">{t("sign_in_account")}</p>
+          <p className="text-[12px] text-text-secondary mb-2">{t("sign_in_account")}</p>
+          <p className="text-[11px] text-text-secondary/50 mb-8 italic">System active for: rukundojosephtuyishime@gmail.com</p>
+
           {error && (
             <div className="mb-4 px-3 py-2.5 bg-danger/10 border border-danger/20 rounded-card flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-danger shrink-0" />
-              <p className="text-[14px] text-danger font-medium">{error}</p>
+              <p className="text-[11px] text-danger font-medium">{error}</p>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-[14px] font-medium text-text-primary mb-1">{t("email")}</label>
+              <label className="block text-[11px] font-medium text-text-primary mb-1">{t("email")}</label>
               <div className="relative">
                 <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
                 <input
                   type="email" value={email} onChange={e => setEmail(e.target.value)}
                   placeholder="you@inzira-insights.rw" required
-                  className="w-full h-10 pl-9 pr-3 border border-border rounded-card bg-surface text-[15px] focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full h-10 pl-9 pr-3 border border-border rounded-card bg-surface text-[12px] focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-[14px] font-medium text-text-primary mb-1">{t("password")}</label>
+              <label className="block text-[11px] font-medium text-text-primary mb-1">{t("password")}</label>
               <div className="relative">
                 <input
                   type={showPass ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••" required
-                  className="w-full h-10 px-3 pr-10 border border-border rounded-card bg-surface text-[15px] focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                  className="w-full h-10 px-3 pr-10 border border-border rounded-card bg-surface text-[12px] focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                 />
                 <button type="button" onClick={() => setShowPass(s => !s)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text-primary">
@@ -150,79 +136,16 @@ export default function Login() {
 
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" className="rounded border-border text-primary focus:ring-primary" />
-              <span className="text-[14px] text-text-secondary">{t("remember_me")}</span>
+              <span className="text-[11px] text-text-secondary">{t("remember_me")}</span>
             </label>
 
             <button
               type="submit" disabled={loading}
-              className="w-full h-11 bg-primary text-white rounded-btn text-[15px] font-semibold hover:bg-primary-dark transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+              className="w-full h-11 bg-primary text-white rounded-btn text-[12px] font-semibold hover:bg-primary-dark transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {loading ? <><Loader2 size={15} className="animate-spin" /> {t("signing_in")}</> : t("sign_in")}
             </button>
           </form>
-
-          {/* Quick Demo Logins */}
-          <div className="mt-6 pt-4 border-t border-border">
-            <p className="text-[12px] font-bold uppercase tracking-wider text-text-secondary mb-2 text-center">
-              Quick Demo Sign In
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("equity.bank@inzira.rw", "inzira2024")}
-                className="px-2.5 py-2 bg-surface border border-border rounded-[6px] text-[12.5px] font-medium text-text-primary hover:border-primary hover:bg-primary/5 text-left flex items-center gap-1.5 transition-colors"
-              >
-                <span>🏦</span>
-                <div className="min-w-0">
-                  <p className="font-semibold text-text-primary leading-tight truncate">Equity Bank</p>
-                  <p className="text-[11px] text-text-secondary leading-tight">Lender Account</p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("advisor@inzira.rw", "inzira2024")}
-                className="px-2.5 py-2 bg-surface border border-border rounded-[6px] text-[12.5px] font-medium text-text-primary hover:border-primary hover:bg-primary/5 text-left flex items-center gap-1.5 transition-colors"
-              >
-                <span>🎓</span>
-                <div className="min-w-0">
-                  <p className="font-semibold text-text-primary leading-tight truncate">DataBridge</p>
-                  <p className="text-[11px] text-text-secondary leading-tight">Advisor Account</p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("demo@inzira.rw", "inzira2024")}
-                className="px-2.5 py-2 bg-surface border border-border rounded-[6px] text-[12.5px] font-medium text-text-primary hover:border-primary hover:bg-primary/5 text-left flex items-center gap-1.5 transition-colors"
-              >
-                <span>🏢</span>
-                <div className="min-w-0">
-                  <p className="font-semibold text-text-primary leading-tight truncate">Demo Shop</p>
-                  <p className="text-[11px] text-text-secondary leading-tight">SME Owner</p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("rukundojosephtuyishime@gmail.com", "rukundo2007")}
-                className="px-2.5 py-2 bg-surface border border-border rounded-[6px] text-[12.5px] font-medium text-text-primary hover:border-primary hover:bg-primary/5 text-left flex items-center gap-1.5 transition-colors"
-              >
-                <span>⚡</span>
-                <div className="min-w-0">
-                  <p className="font-semibold text-text-primary leading-tight truncate">Rukundo Admin</p>
-                  <p className="text-[11px] text-text-secondary leading-tight">Pulse Admin</p>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          <p className="text-center text-[14px] text-text-secondary mt-6">
-            Don't have an account?{" "}
-            <Link to="/app/register" className="text-primary font-semibold hover:underline">
-              Create one free →
-            </Link>
-          </p>
         </div>
       </div>
     </div>

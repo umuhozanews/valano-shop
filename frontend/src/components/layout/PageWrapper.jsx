@@ -39,7 +39,7 @@ export default function PageWrapper({ title, subtitle, breadcrumbs, action, chil
 
         <main className="flex-1 overflow-y-auto p-6">
           {isMockActive && (
-            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2.5 text-amber-800 text-[14px] shadow-sm animate-pulse">
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2.5 text-amber-800 text-[11px] shadow-sm animate-pulse">
               <AlertTriangle size={16} className="text-amber-600 shrink-0" />
               <div>
                 <span className="font-semibold">Offline Mode:</span> The backend server is unreachable. Showing locally-saved data — recent changes may not have synced.

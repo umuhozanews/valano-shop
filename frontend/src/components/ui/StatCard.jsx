@@ -12,7 +12,7 @@ export default function StatCard({ title, value, trend, trendLabel, icon: Icon, 
           <Icon size={20} className={`text-${color}`} />
         </div>
       )}
-      <p className="text-[14px] font-medium text-text-secondary mb-2">{title}</p>
+      <p className="text-[11px] font-medium text-text-secondary mb-2">{title}</p>
       <p className="text-[26px] font-bold text-text-primary leading-none mb-3">{value}</p>
       {trend != null && (
         <div className="flex items-center gap-1.5">
@@ -22,13 +22,13 @@ export default function StatCard({ title, value, trend, trendLabel, icon: Icon, 
             <TrendingDown size={13} className="text-danger" />
           )}
           <span
-            className={`text-[13px] font-semibold ${isPositive ? "text-success" : "text-danger"}`}
+            className={`text-[12px] font-semibold ${isPositive ? "text-success" : "text-danger"}`}
           >
             {isPositive ? "+" : ""}
             {trend}%
           </span>
           {trendLabel && (
-            <span className="text-[13px] text-text-secondary">{trendLabel}</span>
+            <span className="text-[12px] text-text-secondary">{trendLabel}</span>
           )}
         </div>
       )}

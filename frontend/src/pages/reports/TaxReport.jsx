@@ -63,17 +63,17 @@ export default function TaxReport() {
       <Card className="mb-4">
         <div className="flex flex-wrap items-end gap-4">
           <div>
-            <label className="text-[13px] text-text-secondary mb-1 block">From Date</label>
-            <input type="date" className="border border-border rounded-[6px] px-3 py-2 text-[14px] bg-background h-9"
+            <label className="text-[12px] text-text-secondary mb-1 block">From Date</label>
+            <input type="date" className="border border-border rounded-[6px] px-3 py-2 text-[11px] bg-background h-9"
               value={filters.start_date} onChange={e => setFilters(f => ({ ...f, start_date: e.target.value }))} />
           </div>
           <div>
-            <label className="text-[13px] text-text-secondary mb-1 block">To Date</label>
-            <input type="date" className="border border-border rounded-[6px] px-3 py-2 text-[14px] bg-background h-9"
+            <label className="text-[12px] text-text-secondary mb-1 block">To Date</label>
+            <input type="date" className="border border-border rounded-[6px] px-3 py-2 text-[11px] bg-background h-9"
               value={filters.end_date} onChange={e => setFilters(f => ({ ...f, end_date: e.target.value }))} />
           </div>
           <button onClick={load}
-            className="px-4 py-2 bg-primary text-white rounded-[6px] text-[14px] font-medium hover:bg-primary/90 h-9">
+            className="px-4 py-2 bg-primary text-white rounded-[6px] text-[11px] font-medium hover:bg-primary/90 h-9">
             Apply Filter
           </button>
         </div>
@@ -86,7 +86,7 @@ export default function TaxReport() {
           { key: "rssb", label: "RSSB Contributions" },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            className={`px-4 py-2 text-[14px] font-medium border-b-2 transition-colors ${tab === t.key ? "border-primary text-primary" : "border-transparent text-text-secondary hover:text-text-primary"}`}>
+            className={`px-4 py-2 text-[11px] font-medium border-b-2 transition-colors ${tab === t.key ? "border-primary text-primary" : "border-transparent text-text-secondary hover:text-text-primary"}`}>
             {t.label}
           </button>
         ))}
@@ -104,8 +104,8 @@ export default function TaxReport() {
                 { label: "Total Transactions", value: vatData.totals.transactions?.toLocaleString() },
               ].map(({ label, value }) => (
                 <div key={label} className="bg-surface border border-border rounded-[8px] p-4">
-                  <p className="text-[13px] text-text-secondary">{label}</p>
-                  <p className="text-[20px] font-bold text-text-primary mt-1">{value}</p>
+                  <p className="text-[11px] text-text-secondary">{label}</p>
+                  <p className="text-[18px] font-bold text-text-primary mt-1">{value}</p>
                 </div>
               ))}
             </div>
@@ -114,24 +114,24 @@ export default function TaxReport() {
           <Card title="Monthly VAT Breakdown"
             action={
               <button onClick={() => exportExcel("vat")}
-                className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-[6px] text-[13px] text-text-secondary hover:text-text-primary">
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-[6px] text-[12px] text-text-secondary hover:text-text-primary">
                 <Download size={13} /> Export Excel
               </button>
             }
           >
             {loading ? (
-              <div className="py-12 text-center text-[14px] text-text-secondary">Loading…</div>
+              <div className="py-12 text-center text-[11px] text-text-secondary">Loading…</div>
             ) : !vat.length ? (
               <div className="py-12 text-center">
                 <Shield size={36} className="mx-auto text-text-secondary/30 mb-3" />
-                <p className="text-[15px] font-medium text-text-primary">No VAT data in selected period</p>
+                <p className="text-[12px] font-medium text-text-primary">No VAT data in selected period</p>
               </div>
             ) : (
-              <table className="w-full text-[14px]">
+              <table className="w-full text-[11px]">
                 <thead>
                   <tr className="border-b border-border">
                     {["Month", "Transactions", "Gross Sales", "Net Sales (ex-VAT)", "VAT Collected"].map(h => (
-                      <th key={h} className="pb-2 text-left text-[13px] font-semibold text-text-secondary uppercase tracking-wide pr-4">{h}</th>
+                      <th key={h} className="pb-2 text-left text-[11px] font-semibold text-text-secondary uppercase tracking-wide pr-4">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -166,8 +166,8 @@ export default function TaxReport() {
                 { label: "Total RSSB", value: formatRWF(rssbData.totals.total_rssb) },
               ].map(({ label, value }) => (
                 <div key={label} className="bg-surface border border-border rounded-[8px] p-4">
-                  <p className="text-[13px] text-text-secondary">{label}</p>
-                  <p className="text-[20px] font-bold text-text-primary mt-1">{value}</p>
+                  <p className="text-[11px] text-text-secondary">{label}</p>
+                  <p className="text-[18px] font-bold text-text-primary mt-1">{value}</p>
                 </div>
               ))}
             </div>
@@ -176,25 +176,25 @@ export default function TaxReport() {
           <Card title="Monthly RSSB Contributions"
             action={
               <button onClick={() => exportExcel("rssb")}
-                className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-[6px] text-[13px] text-text-secondary hover:text-text-primary">
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-[6px] text-[12px] text-text-secondary hover:text-text-primary">
                 <Download size={13} /> Export Excel
               </button>
             }
           >
             {loading ? (
-              <div className="py-12 text-center text-[14px] text-text-secondary">Loading…</div>
+              <div className="py-12 text-center text-[11px] text-text-secondary">Loading…</div>
             ) : !rssb.length ? (
               <div className="py-12 text-center">
                 <Shield size={36} className="mx-auto text-text-secondary/30 mb-3" />
-                <p className="text-[15px] font-medium text-text-primary">No salary expenses in selected period</p>
-                <p className="text-[13px] text-text-secondary mt-1">Add expenses with category "Salaries" to generate RSSB report</p>
+                <p className="text-[12px] font-medium text-text-primary">No salary expenses in selected period</p>
+                <p className="text-[12px] text-text-secondary mt-1">Add expenses with category "Salaries" to generate RSSB report</p>
               </div>
             ) : (
-              <table className="w-full text-[14px]">
+              <table className="w-full text-[11px]">
                 <thead>
                   <tr className="border-b border-border">
                     {["Month", "Gross Salaries", "Employee (3%)", "Employer (5%)", "Total RSSB"].map(h => (
-                      <th key={h} className="pb-2 text-left text-[13px] font-semibold text-text-secondary uppercase tracking-wide pr-4">{h}</th>
+                      <th key={h} className="pb-2 text-left text-[11px] font-semibold text-text-secondary uppercase tracking-wide pr-4">{h}</th>
                     ))}
                   </tr>
                 </thead>

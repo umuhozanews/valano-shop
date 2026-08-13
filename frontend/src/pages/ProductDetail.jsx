@@ -25,8 +25,8 @@ export default function ProductDetail() {
     <div style={{ backgroundColor: "#F5F2ED", minHeight: "100vh" }}>
       <LandingNav />
       <div className="max-w-[1400px] mx-auto px-6 py-24 text-center">
-        <p className="text-[17px] text-gray-500 mb-6">Product not found.</p>
-        <Link to="/" className="text-[14px] font-bold tracking-wider" style={{ color: "#1B4332" }}>← Back to collection</Link>
+        <p className="text-[12px] text-gray-500 mb-6">Product not found.</p>
+        <Link to="/" className="text-[11px] font-bold tracking-wider" style={{ color: "#1B4332" }}>← Back to collection</Link>
       </div>
     </div>
   );
@@ -57,7 +57,7 @@ export default function ProductDetail() {
 
       <div className="max-w-[1400px] mx-auto px-6 py-6">
         {/* Breadcrumb */}
-        <nav className="flex items-center gap-2 text-[13px] text-gray-400 mb-6">
+        <nav className="flex items-center gap-2 text-[12px] text-gray-400 mb-6">
           <Link to="/" className="hover:text-[#1B4332] transition-colors">HOME</Link>
           <span>›</span>
           <Link to={`/?cat=${p.cat.toLowerCase()}`} className="hover:text-[#1B4332] transition-colors uppercase">{p.cat}</Link>
@@ -77,7 +77,7 @@ export default function ProductDetail() {
                 className="w-full h-full object-cover"
               />
               {discount > 0 && (
-                <span className="absolute top-4 left-4 text-[13px] font-bold bg-[#1B4332] text-white px-2.5 py-1 rounded-sm">
+                <span className="absolute top-4 left-4 text-[11px] font-bold bg-[#1B4332] text-white px-2.5 py-1 rounded-sm">
                   -{discount}%
                 </span>
               )}
@@ -102,33 +102,33 @@ export default function ProductDetail() {
           {/* RIGHT — Info */}
           <div className="lg:pt-2">
             {/* Category */}
-            <p className="text-[13px] font-bold tracking-[0.15em] uppercase mb-2" style={{ color: "#1B4332" }}>{p.cat}</p>
+            <p className="text-[11px] font-bold tracking-[0.15em] uppercase mb-2" style={{ color: "#1B4332" }}>{p.cat}</p>
 
             {/* Name */}
-            <h1 className="text-[30px] sm:text-[36px] font-bold leading-tight text-[#1a1a1a] mb-4" style={{ fontFamily: "'Bebas Neue', sans-serif", letterSpacing: "0.02em" }}>
+            <h1 className="text-[24px] sm:text-[36px] font-bold leading-tight text-[#1a1a1a] mb-4" style={{ fontFamily: "'Bebas Neue', sans-serif", letterSpacing: "0.02em" }}>
               {p.name}
             </h1>
 
             {/* Price */}
             <div className="flex items-baseline gap-3 mb-6">
-              <span className="text-[30px] font-bold" style={{ color: "#1B4332" }}>{formatRWF(p.price)}</span>
-              <span className="text-[17px] text-gray-400 line-through">{formatRWF(p.orig)}</span>
+              <span className="text-[24px] font-bold" style={{ color: "#1B4332" }}>{formatRWF(p.price)}</span>
+              <span className="text-[12px] text-gray-400 line-through">{formatRWF(p.orig)}</span>
               {discount > 0 && (
-                <span className="text-[13px] font-bold px-2 py-0.5 rounded-sm" style={{ backgroundColor: "#DCFCE7", color: "#166534" }}>
+                <span className="text-[12px] font-bold px-2 py-0.5 rounded-sm" style={{ backgroundColor: "#DCFCE7", color: "#166534" }}>
                   SAVE {discount}%
                 </span>
               )}
             </div>
 
             {/* Description */}
-            <p className="text-[15px] text-gray-600 leading-relaxed mb-6">{p.desc}</p>
+            <p className="text-[12px] text-gray-600 leading-relaxed mb-6">{p.desc}</p>
 
             {/* Divider */}
             <div className="border-t mb-6" style={{ borderColor: "#e5e0d8" }} />
 
             {/* Color */}
             <div className="mb-5">
-              <p className="text-[13px] font-bold tracking-wider uppercase mb-2.5 text-[#1a1a1a]">
+              <p className="text-[12px] font-bold tracking-wider uppercase mb-2.5 text-[#1a1a1a]">
                 Colour — <span className="font-normal text-gray-500">{p.swatchNames[selectedColor]}</span>
               </p>
               <div className="flex gap-2.5">
@@ -153,15 +153,15 @@ export default function ProductDetail() {
             {/* Size */}
             <div className="mb-6">
               <div className="flex items-center justify-between mb-2.5">
-                <p className="text-[13px] font-bold tracking-wider uppercase text-[#1a1a1a]">Size</p>
-                <button className="text-[13px] text-gray-400 underline hover:text-[#1B4332] transition-colors">Size Guide</button>
+                <p className="text-[12px] font-bold tracking-wider uppercase text-[#1a1a1a]">Size</p>
+                <button className="text-[11px] text-gray-400 underline hover:text-[#1B4332] transition-colors">Size Guide</button>
               </div>
               <div className="flex flex-wrap gap-2">
                 {p.sizes.map(s => (
                   <button
                     key={s}
                     onClick={() => setSelectedSize(s)}
-                    className="h-10 min-w-[44px] px-3 text-[13px] font-semibold border rounded-sm transition-all"
+                    className="h-10 min-w-[44px] px-3 text-[12px] font-semibold border rounded-sm transition-all"
                     style={selectedSize === s
                       ? { backgroundColor: "#1B4332", color: "#fff", borderColor: "#1B4332" }
                       : { backgroundColor: "transparent", color: "#1a1a1a", borderColor: "#c8c2b8" }
@@ -172,7 +172,7 @@ export default function ProductDetail() {
                 ))}
               </div>
               {!selectedSize && (
-                <p className="text-[13px] text-gray-400 mt-1.5">Please select a size</p>
+                <p className="text-[11px] text-gray-400 mt-1.5">Please select a size</p>
               )}
             </div>
 
@@ -184,7 +184,7 @@ export default function ProductDetail() {
                   onClick={() => setQty(q => Math.max(1, q - 1))}
                   className="w-11 h-12 flex items-center justify-center hover:bg-black/5 transition-colors text-[#1a1a1a]"
                 ><Minus size={14} /></button>
-                <span className="w-12 text-center text-[15px] font-semibold text-[#1a1a1a]">{qty}</span>
+                <span className="w-12 text-center text-[12px] font-semibold text-[#1a1a1a]">{qty}</span>
                 <button
                   onClick={() => setQty(q => q + 1)}
                   className="w-11 h-12 flex items-center justify-center hover:bg-black/5 transition-colors text-[#1a1a1a]"
@@ -194,7 +194,7 @@ export default function ProductDetail() {
               {/* Add to Cart */}
               <button
                 onClick={handleAddToCart}
-                className="flex-1 h-12 flex items-center justify-center gap-2 text-[14px] font-bold tracking-wider text-white rounded-sm transition-all"
+                className="flex-1 h-12 flex items-center justify-center gap-2 text-[11px] font-bold tracking-wider text-white rounded-sm transition-all"
                 style={{ backgroundColor: added ? "#166534" : "#1B4332" }}
                 onMouseEnter={e => !added && (e.currentTarget.style.backgroundColor = "#14532d")}
                 onMouseLeave={e => !added && (e.currentTarget.style.backgroundColor = "#1B4332")}
@@ -206,7 +206,7 @@ export default function ProductDetail() {
             {/* Wishlist */}
             <button
               onClick={() => { setWishlist(v => !v); toast(wishlist ? "Removed from wishlist" : "Added to wishlist ♥"); }}
-              className="w-full h-11 flex items-center justify-center gap-2 text-[13px] font-bold tracking-wider border-2 rounded-sm transition-all"
+              className="w-full h-11 flex items-center justify-center gap-2 text-[12px] font-bold tracking-wider border-2 rounded-sm transition-all"
               style={{ borderColor: "#c8c2b8", color: "#6b7280" }}
             >
               <Heart size={14} fill={wishlist ? "#ef4444" : "none"} stroke={wishlist ? "#ef4444" : "currentColor"} />
@@ -217,7 +217,7 @@ export default function ProductDetail() {
             <div className="mt-6 border-t" style={{ borderColor: "#e5e0d8" }}>
               <button
                 onClick={() => setDetailsOpen(v => !v)}
-                className="w-full flex items-center justify-between py-4 text-[13px] font-bold tracking-wider text-[#1a1a1a]"
+                className="w-full flex items-center justify-between py-4 text-[12px] font-bold tracking-wider text-[#1a1a1a]"
               >
                 PRODUCT DETAILS
                 <ChevronDown size={14} className={`transition-transform ${detailsOpen ? "rotate-180" : ""}`} />
@@ -225,7 +225,7 @@ export default function ProductDetail() {
               {detailsOpen && (
                 <ul className="pb-4 space-y-1.5">
                   {p.details.map((d, i) => (
-                    <li key={i} className="flex items-start gap-2 text-[14px] text-gray-600">
+                    <li key={i} className="flex items-start gap-2 text-[11px] text-gray-600">
                       <span className="text-[#1B4332] mt-0.5">—</span>
                       {d}
                     </li>
@@ -235,7 +235,7 @@ export default function ProductDetail() {
             </div>
 
             {/* Shipping note */}
-            <div className="mt-4 px-4 py-3 rounded-sm text-[13px] text-gray-500" style={{ backgroundColor: "#edeae5" }}>
+            <div className="mt-4 px-4 py-3 rounded-sm text-[12px] text-gray-500" style={{ backgroundColor: "#edeae5" }}>
               Available at <strong className="text-[#1a1a1a]">Nyabugogo</strong> & <strong className="text-[#1a1a1a]">Kimironko</strong> branches, Kigali.
               Order via WhatsApp for same-day delivery.
             </div>
@@ -257,13 +257,13 @@ export default function ProductDetail() {
                   <div className="relative overflow-hidden rounded-sm mb-3" style={{ aspectRatio: "4/5", backgroundColor: "#edeae5" }}>
                     <img src={r.img} alt={r.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                     {r.orig > r.price && (
-                      <span className="absolute top-2 left-2 text-[12px] font-bold bg-[#1B4332] text-white px-2 py-0.5 rounded-sm">SALE</span>
+                      <span className="absolute top-2 left-2 text-[11px] font-bold bg-[#1B4332] text-white px-2 py-0.5 rounded-sm">SALE</span>
                     )}
                   </div>
-                  <p className="text-[14px] font-medium text-[#1a1a1a] truncate mb-1">{r.name}</p>
+                  <p className="text-[11px] font-medium text-[#1a1a1a] truncate mb-1">{r.name}</p>
                   <div className="flex items-center gap-2">
-                    <span className="text-[13px] text-gray-400 line-through">{formatRWF(r.orig)}</span>
-                    <span className="text-[15px] font-bold text-[#1a1a1a]">{formatRWF(r.price)}</span>
+                    <span className="text-[12px] text-gray-400 line-through">{formatRWF(r.orig)}</span>
+                    <span className="text-[12px] font-bold text-[#1a1a1a]">{formatRWF(r.price)}</span>
                   </div>
                 </Link>
               ))}
@@ -274,7 +274,7 @@ export default function ProductDetail() {
 
       {/* Back to top footer link */}
       <div className="border-t mt-16 py-6 text-center" style={{ borderColor: "#e5e0d8" }}>
-        <Link to="/" className="text-[13px] font-bold tracking-widest text-gray-400 hover:text-[#1B4332] transition-colors">
+        <Link to="/" className="text-[12px] font-bold tracking-widest text-gray-400 hover:text-[#1B4332] transition-colors">
           ← BACK TO COLLECTION
         </Link>
       </div>

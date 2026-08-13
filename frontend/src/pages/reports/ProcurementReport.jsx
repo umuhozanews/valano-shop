@@ -63,9 +63,9 @@ export default function ProcurementReport() {
       <Card className="mb-4">
         <div className="flex flex-wrap gap-3">
           <input type="date" value={filters.start_date} onChange={e=>setFilters(f=>({...f,start_date:e.target.value}))}
-            className="h-9 px-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary" />
+            className="h-9 px-3 border border-border rounded-card text-[11px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary" />
           <input type="date" value={filters.end_date} onChange={e=>setFilters(f=>({...f,end_date:e.target.value}))}
-            className="h-9 px-3 border border-border rounded-card text-[14px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary" />
+            className="h-9 px-3 border border-border rounded-card text-[11px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary" />
           <div className="flex gap-2 ml-auto">
             <Button loading={loading} onClick={generate}>Generate</Button>
             {data.length > 0 && <Button variant="secondary" size="sm" icon={Download} onClick={exportExcel}>Excel</Button>}

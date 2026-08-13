@@ -52,9 +52,9 @@ export default function StockList() {
         low:   it.filter(x => x.status === "low_stock").length,
         out:   it.filter(x => x.status === "out_of_stock").length,
       });
-    } catch { toast.error(t("error")); }
+    } catch { toast.error("Failed to load stock"); }
     finally   { setLoading(false); }
-  }, [page, filters, t]);
+  }, [page, filters]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -75,16 +75,16 @@ export default function StockList() {
       };
       if (editItem) await api.put(`/stock/${editItem.id}`, payload);
       else          await api.post("/stock", payload);
-      toast.success(editItem ? t("success") : t("success"));
+      toast.success(editItem ? "Product updated" : "Product added");
       setShowModal(false); fetchData();
-    } catch(e) { toast.error(e.response?.data?.error || t("error")); }
+    } catch(e) { toast.error(e.response?.data?.error || "Failed to save"); }
     finally   { setSaving(false); }
   }
 
   async function handleDelete(id) {
-    if (!confirm(t("confirm_delete"))) return;
-    try { await api.delete(`/stock/${id}`); toast.success(t("success")); fetchData(); }
-    catch { toast.error(t("error")); }
+    if (!confirm("Delete this product?")) return;
+    try { await api.delete(`/stock/${id}`); toast.success("Product deleted"); fetchData(); }
+    catch { toast.error("Failed to delete"); }
   }
 
   function openEdit(item) {
@@ -103,20 +103,20 @@ export default function StockList() {
   }
 
   const columns = [
-    { key:"name", label: t("product"), render:(v,r) => (
+    { key:"name", label:"Product", render:(v,r) => (
       <div>
         <p className="font-medium text-text-primary">{v}</p>
-        {r.name_rw && <p className="text-[13px] text-text-secondary">{r.name_rw}</p>}
-        <p className="text-[13px] text-text-secondary">{r.category}{r.unit ? ` · ${r.unit}` : ""}</p>
+        {r.name_rw && <p className="text-[11px] text-text-secondary">{r.name_rw}</p>}
+        <p className="text-[11px] text-text-secondary">{r.category}{r.unit ? ` · ${r.unit}` : ""}</p>
       </div>
     )},
-    { key:"barcode",       label: t("barcode_col"),  render:v => <span className="font-mono text-[13px] text-text-secondary">{v || "—"}</span> },
-    { key:"quantity",      label: t("qty"),      render:(v,r) => (
+    { key:"barcode",       label:"Barcode",  render:v => <span className="font-mono text-[11px] text-text-secondary">{v || "—"}</span> },
+    { key:"quantity",      label:"Qty",      render:(v,r) => (
       <span className={`font-semibold ${r.status==="out_of_stock"?"text-danger":r.status==="low_stock"?"text-warning":"text-text-primary"}`}>{v} {r.unit}</span>
     )},
-    { key:"cost_price_rwf",  label: t("cost"),   render:v => formatRWF(v) },
-    { key:"sell_price_rwf",  label: t("sell"),   render:v => formatRWF(v) },
-    { key:"status",       label: t("status"),    render:v => <Badge status={STATUS_MAP[v]||"neutral"} label={t(v) || v?.replace(/_/g," ")||"—"} /> },
+    { key:"cost_price_rwf",  label:"Cost",   render:v => formatRWF(v) },
+    { key:"sell_price_rwf",  label:"Sell",   render:v => formatRWF(v) },
+    { key:"status",       label:"Status",    render:v => <Badge status={STATUS_MAP[v]||"neutral"} label={v?.replace(/_/g," ")||"—"} /> },
     { key:"id", label:"", render:(v,r) => (
       <div className="flex gap-1">
         <button onClick={() => navigate(`/app/stock/${v}`)} className="p-1 text-text-secondary hover:text-primary rounded"><Clock size={14}/></button>
@@ -129,86 +129,86 @@ export default function StockList() {
   ];
 
   return (
-    <PageWrapper title={t("stock_page_title")} subtitle={t("stock_subtitle")}
-      breadcrumbs={[{ label: t("stock_page_title"), path:"/app/stock" }]}
+    <PageWrapper title="Stock" subtitle="Manage your product inventory"
+      breadcrumbs={[{ label:"Stock", path:"/app/stock" }]}
       action={canEdit && (
         <button onClick={() => { setEditItem(null); setForm(EMPTY_FORM); setShowModal(true); }}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-[6px] text-[14px] font-medium hover:bg-primary/90">
-          <Plus size={15} /> {t("add_product")}
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-[6px] text-[11px] font-medium hover:bg-primary/90">
+          <Plus size={15} /> Add Product
         </button>
       )}
     >
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
-        <StatCard title={t("total_items")}  value={summary.total || 0} />
-        <StatCard title={t("stock_value")}  value={formatRWF(summary.value || 0)} />
-        <StatCard title={t("low_stock")}    value={summary.low || 0} color="warning" />
-        <StatCard title={t("out_of_stock")} value={summary.out || 0} color="danger" />
+        <StatCard title="Total Items"    value={summary.total || 0} />
+        <StatCard title="Stock Value"    value={formatRWF(summary.value || 0)} />
+        <StatCard title="Low Stock"      value={summary.low || 0} color="warning" />
+        <StatCard title="Out of Stock"   value={summary.out || 0} color="danger" />
       </div>
 
       <Card>
         <div className="flex flex-wrap gap-3 mb-4">
           <div className="relative flex-1 min-w-[180px]">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
-            <input value={filters.search} onChange={e=>setFilters(f=>({...f,search:e.target.value}))} placeholder={t("search_products")}
-              className="w-full h-9 pl-9 pr-3 border border-border rounded-[6px] text-[14px] focus:outline-none focus:ring-1 focus:ring-primary" />
+            <input value={filters.search} onChange={e=>setFilters(f=>({...f,search:e.target.value}))} placeholder="Search products…"
+              className="w-full h-9 pl-9 pr-3 border border-border rounded-[6px] text-[11px] focus:outline-none focus:ring-1 focus:ring-primary" />
           </div>
           <select value={filters.category} onChange={e=>setFilters(f=>({...f,category:e.target.value}))}
-            className="h-9 px-3 border border-border rounded-[6px] text-[14px] bg-surface">
-            <option value="">{t("all_categories")}</option>
+            className="h-9 px-3 border border-border rounded-[6px] text-[11px] bg-surface">
+            <option value="">All Categories</option>
             {ITEM_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
           <select value={filters.status} onChange={e=>setFilters(f=>({...f,status:e.target.value}))}
-            className="h-9 px-3 border border-border rounded-[6px] text-[14px] bg-surface">
-            <option value="">{t("all_status")}</option>
-            <option value="in_stock">{t("in_stock")}</option>
-            <option value="low_stock">{t("low_stock")}</option>
-            <option value="out_of_stock">{t("out_of_stock")}</option>
+            className="h-9 px-3 border border-border rounded-[6px] text-[11px] bg-surface">
+            <option value="">All Status</option>
+            <option value="in_stock">In Stock</option>
+            <option value="low_stock">Low Stock</option>
+            <option value="out_of_stock">Out of Stock</option>
           </select>
         </div>
 
-        <Table columns={columns} data={items} loading={loading} emptyMessage={t("no_products_yet")} />
+        <Table columns={columns} data={items} loading={loading} emptyMessage="No products yet" />
 
         {total > 20 && (
           <div className="flex justify-center gap-2 mt-4">
             <button disabled={page===1} onClick={() => setPage(p=>p-1)}
-              className="px-3 py-1.5 border border-border rounded text-[13px] disabled:opacity-40">{t("prev")}</button>
-            <span className="px-3 py-1.5 text-[13px] text-text-secondary">{t("page_of")} {page} {t("of")} {Math.ceil(total/20)}</span>
+              className="px-3 py-1.5 border border-border rounded text-[12px] disabled:opacity-40">Prev</button>
+            <span className="px-3 py-1.5 text-[12px] text-text-secondary">Page {page} of {Math.ceil(total/20)}</span>
             <button disabled={page>=Math.ceil(total/20)} onClick={() => setPage(p=>p+1)}
-              className="px-3 py-1.5 border border-border rounded text-[13px] disabled:opacity-40">{t("next")}</button>
+              className="px-3 py-1.5 border border-border rounded text-[12px] disabled:opacity-40">Next</button>
           </div>
         )}
       </Card>
 
-      <Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? t("edit_product") : t("add_product")}
-        footer={<><Button variant="secondary" onClick={() => setShowModal(false)}>{t("cancel")}</Button><Button loading={saving} onClick={handleSave}>{t("save")}</Button></>}>
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={editItem ? "Edit Product" : "Add Product"}
+        footer={<><Button variant="secondary" onClick={() => setShowModal(false)}>Cancel</Button><Button loading={saving} onClick={handleSave}>Save</Button></>}>
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2">
-            <Input label={t("product_name_en")} value={form.name}
+            <Input label="Product Name (English)" value={form.name}
               onChange={e=>setForm(f=>({...f,name:e.target.value}))} required />
           </div>
           <div className="col-span-2">
-            <Input label={t("product_name_rw")} value={form.name_rw}
+            <Input label="Izina mu Kinyarwanda (optional)" value={form.name_rw}
               onChange={e=>setForm(f=>({...f,name_rw:e.target.value}))} placeholder="e.g. Umuceri" />
           </div>
           <div>
-            <label className="block text-[14px] font-medium text-text-primary mb-1">{t("category")}</label>
+            <label className="block text-[11px] font-medium text-text-primary mb-1">Category</label>
             <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))}
-              className="w-full h-9 px-3 border border-border rounded-[6px] text-[14px] bg-surface">
+              className="w-full h-9 px-3 border border-border rounded-[6px] text-[11px] bg-surface">
               <option value="">Select…</option>
               {ITEM_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-[14px] font-medium text-text-primary mb-1">{t("unit_of_measure")}</label>
+            <label className="block text-[11px] font-medium text-text-primary mb-1">Unit of Measure</label>
             <select value={form.unit} onChange={e=>setForm(f=>({...f,unit:e.target.value}))}
-              className="w-full h-9 px-3 border border-border rounded-[6px] text-[14px] bg-surface">
+              className="w-full h-9 px-3 border border-border rounded-[6px] text-[11px] bg-surface">
               {STOCK_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
             </select>
           </div>
-          <Input label={t("quantity")}           type="number" value={form.quantity}            onChange={e=>setForm(f=>({...f,quantity:e.target.value}))} />
-          <Input label={t("low_stock_alert_at")} type="number" value={form.low_stock_threshold} onChange={e=>setForm(f=>({...f,low_stock_threshold:e.target.value}))} />
-          <Input label={t("cost_price_rwf")}     type="number" value={form.cost_price_rwf}      onChange={e=>setForm(f=>({...f,cost_price_rwf:e.target.value}))} />
-          <Input label={t("selling_price_rwf")}  type="number" value={form.sell_price_rwf}      onChange={e=>setForm(f=>({...f,sell_price_rwf:e.target.value}))} required />
+          <Input label="Quantity"           type="number" value={form.quantity}            onChange={e=>setForm(f=>({...f,quantity:e.target.value}))} />
+          <Input label="Low Stock Alert at" type="number" value={form.low_stock_threshold} onChange={e=>setForm(f=>({...f,low_stock_threshold:e.target.value}))} />
+          <Input label="Cost Price (RWF)"   type="number" value={form.cost_price_rwf}      onChange={e=>setForm(f=>({...f,cost_price_rwf:e.target.value}))} />
+          <Input label="Selling Price (RWF)" type="number" value={form.sell_price_rwf}     onChange={e=>setForm(f=>({...f,sell_price_rwf:e.target.value}))} required />
         </div>
       </Modal>
     </PageWrapper>

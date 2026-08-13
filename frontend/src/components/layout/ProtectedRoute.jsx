@@ -10,7 +10,7 @@ export default function ProtectedRoute({ children, roles }) {
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="text-center">
           <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-[14px] text-text-secondary">Loading…</p>
+          <p className="text-[11px] text-text-secondary">Loading…</p>
         </div>
       </div>
     );

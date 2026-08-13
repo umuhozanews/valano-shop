@@ -10,7 +10,7 @@ export default function Input({
   return (
     <div className="flex flex-col gap-1">
       {label && (
-        <label className="text-[14px] font-medium text-text-primary">{label}</label>
+        <label className="text-[11px] font-medium text-text-primary">{label}</label>
       )}
       <div className="relative">
         {Icon && (
@@ -22,7 +22,7 @@ export default function Input({
           placeholder={placeholder}
           className={`
             w-full h-9 border border-border rounded-card bg-surface
-            text-[15px] text-text-primary placeholder:text-text-secondary
+            text-[12px] text-text-primary placeholder:text-text-secondary
             px-3 ${Icon ? "pl-9" : ""}
             focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary
             disabled:opacity-50 disabled:bg-background
@@ -32,8 +32,8 @@ export default function Input({
           {...props}
         />
       </div>
-      {error && <p className="text-[13px] text-danger">{error}</p>}
-      {hint && !error && <p className="text-[13px] text-text-secondary">{hint}</p>}
+      {error && <p className="text-[12px] text-danger">{error}</p>}
+      {hint && !error && <p className="text-[12px] text-text-secondary">{hint}</p>}
     </div>
   );
 }
