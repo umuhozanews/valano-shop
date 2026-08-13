@@ -7,7 +7,7 @@ const { JWT_SECRET, JWT_REFRESH_SECRET } = require("../config/env");
 const { verifyToken } = require("../middleware/auth");
 const { logAudit } = require("../utils/helpers");
 const { isValidEmail, validatePasswordStrength } = require("../utils/validation");
-const { sendLoginAlert } = require("../utils/mailer");
+const { sendLoginAlert, sendWelcomeEmail } = require("../utils/mailer");
 
 const VALID_ROLES = ['sme_owner','manager','cashier','accountant','databridge_advisor','lender','pulse_admin','admin'];
 
@@ -306,6 +306,11 @@ const handleRegister = async (req, res, next) => {
 
     await logAudit(user.id, "REGISTER", "users", user.id, null, { email: normalizedEmail, role: targetRole, businessName: orgOrBusinessName }, req.ip);
 
+    // Send Welcome & Confirmation Email to user's registered email address
+    sendWelcomeEmail(normalizedEmail, fullName, orgOrBusinessName).catch(e => {
+      console.error("[MAIL ERROR] Background welcome email dispatch failed:", e.message);
+    });
+
     const { password_hash, otp_code, otp_expires_at, ...safe } = user;
     res.status(201).json({ accessToken, refreshToken, user: safe, businessName: orgOrBusinessName });
   } catch (err) { next(err); }
@@ -313,6 +318,17 @@ const handleRegister = async (req, res, next) => {
 
 router.post("/register", handleRegister);
 router.post("/signup", handleRegister);
+
+router.post("/send-welcome-email", async (req, res, next) => {
+  try {
+    const { email, name, shop_name } = req.body;
+    if (!email || !isValidEmail(email)) {
+      return res.status(400).json({ error: "Valid email required" });
+    }
+    await sendWelcomeEmail(email.toLowerCase().trim(), name || "Merchant", shop_name || "My Business");
+    res.json({ message: "Welcome email dispatched" });
+  } catch (err) { next(err); }
+});
 
 // ─── OTP: send ────────────────────────────────────────────────────────────────
 router.post("/otp/send", async (req, res, next) => {

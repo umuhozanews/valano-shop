@@ -65,6 +65,76 @@ Pulse Data Analytics Ltd`;
     console.error(`[MAIL ERROR] ${err.message}`);
     throw err;
   }
+async function sendWelcomeEmail(toEmail, userName, shopName) {
+  const subject = "Welcome to INZIRA Insights — Account Registration Confirmed";
+  const dateStr = new Date().toLocaleString("en-RW", { timeZone: "Africa/Kigali" });
+
+  const text = `Hello ${userName},
+
+Welcome to INZIRA Insights!
+
+Your business account "${shopName}" has been successfully created.
+
+Account Summary:
+- Business Owner: ${userName}
+- Registered Email: ${toEmail}
+- Date Created: ${dateStr} (Kigali Time)
+
+You can now log in to manage your inventory stock, process POS sales, issue EBM tax invoices, and track your business Profit & Loss.
+
+Best regards,
+The INZIRA Insights Team
+Pulse Data Analytics Ltd`;
+
+  const html = `
+    <div style="font-family:'Segoe UI',Helvetica,Arial,sans-serif;padding:32px;color:#1A1A1A;max-width:600px;background-color:#F9FAFB;border-radius:16px;">
+      <div style="background-color:#10B981;padding:24px;border-radius:12px;text-align:center;margin-bottom:24px;">
+        <h1 style="color:#FFFFFF;margin:0;font-size:24px;font-weight:800;">INZIRA Insights</h1>
+        <p style="color:#D1FAE5;margin:4px 0 0 0;font-size:14px;">SME Business & Inventory Platform</p>
+      </div>
+
+      <div style="background-color:#FFFFFF;padding:24px;border-radius:12px;border:1px solid #E5E7EB;">
+        <h2 style="color:#111827;margin-top:0;font-size:18px;">Welcome, ${userName}!</h2>
+        <p style="font-size:14px;line-height:1.6;color:#4B5563;">
+          Your business account for <strong>${shopName}</strong> has been successfully registered and initialized.
+        </p>
+
+        <div style="background-color:#F3F4F6;padding:16px;border-radius:8px;margin:20px 0;">
+          <table style="width:100%;font-size:13px;color:#374151;">
+            <tr><td style="font-weight:bold;padding:4px 0;width:140px;">Business Name:</td><td>${shopName}</td></tr>
+            <tr><td style="font-weight:bold;padding:4px 0;">Registered Email:</td><td>${toEmail}</td></tr>
+            <tr><td style="font-weight:bold;padding:4px 0;">Created Date:</td><td>${dateStr} (Kigali)</td></tr>
+          </table>
+        </div>
+
+        <p style="font-size:14px;line-height:1.6;color:#4B5563;">
+          You can now start adding stock items, recording POS sales counter receipts, and tracking customer credit receivables.
+        </p>
+      </div>
+
+      <div style="text-align:center;margin-top:24px;font-size:12px;color:#9CA3AF;">
+        <p style="margin:0;">INZIRA Insights — Powered by Pulse Data Analytics Ltd</p>
+      </div>
+    </div>`;
+
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.log(`[MAIL MOCK] Welcome email → ${toEmail} (${shopName})`);
+    return { mock: true };
+  }
+
+  try {
+    const info = await transporter.sendMail({
+      from: process.env.SMTP_FROM || `"INZIRA Insights" <no-reply@inzira.rw>`,
+      to: toEmail,
+      subject,
+      text,
+      html,
+    });
+    return info;
+  } catch (err) {
+    console.error(`[MAIL ERROR] Welcome email dispatch failed: ${err.message}`);
+    return { error: err.message };
+  }
 }
 
-module.exports = { sendLoginAlert };
+module.exports = { sendLoginAlert, sendWelcomeEmail };
