@@ -126,10 +126,12 @@ router.post("/google", async (req, res, next) => {
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_linked BOOLEAN DEFAULT false`).catch(() => {});
     await pool.query(`ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL`).catch(() => {});
 
+    let isNewRegistration = false;
     let { rows: [user] } = await pool.query("SELECT * FROM users WHERE LOWER(email)=$1", [cleanEmail]);
 
     if (!user) {
       // Case (a): Brand New User -> Create Google-only account with NULL password_hash
+      isNewRegistration = true;
       try {
         const { rows: [created] } = await pool.query(
           `INSERT INTO users (name, email, password_hash, role, consent_status, google_auth, google_linked)
@@ -180,6 +182,17 @@ router.post("/google", async (req, res, next) => {
     const userPayload = { id: user.id, email: user.email, role: user.role, ownerId };
     const accessToken = jwt.sign(userPayload, JWT_SECRET, { expiresIn: "15m" });
     const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, { expiresIn: "7d" });
+
+    // Dispatch automated welcome or login confirmation email to the verified Google email
+    if (isNewRegistration) {
+      sendWelcomeEmail(cleanEmail, googleName, `${googleName}'s Shop`).catch(e => {
+        console.error("[MAIL ERROR] Background Google welcome email failed:", e.message);
+      });
+    } else {
+      sendLoginAlert(cleanEmail, googleName, req.ip).catch(e => {
+        console.error("[MAIL ERROR] Background Google login alert failed:", e.message);
+      });
+    }
 
     const { password_hash, otp_code, otp_expires_at, ...safeUser } = user;
     res.json({ accessToken, refreshToken, user: safeUser });
