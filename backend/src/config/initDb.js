@@ -518,6 +518,8 @@ const USER_HASH    = "$2a$10$bH2EXlVyOo.CWljv6e6dsOIg3xyiwBu5sljAgW.Aikx2EliRIpr
 
 const BOOTSTRAP_SQL = `
 INSERT INTO users (name, email, password_hash, role, phone) VALUES
+  ('Creator Admin',      'creator@inzira.rw',                '${ADMIN_HASH}',   'pulse_admin',        '+250780000000'),
+  ('Boy Gatete',         'boygatete@gmail.com',              '${ADMIN_HASH}',   'sme_owner',          '+250788123456'),
   ('Rukundo Joseph',     'rukundojosephtuyishime@gmail.com', '${RUKUNDO_HASH}', 'pulse_admin',        '+250780000001'),
   ('Admin',              'admin@inzira.rw',                  '${ADMIN_HASH}',   'pulse_admin',        '+250780000004'),
   ('Demo Business',      'demo@inzira.rw',                   '${USER_HASH}',    'sme_owner',          '+250780000002'),
