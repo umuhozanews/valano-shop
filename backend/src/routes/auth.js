@@ -52,6 +52,15 @@ router.post("/login", async (req, res, next) => {
       return res.status(403).json({ error: "Your account has been deactivated. Please contact support." });
     }
 
+    // Protection for Google-Only Accounts (password_hash is NULL)
+    if (!user.password_hash) {
+      await logAudit(user.id, "LOGIN_FAILED_GOOGLE_ONLY", "users", user.id, null, { reason: "password_login_attempted_on_google_account" }, req.ip);
+      return res.status(400).json({
+        error: "This account uses Google Sign-In. Please click 'Continue with Google' to log in.",
+        code: "GOOGLE_AUTH_REQUIRED"
+      });
+    }
+
     // Always compare using bcrypt against stored hash
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
@@ -112,23 +121,55 @@ router.post("/google", async (req, res, next) => {
     const cleanEmail = payload.email.toLowerCase().trim();
     const googleName = (payload.name || cleanEmail.split("@")[0]).trim();
 
-    let { rows: [user] } = await pool.query("SELECT * FROM users WHERE email=$1", [cleanEmail]);
+    // Ensure database columns for Google OAuth & Unique constraint exist
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_auth BOOLEAN DEFAULT false`).catch(() => {});
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_linked BOOLEAN DEFAULT false`).catch(() => {});
+    await pool.query(`ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL`).catch(() => {});
+
+    let { rows: [user] } = await pool.query("SELECT * FROM users WHERE LOWER(email)=$1", [cleanEmail]);
 
     if (!user) {
-      const dummyPass = await bcrypt.hash("GoogleOAuth_" + Date.now(), 10);
-      const { rows: [created] } = await pool.query(
-        `INSERT INTO users (name, email, password_hash, role, consent_status)
-         VALUES ($1, $2, $3, 'sme_owner', 'granted') RETURNING *`,
-        [googleName, cleanEmail, dummyPass]
-      );
-      user = created;
+      // Case (a): Brand New User -> Create Google-only account with NULL password_hash
+      try {
+        const { rows: [created] } = await pool.query(
+          `INSERT INTO users (name, email, password_hash, role, consent_status, google_auth, google_linked)
+           VALUES ($1, $2, NULL, 'sme_owner', 'granted', true, true)
+           RETURNING *`,
+          [googleName, cleanEmail]
+        );
+        user = created;
 
+        if (user) {
+          await pool.query(
+            `INSERT INTO settings (owner_id, shop_name, language)
+             VALUES ($1, $2, 'en')
+             ON CONFLICT (owner_id) DO NOTHING`,
+            [user.id, `${googleName}'s Shop`]
+          ).catch(() => {});
+        }
+      } catch (dbConflictErr) {
+        // Fallback for double-click / concurrent registration race condition
+        const { rows: [existing] } = await pool.query("SELECT * FROM users WHERE LOWER(email)=$1", [cleanEmail]);
+        user = existing;
+      }
+      if (user) {
+        await logAudit(user.id, "REGISTER_GOOGLE", "users", user.id, null, { email: cleanEmail }, req.ip);
+      }
+    } else if (!user.google_linked || !user.google_auth) {
+      // Case (b): Existing email/password user logging in via verified Google email -> Link Account
       await pool.query(
-        `INSERT INTO settings (owner_id, shop_name, language)
-         VALUES ($1, $2, 'en')
-         ON CONFLICT (owner_id) DO NOTHING`,
-        [user.id, `${googleName}'s Shop`]
-      );
+        "UPDATE users SET google_linked = true WHERE id = $1",
+        [user.id]
+      ).catch(() => {});
+      user.google_linked = true;
+      await logAudit(user.id, "LINK_GOOGLE_ACCOUNT", "users", user.id, null, { email: cleanEmail }, req.ip);
+    } else {
+      // Case (c): Returning Google User -> Simple Login
+      await logAudit(user.id, "LOGIN_GOOGLE", "users", user.id, null, { email: cleanEmail }, req.ip);
+    }
+
+    if (!user) {
+      return res.status(500).json({ error: "Failed to process Google authentication" });
     }
 
     if (user.is_active === false) {
@@ -139,8 +180,6 @@ router.post("/google", async (req, res, next) => {
     const userPayload = { id: user.id, email: user.email, role: user.role, ownerId };
     const accessToken = jwt.sign(userPayload, JWT_SECRET, { expiresIn: "15m" });
     const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, { expiresIn: "7d" });
-
-    await logAudit(user.id, "LOGIN_GOOGLE", "users", user.id, null, { email: cleanEmail }, req.ip);
 
     const { password_hash, otp_code, otp_expires_at, ...safeUser } = user;
     res.json({ accessToken, refreshToken, user: safeUser });
@@ -202,8 +241,14 @@ router.put("/me/password", verifyToken, async (req, res, next) => {
     const { currentPassword, newPassword } = req.body;
     const { rows } = await pool.query("SELECT * FROM users WHERE id=$1", [req.user.id]);
     const user = rows[0];
-    if (!user || !(await bcrypt.compare(currentPassword, user.password_hash)))
-      return res.status(400).json({ error: "Current password incorrect" });
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // If user already has a password_hash, require current password match
+    if (user.password_hash) {
+      if (!currentPassword || !(await bcrypt.compare(currentPassword, user.password_hash))) {
+        return res.status(400).json({ error: "Current password incorrect" });
+      }
+    }
 
     const strength = validatePasswordStrength(newPassword);
     if (!strength.valid)
@@ -211,7 +256,8 @@ router.put("/me/password", verifyToken, async (req, res, next) => {
 
     const hash = await bcrypt.hash(newPassword, 10);
     await pool.query("UPDATE users SET password_hash=$1 WHERE id=$2", [hash, req.user.id]);
-    res.json({ message: "Password updated" });
+    await logAudit(user.id, "SET_PASSWORD", "users", user.id, null, { initialSet: !user.password_hash }, req.ip);
+    res.json({ message: "Password updated successfully" });
   } catch (err) { next(err); }
 });
 

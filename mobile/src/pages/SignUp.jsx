@@ -19,7 +19,7 @@ import Logomark from "../components/Logomark";
 
 export default function SignUp() {
   const navigate = useNavigate();
-  const { registerUser } = useAuth();
+  const { registerUser, loginWithGoogle } = useAuth();
   const { resetData } = useData();
 
   const [busy, setBusy] = useState(false);
@@ -38,6 +38,34 @@ export default function SignUp() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [referralSource, setReferralSource] = useState("Google Search");
+
+  useEffect(() => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+    if (window.google?.accounts?.id && clientId) {
+      try {
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: async (response) => {
+            if (response?.credential) {
+              setBusy(true);
+              try {
+                await loginWithGoogle(response.credential);
+                resetData();
+                toast.success("Successfully authenticated with Google Account!");
+                navigate("/", { replace: true });
+              } catch (err) {
+                toast.error(errorMessage(err, "Google sign-up failed."));
+              } finally {
+                setBusy(false);
+              }
+            }
+          },
+        });
+      } catch (err) {
+        console.error("[GIS] Google Identity Services init error:", err);
+      }
+    }
+  }, [loginWithGoogle, navigate, resetData]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
