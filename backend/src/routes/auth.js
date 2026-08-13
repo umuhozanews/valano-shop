@@ -1,4 +1,4 @@
-// Verified Git Commit Author: rukundojosephtuyishime@gmail.com
+// Verified Git Commit Author: cyberninja-07 <outofthebo@gmail.com>
 const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
