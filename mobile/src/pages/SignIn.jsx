@@ -35,8 +35,10 @@ export default function SignIn() {
   const [googleCredential, setGoogleCredential] = useState("");
 
   useEffect(() => {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
-    
+    const GOOGLE_CLIENT_ID =
+      import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+      "566140797459-iaml5c6201dh0qpvs86fnm1dtd25rd30.apps.googleusercontent.com";
+
     const handleGoogleResponse = async (response) => {
       if (response?.credential) {
         setBusy(true);
@@ -52,12 +54,14 @@ export default function SignIn() {
       }
     };
 
-    if (window.google?.accounts?.id && clientId) {
+    const initGIS = () => {
+      if (!window.google?.accounts?.id || !GOOGLE_CLIENT_ID) return false;
       try {
         window.google.accounts.id.initialize({
-          client_id: clientId,
+          client_id: GOOGLE_CLIENT_ID,
           callback: handleGoogleResponse,
           auto_select: false,
+          itp_support: true,
         });
 
         const btnContainer = document.getElementById("google-signin-button");
@@ -66,15 +70,33 @@ export default function SignIn() {
           window.google.accounts.id.renderButton(btnContainer, {
             theme: "outline",
             size: "large",
+            type: "standard",
             text: "continue_with",
             shape: "pill",
             width: "320",
           });
         }
+
+        window.google.accounts.id.prompt();
+        return true;
       } catch (err) {
         console.error("[GIS] Google Identity Services init error:", err);
+        return false;
       }
-    }
+    };
+
+    if (initGIS()) return;
+
+    // Poll every 200ms for up to 10 seconds if script loaded asynchronously after mount
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts++;
+      if (initGIS() || attempts > 50) {
+        clearInterval(interval);
+      }
+    }, 200);
+
+    return () => clearInterval(interval);
   }, [loginWithGoogle, navigate]);
 
   const handleTabChange = (newTab) => {
