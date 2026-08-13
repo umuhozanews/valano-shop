@@ -48,3 +48,10 @@ export function clockTime(dateInput) {
 export function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
+
+export function formatDate(dateInput) {
+  if (!dateInput) return "";
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return String(dateInput);
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}

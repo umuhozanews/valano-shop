@@ -1,16 +1,17 @@
-export default function Logomark({ size = 30 }) {
+export default function Logomark({ size = 32, className = "" }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" aria-hidden="true">
-      <circle cx="20" cy="20" r="20" fill="#1F5C4E" />
-      <path
-        d="M9 27C13 27 13 13 20 13C27 13 27 27 31 27"
-        stroke="#E8A33D"
-        strokeWidth="3"
-        strokeLinecap="round"
-        fill="none"
+    <div
+      className={`relative inline-flex shrink-0 items-center justify-center rounded-full bg-white shadow-sm border border-gray-200/80 overflow-hidden ${className}`}
+      style={{ width: size, height: size }}
+    >
+      <img
+        src="/logo-round.png"
+        alt="Inzira Logo"
+        className="h-full w-full rounded-full object-cover"
+        onError={(e) => {
+          e.target.style.display = "none";
+        }}
       />
-      <circle cx="9" cy="27" r="2.3" fill="#fff" />
-      <circle cx="31" cy="27" r="2.3" fill="#E8A33D" />
-    </svg>
+    </div>
   );
 }

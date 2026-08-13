@@ -14,11 +14,36 @@ body,
 
 body {
   margin: 0;
-  background: #eae5d6;
-  font-family: "Inter", system-ui, sans-serif;
-  color: #1a2421;
+  background: linear-gradient(180deg, #F4FBE4 0%, #F9FAFB 40%, #F3F8EA 100%);
+  background-attachment: fixed;
+  font-family: "Manrope", "Inter", system-ui, -apple-system, sans-serif;
+  color: #0F172A;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/* Luminous card styling utility */
+.luminous-card {
+  background-color: #ffffff;
+  border-radius: 28px;
+  border: 1px solid rgba(229, 231, 235, 0.8);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.04);
+}
+
+/* Luminous Lime CTA Button styling utility */
+.luminous-btn {
+  background-color: #D4F06B;
+  color: #0F172A;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
+  border-radius: 9999px;
+  transition: all 0.2s ease-in-out;
+}
+.luminous-btn:hover {
+  background-color: #C5E456;
+}
+.luminous-btn:active {
+  transform: scale(0.98);
 }
 
 /* Tabular numbers for money — figures line up in columns */
@@ -62,4 +87,35 @@ button,
 }
 .db-rise {
   animation: db-rise 0.25s ease-out both;
+}
+
+@keyframes logo-glow {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 12px rgba(212, 240, 107, 0.5));
+  }
+  50% {
+    transform: scale(1.08);
+    filter: drop-shadow(0 0 24px rgba(212, 240, 107, 0.8));
+  }
+}
+
+.animate-logo-glow {
+  animation: logo-glow 2s ease-in-out infinite;
+}
+
+@keyframes shimmer-progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer-progress 1.5s ease-in-out infinite;
 }

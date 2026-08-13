@@ -85,6 +85,11 @@ router.get("/", async (req, res, next) => {
 
 router.get("/:id", async (req, res, next) => {
   try {
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const sOwnerWhere = isAdmin ? "1=1" : "s.owner_id=$2";
+    const arOwnerWhere = isAdmin ? "1=1" : "owner_id=$2";
+    const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
+
     const [saleRes, itemsRes, arRes] = await Promise.all([
       pool.query(
         `SELECT s.*, u.name as cashier_name, u.email as cashier_email, c.name as customer_name, c.phone as customer_phone, c.tin_number as customer_tin,
@@ -93,8 +98,8 @@ router.get("/:id", async (req, res, next) => {
          LEFT JOIN users u ON u.id=s.user_id
          LEFT JOIN customers c ON c.id=s.customer_id
          LEFT JOIN invoices i ON i.sale_id=s.id
-         WHERE s.id=$1 AND (s.owner_id=$2 OR $2 IS NULL)`,
-        [req.params.id, req.ownerId]
+         WHERE s.id=$1 AND ${sOwnerWhere}`,
+        queryParams
       ),
       pool.query(
         `SELECT si.*, stk.name as item_name, stk.barcode, stk.unit
@@ -102,7 +107,7 @@ router.get("/:id", async (req, res, next) => {
          WHERE si.sale_id=$1`,
         [req.params.id]
       ),
-      pool.query("SELECT * FROM accounts_receivable WHERE sale_id=$1 AND (owner_id=$2 OR $2 IS NULL) LIMIT 1", [req.params.id, req.ownerId]),
+      pool.query(`SELECT * FROM accounts_receivable WHERE sale_id=$1 AND ${arOwnerWhere} LIMIT 1`, queryParams),
     ]);
     if (!saleRes.rows[0]) return res.status(404).json({ error: "Sale not found" });
     res.json({ ...saleRes.rows[0], items: itemsRes.rows, receivable: arRes.rows[0] || null });
@@ -306,7 +311,11 @@ router.post("/:id/void", requireRole("admin", "sme_owner", "manager", "accountan
     const { void_reason } = req.body;
     if (!void_reason) return res.status(400).json({ error: "Void reason required" });
 
-    const { rows: [sale] } = await pool.query("SELECT * FROM sales WHERE id=$1 AND (owner_id=$2 OR $2 IS NULL)", [req.params.id, req.ownerId]);
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "owner_id=$2";
+    const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
+
+    const { rows: [sale] } = await pool.query(`SELECT * FROM sales WHERE id=$1 AND ${ownerWhere}`, queryParams);
     if (!sale) return res.status(404).json({ error: "Sale not found" });
     if (sale.is_voided) return res.status(400).json({ error: "Already voided" });
 

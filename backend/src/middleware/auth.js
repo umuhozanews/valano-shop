@@ -24,10 +24,21 @@ function verifyToken(req, res, next) {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
-    // ownerId: null for pulse_admin/admin (sees all), actual ID for sme_owner, owner's ID for workers
-    req.ownerId = decoded.ownerId !== undefined
-      ? decoded.ownerId
-      : (['pulse_admin','admin'].includes(decoded.role) ? null : decoded.id);
+
+    const isAdmin = ['pulse_admin', 'admin'].includes(decoded.role);
+    if (isAdmin) {
+      req.ownerId = null;
+    } else {
+      let oid = decoded.ownerId;
+      if (oid === undefined || oid === null) {
+        oid = decoded.role === 'sme_owner' ? decoded.id : decoded.owner_id;
+      }
+      const parsedOid = parseInt(oid, 10);
+      if (isNaN(parsedOid) || parsedOid <= 0) {
+        return res.status(403).json({ error: "Invalid tenant authorization context", code: "FORBIDDEN" });
+      }
+      req.ownerId = parsedOid;
+    }
     next();
   } catch (err) {
     if (err.name === "TokenExpiredError") {

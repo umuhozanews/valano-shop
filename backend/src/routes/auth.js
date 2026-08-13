@@ -22,14 +22,21 @@ router.post("/login", async (req, res, next) => {
     }
 
     const normalizedEmail = rawIdentifier.toLowerCase();
-    const cleanPhone = rawIdentifier.replace(/\s+/g, "");
-    const phoneFallbackEmail = `${cleanPhone.replace(/\D/g, "")}@inzira.rw`;
+    const cleanDigits = rawIdentifier.replace(/\D/g, "");
+    const last9Digits = cleanDigits.length >= 9 ? cleanDigits.slice(-9) : cleanDigits;
+    const phoneFallbackEmail = cleanDigits ? `${cleanDigits}@inzira.rw` : "";
+    const last9FallbackEmail = last9Digits ? `${last9Digits}@inzira.rw` : "";
 
-    // Query user by normalized email, phone, or phone fallback email
+    // Query user by normalized email, exact phone, clean phone digits, or last 9 digits of phone number
     const { rows } = await pool.query(
       `SELECT * FROM users
-       WHERE LOWER(email) = $1 OR (phone IS NOT NULL AND phone = $2) OR email = $3`,
-      [normalizedEmail, cleanPhone, phoneFallbackEmail]
+       WHERE LOWER(email) = $1
+          OR (phone IS NOT NULL AND phone = $2)
+          OR (email IS NOT NULL AND email = $3)
+          OR ($4 <> '' AND RIGHT(REGEXP_REPLACE(COALESCE(phone, ''), '\\D', 'g'), 9) = $4)
+          OR ($4 <> '' AND RIGHT(REGEXP_REPLACE(COALESCE(email, ''), '\\D', 'g'), 9) = $4)
+          OR (email IS NOT NULL AND email = $5)`,
+      [normalizedEmail, rawIdentifier, phoneFallbackEmail, last9Digits, last9FallbackEmail]
     );
     const user = rows[0];
 

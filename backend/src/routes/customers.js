@@ -74,13 +74,15 @@ router.get("/", requireRole("admin", "sme_owner", "manager", "accountant", "puls
 router.get("/top", requireRole("admin", "sme_owner", "manager", "accountant", "pulse_admin"), async (req, res, next) => {
   try {
     await ensureTenantColumns();
-    const conds = ["c.owner_id = $1 OR $1 IS NULL"];
+    const conds = []; const params = [];
+    addOwnerFilter(conds, params, req, 'c');
+    const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
     const { rows } = await pool.query(
       `SELECT c.*, COUNT(s.id) as orders, COALESCE(SUM(s.total_amount),0) as spent
        FROM customers c LEFT JOIN sales s ON s.customer_id=c.id AND s.is_voided=false
-       WHERE ${conds.join(" AND ")}
+       ${where}
        GROUP BY c.id ORDER BY spent DESC LIMIT 10`,
-      [req.ownerId]
+      params
     );
     res.json(rows);
   } catch (err) { next(err); }
@@ -88,25 +90,31 @@ router.get("/top", requireRole("admin", "sme_owner", "manager", "accountant", "p
 
 router.get("/:id", requireRole("admin", "sme_owner", "manager", "accountant", "pulse_admin"), async (req, res, next) => {
   try {
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const cOwnerWhere = isAdmin ? "1=1" : "c.owner_id=$2";
+    const sOwnerWhere = isAdmin ? "1=1" : "s.owner_id=$2";
+    const arOwnerWhere = isAdmin ? "1=1" : "owner_id=$2";
+    const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
+
     const [customer, sales, receivables] = await Promise.all([
       pool.query(
         `SELECT c.*, COUNT(s.id) as total_orders,
           COALESCE(SUM(s.total_amount),0) as total_spent,
           MAX(s.created_at) as last_purchase
          FROM customers c LEFT JOIN sales s ON s.customer_id=c.id AND s.is_voided=false
-         WHERE c.id=$1 AND (c.owner_id=$2 OR $2 IS NULL) GROUP BY c.id`,
-        [req.params.id, req.ownerId]
+         WHERE c.id=$1 AND ${cOwnerWhere} GROUP BY c.id`,
+        queryParams
       ),
       pool.query(
         `SELECT s.*, i.invoice_number,
           (SELECT COUNT(*) FROM sale_items si WHERE si.sale_id=s.id) as items_count
          FROM sales s LEFT JOIN invoices i ON i.sale_id=s.id
-         WHERE s.customer_id=$1 AND (s.owner_id=$2 OR $2 IS NULL) AND s.is_voided=false ORDER BY s.created_at DESC LIMIT 20`,
-        [req.params.id, req.ownerId]
+         WHERE s.customer_id=$1 AND ${sOwnerWhere} AND s.is_voided=false ORDER BY s.created_at DESC LIMIT 20`,
+        queryParams
       ),
       pool.query(
-        "SELECT * FROM accounts_receivable WHERE customer_id=$1 AND (owner_id=$2 OR $2 IS NULL) ORDER BY created_at DESC LIMIT 10",
-        [req.params.id, req.ownerId]
+        `SELECT * FROM accounts_receivable WHERE customer_id=$1 AND ${arOwnerWhere} ORDER BY created_at DESC LIMIT 10`,
+        queryParams
       ),
     ]);
     if (!customer.rows[0]) return res.status(404).json({ error: "Customer not found" });
@@ -130,10 +138,15 @@ router.post("/", async (req, res, next) => {
 router.put("/:id", requireRole("admin", "sme_owner", "manager", "accountant", "pulse_admin"), async (req, res, next) => {
   try {
     const { name, phone, location, type, segment, notes, credit_limit } = req.body;
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "owner_id=$9";
+    const params = [name, phone || null, location || null, type, segment, notes || null, credit_limit || 0, req.params.id];
+    if (!isAdmin) params.push(req.ownerId);
+
     const { rows: [c] } = await pool.query(
       `UPDATE customers SET name=$1, phone=$2, location=$3, type=$4, segment=$5, notes=$6, credit_limit=$7
-       WHERE id=$8 AND (owner_id=$9 OR $9 IS NULL) RETURNING *`,
-      [name, phone || null, location || null, type, segment, notes || null, credit_limit || 0, req.params.id, req.ownerId]
+       WHERE id=$8 AND ${ownerWhere} RETURNING *`,
+      params
     );
     if (!c) return res.status(404).json({ error: "Customer not found" });
     res.json(c);
@@ -142,7 +155,11 @@ router.put("/:id", requireRole("admin", "sme_owner", "manager", "accountant", "p
 
 router.delete("/:id", requireRole("admin", "sme_owner", "pulse_admin"), async (req, res, next) => {
   try {
-    await pool.query("DELETE FROM customers WHERE id=$1 AND (owner_id=$2 OR $2 IS NULL)", [req.params.id, req.ownerId]);
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "owner_id=$2";
+    const params = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
+
+    await pool.query(`DELETE FROM customers WHERE id=$1 AND ${ownerWhere}`, params);
     res.json({ message: "Customer deleted" });
   } catch (err) { next(err); }
 });

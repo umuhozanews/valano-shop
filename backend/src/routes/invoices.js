@@ -37,8 +37,12 @@ router.get("/", requireRole("admin", "sme_owner", "manager", "accountant", "cash
 
 router.get("/:id", requireRole("admin", "manager", "accountant"), async (req, res, next) => {
   try {
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "s.owner_id=$2";
+    const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
+
     const { rows: [inv] } = await pool.query(
-      `SELECT i.*, s.* FROM invoices i JOIN sales s ON s.id=i.sale_id WHERE i.id=$1 AND (s.owner_id=$2 OR $2 IS NULL)`, [req.params.id, req.ownerId]
+      `SELECT i.*, s.* FROM invoices i JOIN sales s ON s.id=i.sale_id WHERE i.id=$1 AND ${ownerWhere}`, queryParams
     );
     if (!inv) return res.status(404).json({ error: "Invoice not found" });
     res.json(inv);
@@ -47,11 +51,15 @@ router.get("/:id", requireRole("admin", "manager", "accountant"), async (req, re
 
 router.get("/:id/pdf", async (req, res, next) => {
   try {
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "s.owner_id=$2";
+    const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
+
     const { rows: [invoice] } = await pool.query(
       `SELECT i.*, s.total_amount, s.payment_method, s.customer_name, s.user_id, s.owner_id
        FROM invoices i JOIN sales s ON s.id=i.sale_id
-       WHERE i.id=$1 AND (s.owner_id=$2 OR $2 IS NULL)`,
-      [req.params.id, req.ownerId]
+       WHERE i.id=$1 AND ${ownerWhere}`,
+      queryParams
     );
     if (!invoice) return res.status(404).json({ error: "Invoice not found" });
 
@@ -89,16 +97,22 @@ router.get("/:id/pdf", async (req, res, next) => {
 router.put("/:id/status", requireRole("admin", "manager", "accountant"), async (req, res, next) => {
   try {
     const { status } = req.body;
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const invOwnerWhere = isAdmin ? "1=1" : "owner_id=$3";
+    const invParams = isAdmin ? [status, req.params.id] : [status, req.params.id, req.ownerId];
+
     const { rows: [inv] } = await pool.query(
-      "UPDATE invoices SET status=$1, paid_at=CASE WHEN $1='paid' THEN NOW() ELSE paid_at END WHERE id=$2 AND (owner_id=$3 OR $3 IS NULL) RETURNING *",
-      [status, req.params.id, req.ownerId]
+      `UPDATE invoices SET status=$1, paid_at=CASE WHEN $1='paid' THEN NOW() ELSE paid_at END WHERE id=$2 AND ${invOwnerWhere} RETURNING *`,
+      invParams
     );
 
     // Sync: If the invoice is marked as 'paid', mark any corresponding receivable as 'paid'
     if (status === "paid" && inv) {
+      const arOwnerWhere = isAdmin ? "1=1" : "owner_id=$2";
+      const arParams = isAdmin ? [inv.sale_id] : [inv.sale_id, req.ownerId];
       await pool.query(
-        "UPDATE accounts_receivable SET status = 'paid' WHERE sale_id = $1 AND (owner_id=$2 OR $2 IS NULL)",
-        [inv.sale_id, req.ownerId]
+        `UPDATE accounts_receivable SET status = 'paid' WHERE sale_id = $1 AND ${arOwnerWhere}`,
+        arParams
       );
     }
 

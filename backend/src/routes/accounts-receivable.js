@@ -81,10 +81,14 @@ router.get("/aged", async (req, res, next) => {
 // Get single
 router.get("/:id", async (req, res, next) => {
   try {
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "ar.owner_id=$2";
+    const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
+
     const { rows: [ar] } = await pool.query(
       `SELECT ar.*, c.name as customer_name FROM accounts_receivable ar
-       LEFT JOIN customers c ON c.id=ar.customer_id WHERE ar.id=$1 AND (ar.owner_id=$2 OR $2 IS NULL)`,
-      [req.params.id, req.ownerId]
+       LEFT JOIN customers c ON c.id=ar.customer_id WHERE ar.id=$1 AND ${ownerWhere}`,
+      queryParams
     );
     if (!ar) return res.status(404).json({ error: "Record not found" });
     res.json(ar);
@@ -115,17 +119,24 @@ router.post("/:id/payment", async (req, res, next) => {
     if (!amount || amount <= 0)
       return res.status(400).json({ error: "Valid payment amount required" });
 
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "owner_id=$2";
+    const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
+
     const { rows: [existing] } = await pool.query(
-      "SELECT * FROM accounts_receivable WHERE id=$1 AND (owner_id=$2 OR $2 IS NULL)", [req.params.id, req.ownerId]
+      `SELECT * FROM accounts_receivable WHERE id=$1 AND ${ownerWhere}`, queryParams
     );
     if (!existing) return res.status(404).json({ error: "Record not found" });
 
     const newPaid = Math.min(Number(existing.amount_paid) + Number(amount), Number(existing.amount));
     const newStatus = newPaid >= existing.amount ? "paid" : "partial";
 
+    const updateOwnerWhere = isAdmin ? "1=1" : "owner_id=$4";
+    const updateParams = isAdmin ? [newPaid, newStatus, req.params.id] : [newPaid, newStatus, req.params.id, req.ownerId];
+
     const { rows: [ar] } = await pool.query(
-      `UPDATE accounts_receivable SET amount_paid=$1, status=$2 WHERE id=$3 AND (owner_id=$4 OR $4 IS NULL) RETURNING *`,
-      [newPaid, newStatus, req.params.id, req.ownerId]
+      `UPDATE accounts_receivable SET amount_paid=$1, status=$2 WHERE id=$3 AND ${updateOwnerWhere} RETURNING *`,
+      updateParams
     );
     await logAudit(req.user.id, "AR_PAYMENT", "accounts_receivable", ar.id, null, { amount, newPaid, newStatus }, req.ip);
     res.json(ar);

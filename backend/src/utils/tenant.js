@@ -10,8 +10,19 @@ async function ensureTenantColumns() {
   _migrated = true;
 }
 
-// Pushes owner filter into conds/params arrays (the pattern used in every route)
-function addOwnerFilter(conds, params, ownerId, alias = '') {
+function isAdminRole(reqOrRole) {
+  if (!reqOrRole) return false;
+  const role = typeof reqOrRole === 'object' ? reqOrRole?.user?.role : reqOrRole;
+  return ['pulse_admin', 'admin'].includes(role);
+}
+
+// Pushes owner filter into conds/params arrays (the pattern used in list endpoints)
+function addOwnerFilter(conds, params, reqOrOwnerId, alias = '') {
+  const req = typeof reqOrOwnerId === 'object' && reqOrOwnerId !== null ? reqOrOwnerId : null;
+  if (req && isAdminRole(req)) {
+    return;
+  }
+  const ownerId = req ? req.ownerId : reqOrOwnerId;
   if (ownerId !== null && ownerId !== undefined) {
     params.push(ownerId);
     const col = alias ? `${alias}.owner_id` : 'owner_id';
@@ -19,4 +30,16 @@ function addOwnerFilter(conds, params, ownerId, alias = '') {
   }
 }
 
-module.exports = { ensureTenantColumns, addOwnerFilter };
+// Builds explicit tenant WHERE clause snippet for single-record lookups/mutations
+function buildOwnerClause(req, alias = '', startParamIdx = 2) {
+  if (isAdminRole(req)) {
+    return { sql: '1=1', params: [] };
+  }
+  if (!req.ownerId) {
+    throw new Error("TENANT_ISOLATION_VIOLATION: Non-admin request missing valid ownerId");
+  }
+  const col = alias ? `${alias}.owner_id` : 'owner_id';
+  return { sql: `${col} = $${startParamIdx}`, params: [req.ownerId] };
+}
+
+module.exports = { ensureTenantColumns, addOwnerFilter, buildOwnerClause, isAdminRole };

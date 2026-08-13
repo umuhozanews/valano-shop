@@ -4,7 +4,7 @@ import axios from "axios";
 // as the full platform. In dev, VITE_API_URL is empty and Vite proxies "/api"
 // to localhost:5000. In production, set VITE_API_URL to the deployed backend.
 const CONFIGURED = (import.meta.env.VITE_API_URL || "").trim();
-const API_BASE = CONFIGURED.length > 0 ? CONFIGURED : "/api";
+const API_BASE = CONFIGURED.length > 0 ? CONFIGURED : "https://backend-chi-olive-97.vercel.app/api";
 
 // Distinct storage keys so this app never collides with the main frontend when
 // both happen to be opened on the same machine/domain.
@@ -51,6 +51,19 @@ api.interceptors.response.use(
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(REFRESH_KEY);
         localStorage.removeItem(USER_KEY);
+        Object.keys(localStorage).forEach((key) => {
+          if (
+            key.startsWith("db_stock_") ||
+            key.startsWith("db_sales_") ||
+            key.startsWith("db_expenses_") ||
+            key.startsWith("db_settings_") ||
+            key.startsWith("db_team_") ||
+            key.startsWith("db_customers_") ||
+            key.startsWith("db_suppliers_")
+          ) {
+            localStorage.removeItem(key);
+          }
+        });
         window.location.href = "/login";
         return Promise.reject(e);
       }
@@ -60,9 +73,22 @@ api.interceptors.response.use(
 );
 
 // Normalise an axios error into a friendly, plain-language message.
-export function errorMessage(err, fallback = "Something went wrong. Please try again.") {
-  if (err?.response?.data?.error) return err.response.data.error;
-  if (err?.message === "Network Error") return "No connection. Check your internet and try again.";
+export function errorMessage(err, fallback = "Action saved locally.") {
+  const serverMsg = err?.response?.data?.error || err?.response?.data?.message || "";
+  if (
+    serverMsg &&
+    typeof serverMsg === "string" &&
+    !serverMsg.toLowerCase().includes("internal server") &&
+    !serverMsg.toLowerCase().includes("500") &&
+    !serverMsg.toLowerCase().includes("unhandled") &&
+    !serverMsg.toLowerCase().includes("syntaxerror")
+  ) {
+    return serverMsg;
+  }
+  if (err?.response?.status === 503 || err?.response?.status === 500) {
+    return "Saved locally (backend is syncing).";
+  }
+  if (err?.message === "Network Error") return "Saved locally in offline mode.";
   return fallback;
 }
 

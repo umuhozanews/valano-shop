@@ -76,17 +76,24 @@ router.post("/:id/payment", async (req, res, next) => {
     if (!amount || amount <= 0)
       return res.status(400).json({ error: "Valid payment amount required" });
 
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "owner_id=$2";
+    const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
+
     const { rows: [existing] } = await pool.query(
-      "SELECT * FROM accounts_payable WHERE id=$1 AND (owner_id=$2 OR $2 IS NULL)", [req.params.id, req.ownerId]
+      `SELECT * FROM accounts_payable WHERE id=$1 AND ${ownerWhere}`, queryParams
     );
     if (!existing) return res.status(404).json({ error: "Record not found" });
 
     const newPaid  = Math.min(Number(existing.amount_paid) + Number(amount), Number(existing.amount));
     const newStatus = newPaid >= existing.amount ? "paid" : "partial";
 
+    const updateOwnerWhere = isAdmin ? "1=1" : "owner_id=$4";
+    const updateParams = isAdmin ? [newPaid, newStatus, req.params.id] : [newPaid, newStatus, req.params.id, req.ownerId];
+
     const { rows: [ap] } = await pool.query(
-      `UPDATE accounts_payable SET amount_paid=$1, status=$2 WHERE id=$3 AND (owner_id=$4 OR $4 IS NULL) RETURNING *`,
-      [newPaid, newStatus, req.params.id, req.ownerId]
+      `UPDATE accounts_payable SET amount_paid=$1, status=$2 WHERE id=$3 AND ${updateOwnerWhere} RETURNING *`,
+      updateParams
     );
     await logAudit(req.user.id, "AP_PAYMENT", "accounts_payable", ap.id, null, { amount, newPaid, newStatus }, req.ip);
     res.json(ap);

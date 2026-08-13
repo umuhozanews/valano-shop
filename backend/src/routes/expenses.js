@@ -119,9 +119,13 @@ router.post("/:id/receipt", upload.single("receipt"), async (req, res, next) => 
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
     const url = await uploadToCloudinary(req.file.buffer, "inzira_receipts");
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "owner_id=$3";
+    const params = isAdmin ? [url, req.params.id] : [url, req.params.id, req.ownerId];
+
     const { rows: [exp] } = await pool.query(
-      "UPDATE expenses SET receipt_url=$1 WHERE id=$2 AND (owner_id=$3 OR $3 IS NULL) RETURNING *",
-      [url, req.params.id, req.ownerId]
+      `UPDATE expenses SET receipt_url=$1 WHERE id=$2 AND ${ownerWhere} RETURNING *`,
+      params
     );
     if (!exp) return res.status(404).json({ error: "Expense not found" });
     res.json({ url, expense: exp });
@@ -131,10 +135,15 @@ router.post("/:id/receipt", upload.single("receipt"), async (req, res, next) => 
 router.put("/:id", async (req, res, next) => {
   try {
     const { category, amount, description, expense_date, supplier_id } = req.body;
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "owner_id=$7";
+    const params = [category, amount, description, expense_date, supplier_id || null, req.params.id];
+    if (!isAdmin) params.push(req.ownerId);
+
     const { rows: [exp] } = await pool.query(
       `UPDATE expenses SET category=$1, amount=$2, description=$3, expense_date=$4, supplier_id=$5
-       WHERE id=$6 AND (owner_id=$7 OR $7 IS NULL) RETURNING *`,
-      [category, amount, description, expense_date, supplier_id || null, req.params.id, req.ownerId]
+       WHERE id=$6 AND ${ownerWhere} RETURNING *`,
+      params
     );
     if (!exp) return res.status(404).json({ error: "Expense not found" });
     res.json(exp);
@@ -143,7 +152,11 @@ router.put("/:id", async (req, res, next) => {
 
 router.delete("/:id", requireRole("admin", "sme_owner", "accountant", "pulse_admin"), async (req, res, next) => {
   try {
-    await pool.query("DELETE FROM expenses WHERE id=$1 AND (owner_id=$2 OR $2 IS NULL)", [req.params.id, req.ownerId]);
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "owner_id=$2";
+    const params = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
+
+    await pool.query(`DELETE FROM expenses WHERE id=$1 AND ${ownerWhere}`, params);
     res.json({ message: "Expense deleted" });
   } catch (err) { next(err); }
 });

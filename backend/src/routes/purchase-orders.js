@@ -41,10 +41,14 @@ router.get("/", async (req, res, next) => {
 
 router.get("/:id", async (req, res, next) => {
   try {
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "po.owner_id=$2";
+    const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
+
     const { rows: [order] } = await pool.query(
       `SELECT po.*, s.name as supplier_name FROM purchase_orders po
-       LEFT JOIN suppliers s ON s.id=po.supplier_id WHERE po.id=$1 AND (po.owner_id=$2 OR $2 IS NULL)`,
-      [req.params.id, req.ownerId]
+       LEFT JOIN suppliers s ON s.id=po.supplier_id WHERE po.id=$1 AND ${ownerWhere}`,
+      queryParams
     );
     if (!order) return res.status(404).json({ error: "Order not found" });
 
@@ -88,9 +92,13 @@ router.put("/:id/status", async (req, res, next) => {
     if (!STATUS_FLOW.includes(status))
       return res.status(400).json({ error: `Status must be one of: ${STATUS_FLOW.join(", ")}` });
 
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "owner_id=$3";
+    const updateParams = isAdmin ? [status, req.params.id] : [status, req.params.id, req.ownerId];
+
     const { rows: [order] } = await pool.query(
-      `UPDATE purchase_orders SET status=$1 WHERE id=$2 AND (owner_id=$3 OR $3 IS NULL) RETURNING *`,
-      [status, req.params.id, req.ownerId]
+      `UPDATE purchase_orders SET status=$1 WHERE id=$2 AND ${ownerWhere} RETURNING *`,
+      updateParams
     );
     if (!order) return res.status(404).json({ error: "Order not found" });
 
@@ -100,10 +108,12 @@ router.put("/:id/status", async (req, res, next) => {
         "SELECT * FROM purchase_order_items WHERE order_id=$1 AND stock_item_id IS NOT NULL",
         [order.id]
       );
+      const stockOwnerWhere = isAdmin ? "1=1" : "owner_id=$3";
       for (const item of items) {
+        const stkParams = isAdmin ? [item.quantity, item.stock_item_id] : [item.quantity, item.stock_item_id, req.ownerId];
         await pool.query(
-          "UPDATE stock_items SET quantity = quantity + $1 WHERE id=$2 AND (owner_id=$3 OR $3 IS NULL)",
-          [item.quantity, item.stock_item_id, req.ownerId]
+          `UPDATE stock_items SET quantity = quantity + $1 WHERE id=$2 AND ${stockOwnerWhere}`,
+          stkParams
         );
       }
     }
@@ -115,9 +125,13 @@ router.put("/:id/status", async (req, res, next) => {
 
 router.delete("/:id", requireRole("admin", "sme_owner", "pulse_admin"), async (req, res, next) => {
   try {
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "owner_id=$2";
+    const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
+
     const { rows: [order] } = await pool.query(
-      "DELETE FROM purchase_orders WHERE id=$1 AND status='ordered' AND (owner_id=$2 OR $2 IS NULL) RETURNING id",
-      [req.params.id, req.ownerId]
+      `DELETE FROM purchase_orders WHERE id=$1 AND status='ordered' AND ${ownerWhere} RETURNING id`,
+      queryParams
     );
     if (!order) return res.status(404).json({ error: "Order not found or cannot be deleted" });
     await logAudit(req.user.id, "PO_DELETED", "purchase_orders", req.params.id, null, null, req.ip);

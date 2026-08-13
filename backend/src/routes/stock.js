@@ -101,13 +101,17 @@ router.get("/valuation", requireRole("admin", "sme_owner", "accountant", "pulse_
 
 router.get("/:id", async (req, res, next) => {
   try {
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "si.owner_id=$2";
+    const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
+
     const { rows } = await pool.query(
       `SELECT si.*,
         CASE WHEN si.quantity=0 THEN 'out_of_stock'
              WHEN si.quantity<=si.low_stock_threshold THEN 'low_stock'
              ELSE 'in_stock' END as stock_status
-       FROM stock_items si WHERE si.id=$1 AND (si.owner_id=$2 OR $2 IS NULL)`,
-      [req.params.id, req.ownerId]
+       FROM stock_items si WHERE si.id=$1 AND ${ownerWhere}`,
+      queryParams
     );
     if (!rows[0]) return res.status(404).json({ error: "Item not found" });
     res.json(rows[0]);
@@ -116,7 +120,11 @@ router.get("/:id", async (req, res, next) => {
 
 router.get("/:id/barcode", async (req, res, next) => {
   try {
-    const { rows } = await pool.query("SELECT barcode FROM stock_items WHERE id=$1 AND (owner_id=$2 OR $2 IS NULL)", [req.params.id, req.ownerId]);
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "owner_id=$2";
+    const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
+
+    const { rows } = await pool.query(`SELECT barcode FROM stock_items WHERE id=$1 AND ${ownerWhere}`, queryParams);
     if (!rows[0]?.barcode) return res.status(404).json({ error: "No barcode" });
     const buf = await generateBarcodeBuffer(rows[0].barcode);
     res.setHeader("Content-Type", "image/png");
@@ -126,14 +134,18 @@ router.get("/:id/barcode", async (req, res, next) => {
 
 router.get("/:id/history", async (req, res, next) => {
   try {
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "s.owner_id=$2";
+    const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
+
     const { rows } = await pool.query(
       `SELECT 'sale' as type, s.created_at as date, si.quantity, u.name as done_by
        FROM sale_items si
        JOIN sales s ON s.id=si.sale_id
        LEFT JOIN users u ON u.id=s.user_id
-       WHERE si.stock_item_id=$1 AND (s.owner_id=$2 OR $2 IS NULL)
+       WHERE si.stock_item_id=$1 AND ${ownerWhere}
        ORDER BY date DESC LIMIT 50`,
-      [req.params.id, req.ownerId]
+      queryParams
     );
     res.json(rows);
   } catch (err) { next(err); }
@@ -145,8 +157,12 @@ router.get("/print-labels", async (req, res, next) => {
     const idList = String(ids).split(",").map(Number).filter(Boolean);
     if (!idList.length) return res.status(400).json({ error: "No item IDs" });
 
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "owner_id=$2";
+    const queryParams = isAdmin ? [idList] : [idList, req.ownerId];
+
     const { rows } = await pool.query(
-      "SELECT * FROM stock_items WHERE id=ANY($1::int[]) AND (owner_id=$2 OR $2 IS NULL) AND is_active=true", [idList, req.ownerId]
+      `SELECT * FROM stock_items WHERE id=ANY($1::int[]) AND ${ownerWhere} AND is_active=true`, queryParams
     );
 
     const PDFDocument = require("pdfkit");
@@ -204,28 +220,34 @@ router.post("/", requireRole("admin", "sme_owner", "manager", "pulse_admin"), as
 router.put("/:id", requireRole("admin", "sme_owner", "manager", "pulse_admin"), async (req, res, next) => {
   try {
     const { name, name_rw, category, unit, quantity, cost_price_rwf, sell_price_rwf, low_stock_threshold, image_url } = req.body;
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "owner_id=$2";
+    const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
 
-    const { rows: [old] } = await pool.query("SELECT * FROM stock_items WHERE id=$1 AND (owner_id=$2 OR $2 IS NULL)", [req.params.id, req.ownerId]);
+    const { rows: [old] } = await pool.query(`SELECT * FROM stock_items WHERE id=$1 AND ${ownerWhere}`, queryParams);
     if (!old) return res.status(404).json({ error: "Item not found" });
+
+    const updateOwnerWhere = isAdmin ? "1=1" : "owner_id=$11";
+    const updateParams = [
+      name || old.name,
+      name_rw !== undefined ? name_rw : old.name_rw,
+      category !== undefined ? category : old.category,
+      unit || old.unit || "pcs",
+      quantity !== undefined ? parseInt(quantity) : old.quantity,
+      cost_price_rwf !== undefined ? parseInt(cost_price_rwf) : old.cost_price_rwf,
+      sell_price_rwf !== undefined ? parseInt(sell_price_rwf) : old.sell_price_rwf,
+      low_stock_threshold !== undefined ? parseInt(low_stock_threshold) : old.low_stock_threshold,
+      image_url || null,
+      req.params.id,
+    ];
+    if (!isAdmin) updateParams.push(req.ownerId);
 
     const { rows: [item] } = await pool.query(
       `UPDATE stock_items SET name=$1, name_rw=$2, category=$3, unit=$4,
         quantity=$5, cost_price_rwf=$6, sell_price_rwf=$7, low_stock_threshold=$8,
         image_url=COALESCE($9, image_url)
-       WHERE id=$10 AND (owner_id=$11 OR $11 IS NULL) RETURNING *`,
-      [
-        name || old.name,
-        name_rw !== undefined ? name_rw : old.name_rw,
-        category !== undefined ? category : old.category,
-        unit || old.unit || "pcs",
-        quantity !== undefined ? parseInt(quantity) : old.quantity,
-        cost_price_rwf !== undefined ? parseInt(cost_price_rwf) : old.cost_price_rwf,
-        sell_price_rwf !== undefined ? parseInt(sell_price_rwf) : old.sell_price_rwf,
-        low_stock_threshold !== undefined ? parseInt(low_stock_threshold) : old.low_stock_threshold,
-        image_url || null,
-        req.params.id,
-        req.ownerId,
-      ]
+       WHERE id=$10 AND ${updateOwnerWhere} RETURNING *`,
+      updateParams
     );
     await logAudit(req.user.id, "STOCK_UPDATED", "stock_items", item.id, old, item, req.ip);
     res.json(item);
@@ -239,13 +261,20 @@ router.post("/:id/adjust", requireRole("admin", "sme_owner", "manager", "pulse_a
     if (adjustment === undefined) return res.status(400).json({ error: "adjustment amount required" });
     if (!reason) return res.status(400).json({ error: "Reason is required for stock adjustment" });
 
-    const { rows: [old] } = await pool.query("SELECT * FROM stock_items WHERE id=$1 AND (owner_id=$2 OR $2 IS NULL)", [req.params.id, req.ownerId]);
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "owner_id=$2";
+    const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
+
+    const { rows: [old] } = await pool.query(`SELECT * FROM stock_items WHERE id=$1 AND ${ownerWhere}`, queryParams);
     if (!old) return res.status(404).json({ error: "Item not found" });
 
     const newQty = Math.max(0, old.quantity + parseInt(adjustment));
+    const updateOwnerWhere = isAdmin ? "1=1" : "owner_id=$3";
+    const updateParams = isAdmin ? [newQty, req.params.id] : [newQty, req.params.id, req.ownerId];
+
     const { rows: [item] } = await pool.query(
-      "UPDATE stock_items SET quantity=$1 WHERE id=$2 AND (owner_id=$3 OR $3 IS NULL) RETURNING *",
-      [newQty, req.params.id, req.ownerId]
+      `UPDATE stock_items SET quantity=$1 WHERE id=$2 AND ${updateOwnerWhere} RETURNING *`,
+      updateParams
     );
 
     if (item.quantity === 0) {
@@ -261,10 +290,14 @@ router.post("/:id/adjust", requireRole("admin", "sme_owner", "manager", "pulse_a
 
 router.delete("/:id", requireRole("admin", "sme_owner", "pulse_admin"), async (req, res, next) => {
   try {
-    const { rows: [item] } = await pool.query("SELECT id FROM stock_items WHERE id=$1 AND (owner_id=$2 OR $2 IS NULL)", [req.params.id, req.ownerId]);
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "owner_id=$2";
+    const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
+
+    const { rows: [item] } = await pool.query(`SELECT id FROM stock_items WHERE id=$1 AND ${ownerWhere}`, queryParams);
     if (!item) return res.status(404).json({ error: "Item not found" });
 
-    await pool.query("UPDATE stock_items SET is_active=false WHERE id=$1 AND (owner_id=$2 OR $2 IS NULL)", [req.params.id, req.ownerId]);
+    await pool.query(`UPDATE stock_items SET is_active=false WHERE id=$1 AND ${ownerWhere}`, queryParams);
     await logAudit(req.user.id, "STOCK_DELETED", "stock_items", req.params.id, null, null, req.ip);
     res.json({ message: "Item removed" });
   } catch (err) { next(err); }
