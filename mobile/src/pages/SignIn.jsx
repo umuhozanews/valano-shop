@@ -39,6 +39,16 @@ export default function SignIn() {
       import.meta.env.VITE_GOOGLE_CLIENT_ID ||
       "566140797459-iaml5c6201dh0qpvs86fnm1dtd25rd30.apps.googleusercontent.com";
 
+    // Ensure Google Identity Services script is dynamically loaded if missing in production DOM
+    if (!window.google?.accounts?.id && !document.getElementById("google-gsi-script")) {
+      const script = document.createElement("script");
+      script.id = "google-gsi-script";
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    }
+
     const handleGoogleResponse = async (response) => {
       if (response?.credential) {
         setBusy(true);
