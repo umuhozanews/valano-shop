@@ -98,6 +98,8 @@ valano-shop/
 
 | Series | Status     | Description                                      |
 |--------|------------|--------------------------------------------------|
+| 1.0    | Live       | Integrated Multi-Tenant SME Management Platform |
+
 | 1      | ✅ Done    | Scaffold, design system, layout shell, schema    |
 | 2      | Pending    | Auth — login, JWT, role-guard, session           |
 | 3      | Pending    | Dashboard — KPI cards, charts, live summary      |
