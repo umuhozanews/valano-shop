@@ -1,4 +1,4 @@
-const { Pool } = require("pg");
+const { Client } = require("pg");
 require("dotenv").config();
 
 const connectionString = (
@@ -16,33 +16,6 @@ if (!connectionString && !isLocalDevMode) {
   console.error(`[DB FATAL ERROR] ${errMsg}`);
   throw new Error(errMsg);
 }
-
-function createPool() {
-  if (!connectionString) return null;
-  const isLocal = /localhost|127\.0\.0\.1/.test(connectionString);
-
-  try {
-    const p = new Pool({
-      connectionString: connectionString,
-      ssl: isLocal ? false : { rejectUnauthorized: false },
-      max: parseInt(process.env.PG_POOL_MAX || "2", 10),
-      idleTimeoutMillis: 2000,
-      connectionTimeoutMillis: 10000,
-      allowExitOnIdle: true,
-    });
-
-    p.on("error", (err) => {
-      console.warn("[PG POOL ERROR EVENT - HANDLED]", err.message);
-    });
-
-    return p;
-  } catch (e) {
-    console.error("[PG POOL INITIALIZATION FAILED]", e.message);
-    return null;
-  }
-}
-
-let pool = createPool();
 
 function isTransient(err) {
   if (!err) return false;
@@ -161,43 +134,34 @@ const memoryStore = {
 
 async function executeQuery(text, params = []) {
   if (connectionString) {
+    const isLocal = /localhost|127\.0\.0\.1/.test(connectionString);
     for (let attempt = 1; attempt <= 3; attempt++) {
-      let client = null;
+      const client = new Client({
+        connectionString,
+        ssl: isLocal ? false : { rejectUnauthorized: false },
+        connectionTimeoutMillis: 10000,
+      });
+
       try {
-        if (!pool) pool = createPool();
-        if (!pool) throw new Error("Database pool initialization failed");
-        
-        client = await pool.connect();
+        await client.connect();
         const res = await client.query(text, params);
+        await client.end().catch(() => {});
         return res;
       } catch (err) {
-        if (client) {
-          try { client.release(true); } catch {}
-          client = null;
-        }
-
+        await client.end().catch(() => {});
         const isTrans = isTransient(err);
         if (isTrans && attempt < 3) {
-          console.warn(`[PG RETRY ${attempt}/3] Reconnecting after transient drop:`, err.message);
-          try {
-            if (pool) pool.end().catch(() => {});
-          } catch {}
-          pool = createPool();
-          await new Promise((r) => setTimeout(r, 150 * attempt));
+          console.warn(`[PG RETRY ${attempt}/3] Reconnecting:`, err.message);
+          await new Promise((r) => setTimeout(r, 200 * attempt));
           continue;
         }
-
         throw formatDbError(err);
-      } finally {
-        if (client) {
-          try { client.release(); } catch {}
-        }
       }
     }
   }
 
   if (!isLocalDevMode) {
-    console.error("[DB ERROR] Database pool uninitialized and LOCAL_DEV_MODE is false.");
+    console.error("[DB ERROR] Database connection string missing and LOCAL_DEV_MODE is false.");
     const err = new Error("Database unavailable. Please check database configuration.");
     err.status = 503;
     err.code = "DB_UNAVAILABLE";
@@ -337,7 +301,5 @@ async function executeQuery(text, params = []) {
 
 module.exports = {
   query: executeQuery,
-  on: (event, handler) => {
-    if (pool) pool.on(event, handler);
-  }
+  on: () => {}
 };
