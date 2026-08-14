@@ -38,7 +38,7 @@ app.get("/api/health", async (req, res) => {
   let dbError = null;
   let dbHost = "not_configured";
   try {
-    const raw = process.env.DATABASE_URL || process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL || "";
+    const raw = process.env.DATABASE_URL || "";
     if (raw) {
       const match = raw.match(/@([^:\/]+)/);
       dbHost = match ? match[1] : "configured";

@@ -86,57 +86,6 @@ router.post("/login", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ─── Direct Database Diagnostic & Inspection Endpoints ───────────────────────
-router.get("/inspect-user", async (req, res, next) => {
-  try {
-    const targetEmail = String(req.query.email || "umuhozanews@gmail.com").toLowerCase().trim();
-    const rawConn = (
-      process.env.POSTGRES_URL_NON_POOLING ||
-      process.env.DATABASE_URL ||
-      process.env.POSTGRES_PRISMA_URL ||
-      process.env.POSTGRES_URL ||
-      ""
-    ).trim();
-
-    let parsedUrl = {};
-    try {
-      if (rawConn) {
-        const u = new URL(rawConn);
-        parsedUrl = {
-          protocol: u.protocol,
-          host: u.hostname,
-          port: u.port,
-          pathname: u.pathname,
-          search: u.search,
-          username: u.username,
-        };
-      }
-    } catch (parseErr) {
-      parsedUrl = { error: parseErr.message };
-    }
-
-    res.json({
-      targetEmail,
-      parsedUrl,
-      availableEnvKeys: Object.keys(process.env).filter(k => k.includes("POSTGRES") || k.includes("DATABASE") || k.includes("VERCEL")),
-    });
-  } catch (err) { next(err); }
-});
-
-router.post("/fix-profile-complete", async (req, res, next) => {
-  try {
-    const targetEmail = String(req.body.email || "umuhozanews@gmail.com").toLowerCase().trim();
-    const { rows } = await pool.query(
-      `UPDATE users
-       SET profile_complete = true, google_linked = true, google_auth = true
-       WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))
-       RETURNING id, email, name, profile_complete, google_linked, google_auth`,
-      [targetEmail]
-    );
-    res.json({ message: "Updated profile_complete", targetEmail, rows });
-  } catch (err) { next(err); }
-});
-
 const { OAuth2Client } = require("google-auth-library");
 const { GOOGLE_CLIENT_ID } = require("../config/env");
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
