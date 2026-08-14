@@ -10,11 +10,14 @@ CREATE TABLE IF NOT EXISTS users (
   id               SERIAL PRIMARY KEY,
   name             VARCHAR(100) NOT NULL,
   email            VARCHAR(100) UNIQUE NOT NULL,
-  password_hash    TEXT NOT NULL,
+  password_hash    TEXT,
   role             VARCHAR(30) NOT NULL DEFAULT 'sme_owner',
   phone            VARCHAR(20),
   avatar_url       TEXT,
   is_active        BOOLEAN DEFAULT true,
+  profile_complete BOOLEAN DEFAULT true,
+  google_auth      BOOLEAN DEFAULT false,
+  google_linked    BOOLEAN DEFAULT false,
   -- Inzira Insights fields
   consent_status   VARCHAR(20) DEFAULT 'pending',
   consent_date     TIMESTAMP,
@@ -572,17 +575,6 @@ let isInitialized = false;
 
 async function runInit() {
   if (isInitialized) return;
-
-  try {
-    const testRes = await pool.query("SELECT id FROM users LIMIT 1");
-    if (testRes && testRes.rows) {
-      isInitialized = true;
-      return;
-    }
-  } catch (checkErr) {
-    // Database tables don't exist yet, proceed with one-time bootstrap
-    console.log("[DB INIT] Running initial bootstrap schema...");
-  }
 
   try {
     await pool.query(SCHEMA_SQL);
