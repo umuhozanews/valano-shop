@@ -26,11 +26,6 @@ async function logAudit(userId, action, tableName, recordId, oldValue, newValue,
        newValue ? JSON.stringify(newValue) : null,
        ip || null]
     );
-    
-    // Automatically trigger database backup on audit logging (write operations)
-    runDatabaseBackup().catch(e => {
-      console.error("[BACKUP ERROR] Auto backup failed in logAudit:", e.message);
-    });
   } catch (e) {
     console.error("Audit log error:", e.message);
   }
