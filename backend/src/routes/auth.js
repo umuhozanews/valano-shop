@@ -91,8 +91,7 @@ router.get("/inspect-user", async (req, res, next) => {
   try {
     const targetEmail = String(req.query.email || "umuhozanews@gmail.com").toLowerCase().trim();
     
-    // Test direct pg.Client to see if PostgreSQL is reachable directly
-    const { Client } = require("pg");
+    const { Client, Pool } = require("pg");
     const rawConn = (
       process.env.POSTGRES_URL_NON_POOLING ||
       process.env.DATABASE_URL ||
@@ -101,35 +100,63 @@ router.get("/inspect-user", async (req, res, next) => {
       ""
     ).trim();
 
-    let directPgStatus = "not_attempted";
-    let directPgError = null;
-    let directPgRows = [];
+    const attempts = {};
 
-    if (rawConn) {
-      const isLocal = /localhost|127\.0\.0\.1/.test(rawConn);
-      const testClient = new Client({
+    // Attempt A: pg.Pool with rejectUnauthorized: false
+    try {
+      const poolA = new Pool({
         connectionString: rawConn,
-        ssl: isLocal ? false : { rejectUnauthorized: false },
-        connectionTimeoutMillis: 7000,
+        ssl: { rejectUnauthorized: false },
+        connectionTimeoutMillis: 10000,
       });
-      try {
-        await testClient.connect();
-        const queryRes = await testClient.query(
-          `SELECT id, email, name, role, profile_complete, google_linked, google_auth,
-                  password_hash IS NOT NULL AS has_password, created_at
-           FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
-          [targetEmail]
-        );
-        directPgRows = queryRes.rows;
-        directPgStatus = "connected_and_queried";
-        await testClient.end().catch(() => {});
-      } catch (clientErr) {
-        directPgStatus = "error";
-        directPgError = clientErr.message;
-        await testClient.end().catch(() => {});
-      }
-    } else {
-      directPgStatus = "no_connection_string";
+      const resA = await poolA.query(
+        `SELECT id, email, name, role, profile_complete, google_linked, google_auth,
+                password_hash IS NOT NULL AS has_password, created_at
+         FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
+        [targetEmail]
+      );
+      attempts.poolWithSSL = { status: "SUCCESS", count: resA.rows.length, rows: resA.rows };
+      await poolA.end().catch(() => {});
+    } catch (eA) {
+      attempts.poolWithSSL = { status: "ERROR", error: eA.message, code: eA.code };
+    }
+
+    // Attempt B: pg.Pool without ssl config (in case SSL is not required or handled by URL)
+    try {
+      const poolB = new Pool({
+        connectionString: rawConn,
+        connectionTimeoutMillis: 10000,
+      });
+      const resB = await poolB.query(
+        `SELECT id, email, name, role, profile_complete, google_linked, google_auth,
+                password_hash IS NOT NULL AS has_password, created_at
+         FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
+        [targetEmail]
+      );
+      attempts.poolWithoutSSL = { status: "SUCCESS", count: resB.rows.length, rows: resB.rows };
+      await poolB.end().catch(() => {});
+    } catch (eB) {
+      attempts.poolWithoutSSL = { status: "ERROR", error: eB.message, code: eB.code };
+    }
+
+    // Attempt C: Clean connection string without search params
+    try {
+      const cleanUrl = rawConn.split("?")[0];
+      const poolC = new Pool({
+        connectionString: cleanUrl,
+        ssl: { rejectUnauthorized: false },
+        connectionTimeoutMillis: 10000,
+      });
+      const resC = await poolC.query(
+        `SELECT id, email, name, role, profile_complete, google_linked, google_auth,
+                password_hash IS NOT NULL AS has_password, created_at
+         FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
+        [targetEmail]
+      );
+      attempts.poolCleanUrlSSL = { status: "SUCCESS", count: resC.rows.length, rows: resC.rows };
+      await poolC.end().catch(() => {});
+    } catch (eC) {
+      attempts.poolCleanUrlSSL = { status: "ERROR", error: eC.message, code: eC.code };
     }
 
     const { rows } = await pool.query(
@@ -141,11 +168,10 @@ router.get("/inspect-user", async (req, res, next) => {
 
     res.json({
       targetEmail,
-      directPgStatus,
-      directPgError,
-      directPgRows,
-      poolCount: rows.length,
-      poolRows: rows
+      dbHost: rawConn ? (rawConn.match(/@([^:\/]+)/)?.[1] || "configured") : "none",
+      attempts,
+      poolDefaultCount: rows.length,
+      poolDefaultRows: rows
     });
   } catch (err) { next(err); }
 });
