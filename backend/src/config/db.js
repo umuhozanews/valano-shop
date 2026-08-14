@@ -52,7 +52,7 @@ const memoryStore = {
       id: 2,
       name: "Rukundo Joseph",
       email: "rukundojosephtuyishime@gmail.com",
-      password_hash: "$2a$10$3nEecqT66.qN02W8y8Y0P.5Z9vA9oKk7q8x8G0P.5Z9vA9oKk7q8x", // rukundo2007
+      password_hash: "$2a$10$3nEecqT66.qN02W8y8Y0P.5Z9vA9oKk7q8x8G0P.5Z9vA9oKk7q8x",
       role: "pulse_admin",
       phone: "+250780000001",
       district: "Kigali",
@@ -67,7 +67,7 @@ const memoryStore = {
       id: 3,
       name: "Admin",
       email: "admin@inzira.rw",
-      password_hash: "$2a$10$sZG8ecQDj8qWGD1ZKHVxHuDbvfYeVBSgRwtz/nvAABTWo0iFie5Om", // inzira2024
+      password_hash: "$2a$10$sZG8ecQDj8qWGD1ZKHVxHuDbvfYeVBSgRwtz/nvAABTWo0iFie5Om",
       role: "pulse_admin",
       phone: "+250780000004",
       district: "Kigali",
@@ -82,7 +82,7 @@ const memoryStore = {
       id: 4,
       name: "Demo Cashier",
       email: "cashier@inzira.rw",
-      password_hash: "$2a$10$sZG8ecQDj8qWGD1ZKHVxHuDbvfYeVBSgRwtz/nvAABTWo0iFie5Om", // inzira2024
+      password_hash: "$2a$10$sZG8ecQDj8qWGD1ZKHVxHuDbvfYeVBSgRwtz/nvAABTWo0iFie5Om",
       role: "cashier",
       phone: "+250780000003",
       district: "Gasabo",
@@ -118,6 +118,7 @@ const memoryStore = {
       owner_id: 1,
       user_id: 1,
       customer_id: 1,
+      idempotency_key: "demo_init_sale_1",
       cashier_name: "Demo Cashier",
       customer_name: "Walk-in Customer",
       invoice_number: "INV-2026-001",
@@ -126,13 +127,14 @@ const memoryStore = {
       payment_status: "completed",
       is_voided: false,
       items_count: 2,
-      created_at: new Date().toISOString()
+      created_at: new Date(Date.now() - 7200000).toISOString()
     },
     {
       id: 102,
       owner_id: 1,
       user_id: 1,
       customer_id: 1,
+      idempotency_key: "demo_init_sale_2",
       cashier_name: "Demo Cashier",
       customer_name: "Kigali Retailer",
       invoice_number: "INV-2026-002",
@@ -144,6 +146,7 @@ const memoryStore = {
       created_at: new Date(Date.now() - 3600000).toISOString()
     }
   ],
+  sale_items: [],
   expenses: [],
   suppliers: [
     { id: 1, owner_id: 1, name: "Inyange Industries", phone: "+250788200001", address: "Kigali", products_supplied: "Dairy" },
@@ -217,10 +220,9 @@ async function executeQuery(text, params = []) {
     let sector = null;
     let district = null;
     let currency = "RWF";
-    let profile_complete = !isGoogle; // Google users require setup, normal signup is complete
+    let profile_complete = !isGoogle;
 
     if (!isGoogle) {
-      // standard signup: (name, email, password_hash, role, phone, sector, district, currency, consent_status)
       role = params[3] || "sme_owner";
       phone = params[4] || null;
       sector = params[5] || null;
@@ -359,7 +361,7 @@ async function executeQuery(text, params = []) {
   }
 
   // ─── AGGREGATE KPI STATS (`GET /api/admin/overview`) ────────────────────────
-  if (normalized.includes("count(*) as total_smes") || (normalized.includes("count(*)") && normalized.includes("from users where role = 'sme_owner'"))) {
+  if (normalized.includes("count(*) as total_smes") || (normalized.includes("count(*)") && normalized.includes("from users where role"))) {
     const smes = memoryStore.users.filter(u => ['sme_owner', 'admin'].includes(u.role) && !['pulse_admin'].includes(u.role));
     const new7d = smes.filter(u => new Date(u.created_at) >= new Date(Date.now() - 7 * 86400000)).length;
     const new30d = smes.filter(u => new Date(u.created_at) >= new Date(Date.now() - 30 * 86400000)).length;
@@ -396,6 +398,105 @@ async function executeQuery(text, params = []) {
     };
   }
 
+  // ─── IDEMPOTENCY CHECK IN SALES (`POST /api/sales`) ────────────────────────
+  if (normalized.includes("from sales") && normalized.includes("idempotency_key")) {
+    const key = params[0] ? String(params[0]) : "";
+    const ownerId = params[1] !== undefined ? parseInt(params[1]) : null;
+    const match = memoryStore.sales.find(s => s.idempotency_key === key && (ownerId === null || s.owner_id === ownerId));
+    return { rows: match ? [match] : [], rowCount: match ? 1 : 0 };
+  }
+
+  // ─── SALES QUERIES (`GET /api/sales`) ───────────────────────────────────────
+  if (normalized.includes("from sales")) {
+    // Check if it's the stats summary query (count, revenue, avg_sale)
+    if (normalized.includes("coalesce(sum(s.total_amount),0) as revenue") || normalized.includes("sum(total_amount)")) {
+      let filtered = memoryStore.sales.filter(s => !s.is_voided);
+      if (params.length > 0 && typeof params[0] === "number") {
+        filtered = filtered.filter(s => s.owner_id === params[0] || s.user_id === params[0]);
+      }
+      const rev = filtered.reduce((sum, s) => sum + (Number(s.total_amount) || 0), 0);
+      const cnt = filtered.length;
+      const avg = cnt > 0 ? Math.round(rev / cnt) : 0;
+      return { rows: [{ count: cnt, revenue: rev, avg_sale: avg }], rowCount: 1 };
+    }
+
+    // Check if it's a simple count query
+    if (normalized.startsWith("select count(*)")) {
+      let filtered = memoryStore.sales.filter(s => !s.is_voided);
+      if (params.length > 0 && typeof params[0] === "number") {
+        filtered = filtered.filter(s => s.owner_id === params[0] || s.user_id === params[0]);
+      }
+      return { rows: [{ count: filtered.length }], rowCount: 1 };
+    }
+
+    // Single sale lookup by id: `WHERE s.id = $1`
+    if (normalized.includes("where s.id=$1") || normalized.includes("where s.id = $1")) {
+      const targetId = parseInt(params[0]);
+      const sale = memoryStore.sales.find(s => s.id === targetId);
+      return { rows: sale ? [sale] : [], rowCount: sale ? 1 : 0 };
+    }
+
+    // Full list query
+    let filtered = memoryStore.sales.filter(s => !s.is_voided);
+    if (params.length > 0 && typeof params[0] === "number") {
+      // If tenant filtered
+      filtered = filtered.filter(s => s.owner_id === params[0] || s.user_id === params[0]);
+    }
+    return { rows: filtered, rowCount: filtered.length };
+  }
+
+  // ─── STOCK QUERIES (`GET /api/stock`) ──────────────────────────────────────
+  if (normalized.includes("from stock_items")) {
+    if (normalized.startsWith("select count(*)")) {
+      let filtered = memoryStore.stock_items.filter(s => s.is_active);
+      if (params.length > 0 && typeof params[0] === "number") {
+        filtered = filtered.filter(s => s.owner_id === params[0]);
+      }
+      return { rows: [{ count: filtered.length }], rowCount: 1 };
+    }
+    if (normalized.includes("any($1)") || normalized.includes("where id = any")) {
+      const ids = Array.isArray(params[0]) ? params[0].map(Number) : [];
+      const matches = memoryStore.stock_items.filter(s => ids.includes(s.id));
+      return { rows: matches, rowCount: matches.length };
+    }
+    let filtered = memoryStore.stock_items.filter(s => s.is_active);
+    if (params.length > 0 && typeof params[0] === "number") {
+      filtered = filtered.filter(s => s.owner_id === params[0]);
+    }
+    return { rows: filtered, rowCount: filtered.length };
+  }
+
+  // ─── EXPENSES QUERIES (`GET /api/expenses`) ────────────────────────────────
+  if (normalized.includes("from expenses")) {
+    if (normalized.includes("coalesce(sum(amount),0) as total_sum") || normalized.includes("count(*) as count")) {
+      let filtered = memoryStore.expenses;
+      if (params.length > 0 && typeof params[0] === "number") {
+        filtered = filtered.filter(e => e.owner_id === params[0]);
+      }
+      const sum = filtered.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
+      return { rows: [{ count: filtered.length, total_sum: sum }], rowCount: 1 };
+    }
+    if (normalized.includes("group by category")) {
+      return { rows: [], rowCount: 0 };
+    }
+    let filtered = memoryStore.expenses;
+    if (params.length > 0 && typeof params[0] === "number") {
+      filtered = filtered.filter(e => e.owner_id === params[0]);
+    }
+    return { rows: filtered, rowCount: filtered.length };
+  }
+
+  // ─── CUSTOMERS QUERIES ─────────────────────────────────────────────────────
+  if (normalized.includes("from customers")) {
+    if (normalized.includes("lower(name) = lower($1)")) {
+      const name = String(params[0] || "").toLowerCase().trim();
+      const match = memoryStore.customers.find(c => c.name.toLowerCase().trim() === name);
+      return { rows: match ? [match] : [], rowCount: match ? 1 : 0 };
+    }
+    return { rows: memoryStore.customers, rowCount: memoryStore.customers.length };
+  }
+
+  // ─── USERS QUERIES ─────────────────────────────────────────────────────────
   if (normalized.includes("from users")) {
     if (params.length > 0 && typeof params[0] === "string" && params[0].includes("@")) {
       const email = params[0].toLowerCase().trim();
@@ -409,6 +510,7 @@ async function executeQuery(text, params = []) {
     return { rows: memoryStore.users, rowCount: memoryStore.users.length };
   }
 
+  // ─── SETTINGS QUERIES ──────────────────────────────────────────────────────
   if (normalized.includes("from settings")) {
     if (params.length > 0) {
       const match = memoryStore.settings.find(s => s.owner_id === params[0] || s.owner_id === parseInt(params[0]));
@@ -417,48 +519,59 @@ async function executeQuery(text, params = []) {
     return { rows: memoryStore.settings, rowCount: memoryStore.settings.length };
   }
 
-  if (normalized.includes("from stock_items")) {
-    return { rows: memoryStore.stock_items, rowCount: memoryStore.stock_items.length };
-  }
-
   if (normalized.includes("from suppliers")) {
     return { rows: memoryStore.suppliers, rowCount: memoryStore.suppliers.length };
   }
 
-  if (normalized.includes("from expenses")) {
-    return { rows: memoryStore.expenses, rowCount: memoryStore.expenses.length };
-  }
-
-  if (normalized.includes("from sales")) {
-    return { rows: memoryStore.sales, rowCount: memoryStore.sales.length };
-  }
-
-  if (normalized.includes("from customers")) {
-    return { rows: memoryStore.customers, rowCount: memoryStore.customers.length };
+  if (normalized.includes("from sale_items")) {
+    if (params.length > 0) {
+      const saleId = parseInt(params[0]);
+      const items = memoryStore.sale_items.filter(si => si.sale_id === saleId);
+      return { rows: items, rowCount: items.length };
+    }
+    return { rows: memoryStore.sale_items, rowCount: memoryStore.sale_items.length };
   }
 
   if (normalized.includes("insert into audit_log")) {
     return { rows: [{ id: 1 }], rowCount: 1 };
   }
 
+  // ─── INSERT INTO SALES ─────────────────────────────────────────────────────
   if (normalized.includes("insert into sales")) {
+    const nextSaleId = memoryStore.sales.length ? Math.max(...memoryStore.sales.map(s => s.id)) + 1 : 101;
     const newSale = {
-      id: memoryStore.sales.length + 1,
+      id: nextSaleId,
       user_id: params[0] || 1,
       customer_id: params[1] || 1,
       payment_method: params[2] || "cash",
-      total_amount: params[3] || 0,
+      total_amount: Number(params[3]) || 0,
       is_offline: params[4] || false,
       payment_reference: params[5] || null,
       payment_status: params[6] || "completed",
       owner_id: params[7] || 1,
+      idempotency_key: params[8] ? String(params[8]) : null,
       is_voided: false,
+      invoice_number: `INV-2026-${String(nextSaleId).padStart(3, "0")}`,
+      cashier_name: "Cashier",
+      customer_name: "Walk-in Customer",
+      items_count: 1,
       created_at: new Date().toISOString()
     };
-    memoryStore.sales.push(newSale);
+    memoryStore.sales.unshift(newSale);
     return { rows: [newSale], rowCount: 1 };
   }
 
+  // ─── INSERT INTO SALE_ITEMS ────────────────────────────────────────────────
+  if (normalized.includes("insert into sale_items")) {
+    return { rows: [{ id: 1 }], rowCount: 1 };
+  }
+
+  // ─── UPDATE STOCK_ITEMS ────────────────────────────────────────────────────
+  if (normalized.includes("update stock_items")) {
+    return { rows: [], rowCount: 1 };
+  }
+
+  // ─── INSERT INTO CUSTOMERS ─────────────────────────────────────────────────
   if (normalized.includes("insert into customers")) {
     const newCust = {
       id: memoryStore.customers.length + 1,
@@ -469,6 +582,7 @@ async function executeQuery(text, params = []) {
     return { rows: [newCust], rowCount: 1 };
   }
 
+  // ─── INSERT INTO INVOICES ──────────────────────────────────────────────────
   if (normalized.includes("insert into invoices")) {
     const inv = {
       id: memoryStore.sales.length + 100,
@@ -479,7 +593,7 @@ async function executeQuery(text, params = []) {
     return { rows: [inv], rowCount: 1 };
   }
 
-  if (normalized.includes("insert into sale_items") || normalized.includes("insert into accounts_receivable")) {
+  if (normalized.includes("insert into accounts_receivable")) {
     return { rows: [{ id: 1 }], rowCount: 1 };
   }
 
