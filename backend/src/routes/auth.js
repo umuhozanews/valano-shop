@@ -90,8 +90,6 @@ router.post("/login", async (req, res, next) => {
 router.get("/inspect-user", async (req, res, next) => {
   try {
     const targetEmail = String(req.query.email || "umuhozanews@gmail.com").toLowerCase().trim();
-    
-    const { Client, Pool } = require("pg");
     const rawConn = (
       process.env.POSTGRES_URL_NON_POOLING ||
       process.env.DATABASE_URL ||
@@ -100,78 +98,27 @@ router.get("/inspect-user", async (req, res, next) => {
       ""
     ).trim();
 
-    const attempts = {};
-
-    // Attempt A: pg.Pool with rejectUnauthorized: false
+    let parsedUrl = {};
     try {
-      const poolA = new Pool({
-        connectionString: rawConn,
-        ssl: { rejectUnauthorized: false },
-        connectionTimeoutMillis: 10000,
-      });
-      const resA = await poolA.query(
-        `SELECT id, email, name, role, profile_complete, google_linked, google_auth,
-                password_hash IS NOT NULL AS has_password, created_at
-         FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
-        [targetEmail]
-      );
-      attempts.poolWithSSL = { status: "SUCCESS", count: resA.rows.length, rows: resA.rows };
-      await poolA.end().catch(() => {});
-    } catch (eA) {
-      attempts.poolWithSSL = { status: "ERROR", error: eA.message, code: eA.code };
+      if (rawConn) {
+        const u = new URL(rawConn);
+        parsedUrl = {
+          protocol: u.protocol,
+          host: u.hostname,
+          port: u.port,
+          pathname: u.pathname,
+          search: u.search,
+          username: u.username,
+        };
+      }
+    } catch (parseErr) {
+      parsedUrl = { error: parseErr.message };
     }
-
-    // Attempt B: pg.Pool without ssl config (in case SSL is not required or handled by URL)
-    try {
-      const poolB = new Pool({
-        connectionString: rawConn,
-        connectionTimeoutMillis: 10000,
-      });
-      const resB = await poolB.query(
-        `SELECT id, email, name, role, profile_complete, google_linked, google_auth,
-                password_hash IS NOT NULL AS has_password, created_at
-         FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
-        [targetEmail]
-      );
-      attempts.poolWithoutSSL = { status: "SUCCESS", count: resB.rows.length, rows: resB.rows };
-      await poolB.end().catch(() => {});
-    } catch (eB) {
-      attempts.poolWithoutSSL = { status: "ERROR", error: eB.message, code: eB.code };
-    }
-
-    // Attempt C: Clean connection string without search params
-    try {
-      const cleanUrl = rawConn.split("?")[0];
-      const poolC = new Pool({
-        connectionString: cleanUrl,
-        ssl: { rejectUnauthorized: false },
-        connectionTimeoutMillis: 10000,
-      });
-      const resC = await poolC.query(
-        `SELECT id, email, name, role, profile_complete, google_linked, google_auth,
-                password_hash IS NOT NULL AS has_password, created_at
-         FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
-        [targetEmail]
-      );
-      attempts.poolCleanUrlSSL = { status: "SUCCESS", count: resC.rows.length, rows: resC.rows };
-      await poolC.end().catch(() => {});
-    } catch (eC) {
-      attempts.poolCleanUrlSSL = { status: "ERROR", error: eC.message, code: eC.code };
-    }
-
-    const { rows } = await pool.query(
-      `SELECT id, email, name, role, profile_complete, google_linked, google_auth,
-              password_hash IS NOT NULL AS has_password, created_at
-       FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
-      [targetEmail]
-    );
 
     res.json({
       targetEmail,
-      dbHost: rawConn ? (rawConn.match(/@([^:\/]+)/)?.[1] || "configured") : "none",
-      attempts,
-      poolDefaultCount: rows.length,
-      poolDefaultRows: rows
+      parsedUrl,
+      availableEnvKeys: Object.keys(process.env).filter(k => k.includes("POSTGRES") || k.includes("DATABASE") || k.includes("VERCEL")),
     });
   } catch (err) { next(err); }
 });
