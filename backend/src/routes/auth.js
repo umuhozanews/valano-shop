@@ -86,6 +86,34 @@ router.post("/login", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ─── Direct Database Diagnostic & Inspection Endpoints ───────────────────────
+router.get("/inspect-user", async (req, res, next) => {
+  try {
+    const targetEmail = String(req.query.email || "umuhozanews@gmail.com").toLowerCase().trim();
+    const { rows } = await pool.query(
+      `SELECT id, email, name, profile_complete, google_linked, google_auth,
+              password_hash IS NOT NULL AS has_password, created_at
+       FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
+      [targetEmail]
+    );
+    res.json({ targetEmail, count: rows.length, rows });
+  } catch (err) { next(err); }
+});
+
+router.post("/fix-profile-complete", async (req, res, next) => {
+  try {
+    const targetEmail = String(req.body.email || "umuhozanews@gmail.com").toLowerCase().trim();
+    const { rows } = await pool.query(
+      `UPDATE users
+       SET profile_complete = true, google_linked = true, google_auth = true
+       WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))
+       RETURNING id, email, name, profile_complete, google_linked, google_auth`,
+      [targetEmail]
+    );
+    res.json({ message: "Updated profile_complete", targetEmail, rows });
+  } catch (err) { next(err); }
+});
+
 const { OAuth2Client } = require("google-auth-library");
 const { GOOGLE_CLIENT_ID } = require("../config/env");
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
