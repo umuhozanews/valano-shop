@@ -17,30 +17,69 @@ if (!connectionString && !isLocalDevMode) {
   throw new Error(errMsg);
 }
 
-let pool = null;
-if (connectionString) {
+function createPool() {
+  if (!connectionString) return null;
   const cleanConnStr = connectionString.replace(/[?&]sslmode=[^&]*/gi, "").replace(/\?$/, "");
   const isLocal = /localhost|127\.0\.0\.1/.test(cleanConnStr);
 
   try {
-    pool = new Pool({
+    const p = new Pool({
       connectionString: cleanConnStr,
       ssl: isLocal ? false : { rejectUnauthorized: false },
-      max: parseInt(process.env.PG_POOL_MAX || "5", 10),
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
-      keepAlive: true,
+      max: parseInt(process.env.PG_POOL_MAX || "2", 10),
+      idleTimeoutMillis: 3000,
+      connectionTimeoutMillis: 10000,
+      allowExitOnIdle: true,
     });
-    pool.on("error", (err) => {
-      console.error("[PG POOL ERROR]", err.message);
+
+    p.on("error", (err) => {
+      console.warn("[PG POOL IDLE CLIENT RECOVERED]", err.message);
     });
+
+    return p;
   } catch (e) {
     console.error("[PG POOL INITIALIZATION FAILED]", e.message);
-    pool = null;
+    return null;
   }
 }
 
-// In-Memory Database Fallback Store
+let pool = createPool();
+
+const TRANSIENT_PATTERNS = [
+  "connection terminated",
+  "client was closed",
+  "terminating connection",
+  "econnreset",
+  "etimedout",
+  "epipe",
+  "connection closed",
+  "broken pipe",
+  "timeout",
+  "57p01",
+  "57p02",
+  "57p03",
+  "08006",
+  "08001",
+  "08004",
+];
+
+function isTransient(err) {
+  if (!err) return false;
+  const msg = String(err.message || "").toLowerCase();
+  const code = String(err.code || "").toLowerCase();
+  return TRANSIENT_PATTERNS.some((p) => msg.includes(p) || code === p);
+}
+
+function formatDbError(err) {
+  console.error("[PG QUERY ERROR]", err.message);
+  const dbErr = new Error(`Database query failed: ${err.message}`);
+  dbErr.status = 503;
+  dbErr.code = err.code || "DB_UNAVAILABLE";
+  dbErr.expose = true;
+  return dbErr;
+}
+
+// In-Memory Database Fallback Store (Offline Local Dev)
 const memoryStore = {
   users: [
     {
@@ -132,12 +171,25 @@ async function executeQuery(text, params = []) {
     try {
       return await pool.query(text, params);
     } catch (err) {
-      console.error("[PG QUERY ERROR]", err.message);
-      const dbErr = new Error(`Database query failed: ${err.message}`);
-      dbErr.status = 503;
-      dbErr.code = err.code || "DB_UNAVAILABLE";
-      dbErr.expose = true;
-      throw dbErr;
+      if (isTransient(err)) {
+        console.warn("[PG RETRY] Transient connection error detected:", err.message, "Retrying query...");
+        try {
+          return await pool.query(text, params);
+        } catch (retryErr) {
+          if (isTransient(retryErr)) {
+            console.warn("[PG RE-INIT] Recreating pool after connection drop...");
+            try {
+              pool.end().catch(() => {});
+            } catch {}
+            pool = createPool();
+            if (pool) {
+              return await pool.query(text, params);
+            }
+          }
+          throw formatDbError(retryErr);
+        }
+      }
+      throw formatDbError(err);
     }
   }
 
@@ -277,7 +329,6 @@ async function executeQuery(text, params = []) {
     return { rows: [{ count: 0 }], rowCount: 1 };
   }
 
-  // Default empty response for unknown queries to prevent crashes
   return { rows: [], rowCount: 0 };
 }
 
