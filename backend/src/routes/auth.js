@@ -251,17 +251,30 @@ router.post("/complete-setup", verifyToken, async (req, res, next) => {
 
     logAudit(req.user.id, "COMPLETE_SHOP_SETUP", "users", req.user.id, null, { shop_name: cleanShopName }, req.ip).catch(() => {});
 
-    // Send Welcome & Admin Alert Emails now that full details exist
-    sendWelcomeEmail(safeUser.email, safeUser.name, cleanShopName, { sector: cleanSector }).catch(() => {});
-    sendAdminSignupAlert({
-      name: safeUser.name,
-      email: safeUser.email,
-      phone: cleanPhone,
-      shop_name: cleanShopName,
-      sector: cleanSector,
-      role: safeUser.role || "sme_owner",
-      ip: req.ip,
-    }).catch(() => {});
+    // Send Welcome & Admin Alert Emails (awaited with Promise.allSettled so serverless runtime doesn't terminate before dispatch)
+    try {
+      await Promise.allSettled([
+        sendWelcomeEmail(safeUser.email, safeUser.name, cleanShopName, {
+          sector: cleanSector,
+          district: cleanDistrict,
+          phone: cleanPhone,
+          currency: cleanCurrency,
+        }),
+        sendAdminSignupAlert({
+          name: safeUser.name,
+          email: safeUser.email,
+          phone: cleanPhone,
+          shop_name: cleanShopName,
+          sector: cleanSector,
+          district: cleanDistrict,
+          currency: cleanCurrency,
+          role: safeUser.role || "sme_owner",
+          ip: req.ip,
+        })
+      ]);
+    } catch (mailErr) {
+      console.error("[MAIL ERROR] Complete setup email dispatch exception:", mailErr.message);
+    }
 
     res.json({
       message: "Shop setup completed successfully",
@@ -519,32 +532,32 @@ const handleRegister = async (req, res, next) => {
 
     await logAudit(user.id, "REGISTER", "users", user.id, null, { email: normalizedEmail, role: targetRole, businessName: orgOrBusinessName }, req.ip);
 
-    // Send Welcome & Confirmation Email to user's registered email address
-    sendWelcomeEmail(normalizedEmail, fullName, orgOrBusinessName, {
-      currency: req.body.currency,
-      sector: sectorStr,
-      district,
-      phone: phone ? String(phone).trim() : null,
-    }).catch(e => {
-      console.error("[MAIL ERROR] Background welcome email dispatch failed:", e.message);
-    });
-
-    // Send immediate Admin Alert Email about the new registration
-    sendAdminSignupAlert({
-      name: fullName,
-      email: normalizedEmail,
-      phone: phone ? String(phone).trim() : "N/A",
-      shop_name: orgOrBusinessName,
-      sector: sectorStr,
-      district: district || null,
-      location: req.body.location || district || null,
-      currency: req.body.currency || "RWF",
-      referralCode: req.body.referralCode || "DIRECT",
-      role: targetRole,
-      ip: req.ip,
-    }).catch(e => {
-      console.error("[MAIL ERROR] Background admin signup alert dispatch failed:", e.message);
-    });
+    // Send Welcome & Admin Alert Emails (awaited with Promise.allSettled so serverless function keeps execution alive)
+    try {
+      await Promise.allSettled([
+        sendWelcomeEmail(normalizedEmail, fullName, orgOrBusinessName, {
+          currency: req.body.currency || "RWF",
+          sector: sectorStr,
+          district,
+          phone: phone ? String(phone).trim() : null,
+        }),
+        sendAdminSignupAlert({
+          name: fullName,
+          email: normalizedEmail,
+          phone: phone ? String(phone).trim() : "N/A",
+          shop_name: orgOrBusinessName,
+          sector: sectorStr,
+          district: district || null,
+          location: req.body.location || district || null,
+          currency: req.body.currency || "RWF",
+          referralCode: req.body.referralCode || "DIRECT",
+          role: targetRole,
+          ip: req.ip,
+        })
+      ]);
+    } catch (mailErr) {
+      console.error("[MAIL ERROR] Registration email dispatch exception:", mailErr.message);
+    }
 
     const { password_hash, otp_code, otp_expires_at, ...safe } = user;
     res.status(201).json({ accessToken, refreshToken, user: safe, businessName: orgOrBusinessName });
