@@ -16,9 +16,10 @@ function createInvoicePDF(res, { invoice, sale, items, settings, branch, custome
   const shopAddress = settings?.shop_address || sale?.shop_address || "Kigali, Rwanda";
   const shopPhone = settings?.shop_phone || sale?.shop_phone || "";
   const shopEmail = settings?.shop_email || sale?.shop_email || "";
-  const tinNumber = settings?.tin_number || "TIN Pending";
-  const sdcId = settings?.sdc_id || "SDC010013000";
-  const mrcNumber = settings?.mrc_number || "MIS00013705";
+  const hasEbm = Boolean(settings?.has_ebm) || (Boolean(settings?.tin_number) && settings?.tin_number !== "TIN Pending");
+  const tinNumber = hasEbm ? settings?.tin_number : null;
+  const sdcId = hasEbm ? (settings?.sdc_id || "SDC010013000") : null;
+  const mrcNumber = hasEbm ? (settings?.mrc_number || "MIS00013705") : null;
   const cashierName = sale?.cashier_name || sale?.done_by || "Store Manager";
 
   // Header bar
@@ -27,16 +28,21 @@ function createInvoicePDF(res, { invoice, sale, items, settings, branch, custome
      .text(shopName.toUpperCase(), 50, 18);
   doc.fontSize(9).font("Helvetica")
      .text(shopAddress, 50, 42)
-     .text(`TEL: ${shopPhone}${shopEmail ? ` | EMAIL: ${shopEmail}` : ''}`, 50, 54)
-     .text(`TIN: ${tinNumber} | CASHIER: ${cashierName}`, 50, 66);
+     .text(`TEL: ${shopPhone}${shopEmail ? ` | EMAIL: ${shopEmail}` : ''}`, 50, 54);
+  
+  if (hasEbm) {
+    doc.text(`TIN: ${tinNumber} | CASHIER: ${cashierName}`, 50, 66);
+  } else {
+    doc.text(`CASHIER: ${cashierName}`, 50, 66);
+  }
 
   doc.fillColor(dark);
 
-  // Fiscal Invoice info
+  // Fiscal or Commercial Invoice info
   const y = 105;
-  doc.fontSize(16).font("Helvetica-Bold").text("RRA EBM v2 FISCAL RECEIPT", 50, y);
+  doc.fontSize(16).font("Helvetica-Bold").text(hasEbm ? "RRA EBM v2 FISCAL RECEIPT" : "OFFICIAL COMMERCIAL INVOICE", 50, y);
   doc.fontSize(9).font("Helvetica");
-  doc.fillColor(gray).text("Receipt Number:", 50, y + 24);
+  doc.fillColor(gray).text(hasEbm ? "Receipt Number:" : "Invoice Number:", 50, y + 24);
   doc.fillColor(dark).text(invoice?.invoice_number || `${sale?.id}/CS`, 160, y + 24);
   doc.fillColor(gray).text("Date & Time:", 50, y + 38);
   doc.fillColor(dark).text(new Date(invoice?.issued_at || sale?.created_at || Date.now()).toLocaleString("en-RW"), 160, y + 38);
@@ -105,24 +111,34 @@ function createInvoicePDF(res, { invoice, sale, items, settings, branch, custome
 
   rowY += 125;
 
-  // SDC Information Footer
-  const seed = (sale?.id || 1) * 99991;
-  const rawHash = (Math.abs(Math.sin(seed) * 100000000).toString(36) + "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789").toUpperCase();
-  const internalData = `${rawHash.slice(0,4)}-${rawHash.slice(4,8)}-${rawHash.slice(8,12)}-${rawHash.slice(12,16)}-${rawHash.slice(16,20)}-${rawHash.slice(20,24)}-${rawHash.slice(24,27)}CS`;
-  const receiptSignature = `${rawHash.slice(3,7)}-${rawHash.slice(7,11)}-${rawHash.slice(11,15)}-${rawHash.slice(15,19)}`;
+  if (hasEbm) {
+    // SDC Information Footer for EBM Fiscal Receipts
+    const seed = (sale?.id || 1) * 99991;
+    const rawHash = (Math.abs(Math.sin(seed) * 100000000).toString(36) + "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789").toUpperCase();
+    const internalData = `${rawHash.slice(0,4)}-${rawHash.slice(4,8)}-${rawHash.slice(8,12)}-${rawHash.slice(12,16)}-${rawHash.slice(16,20)}-${rawHash.slice(20,24)}-${rawHash.slice(24,27)}CS`;
+    const receiptSignature = `${rawHash.slice(3,7)}-${rawHash.slice(7,11)}-${rawHash.slice(11,15)}-${rawHash.slice(15,19)}`;
 
-  doc.rect(50, rowY, doc.page.width - 100, 115).strokeColor("#E5E7EB").stroke();
-  doc.fillColor(gray).font("Helvetica-Bold").fontSize(9)
-     .text("SDC INFORMATION", 60, rowY + 8);
+    doc.rect(50, rowY, doc.page.width - 100, 115).strokeColor("#E5E7EB").stroke();
+    doc.fillColor(gray).font("Helvetica-Bold").fontSize(9)
+       .text("SDC INFORMATION", 60, rowY + 8);
 
-  doc.font("Helvetica").fontSize(8).fillColor(dark);
-  doc.text(`SDC ID: ${sdcId} | RECEIPT NUMBER: ${sale?.id || '3671'}/${sale?.id || '3671'}CS`, 60, rowY + 24);
-  doc.text(`Internal Data: ${internalData}`, 60, rowY + 38);
-  doc.text(`Receipt Signature: ${receiptSignature}`, 60, rowY + 52);
-  doc.text(`MRC: ${mrcNumber} | ITEM NUMBER: ${items?.length || 0}`, 60, rowY + 66);
-  
-  doc.fillColor(emerald).font("Helvetica-Bold").fontSize(9)
-     .text("End of Legal Receipt — Powered by EBM v2", 60, rowY + 90, { align: "center" });
+    doc.font("Helvetica").fontSize(8).fillColor(dark);
+    doc.text(`SDC ID: ${sdcId || 'SDC010013000'} | RECEIPT NUMBER: ${sale?.id || '3671'}/${sale?.id || '3671'}CS`, 60, rowY + 24);
+    doc.text(`Internal Data: ${internalData}`, 60, rowY + 38);
+    doc.text(`Receipt Signature: ${receiptSignature}`, 60, rowY + 52);
+    doc.text(`MRC: ${mrcNumber || 'MIS00013705'} | ITEM NUMBER: ${items?.length || 0}`, 60, rowY + 66);
+    
+    doc.fillColor(emerald).font("Helvetica-Bold").fontSize(9)
+       .text("End of Legal Receipt — Powered by EBM v2", 60, rowY + 90, { align: "center" });
+  } else {
+    // Clean Commercial Verification Seal
+    doc.rect(50, rowY, doc.page.width - 100, 70).strokeColor("#E5E7EB").stroke();
+    doc.fillColor(emerald).font("Helvetica-Bold").fontSize(10)
+       .text("OFFICIAL STORE RECEIPT & COMMERCIAL RECORD", 60, rowY + 14, { align: "center" });
+    doc.fillColor(gray).font("Helvetica").fontSize(8)
+       .text(`Issued by ${shopName} • ${shopAddress}`, 60, rowY + 32, { align: "center" })
+       .text("Thank you for your valued business! Generated via INZIRA SME Platform", 60, rowY + 46, { align: "center" });
+  }
 
   doc.end();
 }

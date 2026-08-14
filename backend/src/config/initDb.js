@@ -422,16 +422,17 @@ ALTER TABLE expenses ADD COLUMN IF NOT EXISTS supplier_id INTEGER;
 ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sent_via_sms BOOLEAN DEFAULT false;
 ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sms_sent_at TIMESTAMP;
 
--- Settings: add language, currency and location defaults and EBM fiscal details
+-- Settings: add language, currency, location defaults, and dynamic EBM fiscal details
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'RWF';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS language VARCHAR(5) DEFAULT 'en';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS sector_default VARCHAR(50);
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS district_default VARCHAR(50);
-ALTER TABLE settings ADD COLUMN IF NOT EXISTS tin_number VARCHAR(20) DEFAULT '103777856';
-ALTER TABLE settings ADD COLUMN IF NOT EXISTS sdc_id VARCHAR(30) DEFAULT 'SDC010013000';
-ALTER TABLE settings ADD COLUMN IF NOT EXISTS mrc_number VARCHAR(30) DEFAULT 'MIS00013705';
-ALTER TABLE settings ADD COLUMN IF NOT EXISTS shop_email VARCHAR(100) DEFAULT 'andrenikobatuye@gmail.com';
-ALTER TABLE settings ADD COLUMN IF NOT EXISTS cashier_tin VARCHAR(20) DEFAULT '103777856';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS has_ebm BOOLEAN DEFAULT false;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS tin_number VARCHAR(20);
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS sdc_id VARCHAR(30);
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS mrc_number VARCHAR(30);
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS shop_email VARCHAR(100);
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS cashier_tin VARCHAR(20);
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS vat_rate DECIMAL(5,2) DEFAULT 18.00;
 
 -- Customers: add tin_number for EBM receipt client TIN
