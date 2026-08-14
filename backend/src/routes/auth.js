@@ -122,36 +122,64 @@ router.post("/google", async (req, res, next) => {
       return res.status(401).json({ error: "Google account email is unverified or missing" });
     }
 
-    const cleanEmail = payload.email.toLowerCase().trim();
+    const cleanEmail = String(payload.email || "").toLowerCase().trim();
     const googleName = (payload.name || cleanEmail.split("@")[0]).trim();
 
-    // Ensure database columns for Google OAuth & Unique constraint exist
+    // Ensure database columns for Google OAuth & profile status exist
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_auth BOOLEAN DEFAULT false`).catch(() => {});
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_linked BOOLEAN DEFAULT false`).catch(() => {});
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_complete BOOLEAN DEFAULT true`).catch(() => {});
     await pool.query(`ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL`).catch(() => {});
 
+    // Lookup existing user by exact normalized trimmed email
+    const existingUser = await pool.query(
+      "SELECT * FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM($1)) LIMIT 1",
+      [cleanEmail]
+    );
+
+    let user;
     let isNewRegistration = false;
-    let { rows: [user] } = await pool.query("SELECT * FROM users WHERE LOWER(email)=$1", [cleanEmail]);
 
     console.log("=== [GOOGLE AUTH DEBUG LOG START] ===");
     console.log("1. Verified Payload Email:", payload.email);
     console.log("2. Verified email_verified Flag:", payload.email_verified);
     console.log("3. Clean Normalized Email:", cleanEmail);
     console.log("4. Google User Full Name:", googleName);
-    console.log("5. Existing DB User Record:", user ? {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      profile_complete: user.profile_complete,
-      google_auth: user.google_auth,
-      google_linked: user.google_linked,
+    console.log("5. Existing DB User Record:", existingUser.rows[0] ? {
+      id: existingUser.rows[0].id,
+      name: existingUser.rows[0].name,
+      email: existingUser.rows[0].email,
+      role: existingUser.rows[0].role,
+      profile_complete: existingUser.rows[0].profile_complete,
+      google_auth: existingUser.rows[0].google_auth,
+      google_linked: existingUser.rows[0].google_linked,
     } : "NONE_FOUND (Treating as new Google signup)");
     console.log("=== [GOOGLE AUTH DEBUG LOG END] ===");
 
-    if (!user) {
-      // Case (a): Brand New Google User -> Create account with profile_complete = false
+    if (existingUser.rows[0]) {
+      // EXISTING USER — log in directly, do not touch their data, do not send to setup
+      user = existingUser.rows[0];
+      isNewRegistration = false;
+
+      if (!user.google_linked || !user.google_auth) {
+        // First time using Google for an existing email/password account — link it
+        await pool.query(
+          "UPDATE users SET google_linked = true, google_auth = true WHERE id = $1",
+          [user.id]
+        ).catch(() => {});
+        user.google_linked = true;
+        user.google_auth = true;
+      }
+
+      // Existing accounts must retain profile_complete = true so they are never forced to setup
+      if (user.profile_complete === null || user.profile_complete === undefined || user.password_hash) {
+        user.profile_complete = true;
+        await pool.query("UPDATE users SET profile_complete = true WHERE id = $1", [user.id]).catch(() => {});
+      }
+
+      logAudit(user.id, "LOGIN_GOOGLE", "users", user.id, null, { email: cleanEmail }, req.ip).catch(() => {});
+    } else {
+      // TRULY NEW USER — create account, THEN require shop setup
       isNewRegistration = true;
       try {
         const { rows: [created] } = await pool.query(
@@ -162,24 +190,16 @@ router.post("/google", async (req, res, next) => {
         );
         user = created;
       } catch (dbConflictErr) {
-        // Fallback for double-click / concurrent registration race condition
-        const { rows: [existing] } = await pool.query("SELECT * FROM users WHERE LOWER(email)=$1", [cleanEmail]);
+        // Fallback for concurrent registration race condition
+        const { rows: [existing] } = await pool.query(
+          "SELECT * FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM($1)) LIMIT 1",
+          [cleanEmail]
+        );
         user = existing;
       }
       if (user) {
         logAudit(user.id, "REGISTER_GOOGLE", "users", user.id, null, { email: cleanEmail }, req.ip).catch(() => {});
       }
-    } else if (!user.google_linked || !user.google_auth) {
-      // Case (b): Existing user logging in via verified Google email -> Link Account
-      await pool.query(
-        "UPDATE users SET google_linked = true WHERE id = $1",
-        [user.id]
-      ).catch(() => {});
-      user.google_linked = true;
-      logAudit(user.id, "LINK_GOOGLE_ACCOUNT", "users", user.id, null, { email: cleanEmail }, req.ip).catch(() => {});
-    } else {
-      // Case (c): Returning Google User -> Simple Login
-      logAudit(user.id, "LOGIN_GOOGLE", "users", user.id, null, { email: cleanEmail }, req.ip).catch(() => {});
     }
 
     if (!user) {
@@ -197,7 +217,7 @@ router.post("/google", async (req, res, next) => {
 
     // For returning Google users, send standard login alert
     if (!isNewRegistration) {
-      sendLoginAlert(cleanEmail, googleName, req.ip).catch(e => {
+      sendLoginAlert(cleanEmail, user.name || googleName, req.ip).catch(e => {
         console.error("[MAIL ERROR] Background Google login alert failed:", e.message);
       });
     }
