@@ -90,17 +90,63 @@ router.post("/login", async (req, res, next) => {
 router.get("/inspect-user", async (req, res, next) => {
   try {
     const targetEmail = String(req.query.email || "umuhozanews@gmail.com").toLowerCase().trim();
+    
+    // Test direct pg.Client to see if PostgreSQL is reachable directly
+    const { Client } = require("pg");
+    const rawConn = (
+      process.env.POSTGRES_URL_NON_POOLING ||
+      process.env.DATABASE_URL ||
+      process.env.POSTGRES_PRISMA_URL ||
+      process.env.POSTGRES_URL ||
+      ""
+    ).trim();
+
+    let directPgStatus = "not_attempted";
+    let directPgError = null;
+    let directPgRows = [];
+
+    if (rawConn) {
+      const isLocal = /localhost|127\.0\.0\.1/.test(rawConn);
+      const testClient = new Client({
+        connectionString: rawConn,
+        ssl: isLocal ? false : { rejectUnauthorized: false },
+        connectionTimeoutMillis: 7000,
+      });
+      try {
+        await testClient.connect();
+        const queryRes = await testClient.query(
+          `SELECT id, email, name, role, profile_complete, google_linked, google_auth,
+                  password_hash IS NOT NULL AS has_password, created_at
+           FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
+          [targetEmail]
+        );
+        directPgRows = queryRes.rows;
+        directPgStatus = "connected_and_queried";
+        await testClient.end().catch(() => {});
+      } catch (clientErr) {
+        directPgStatus = "error";
+        directPgError = clientErr.message;
+        await testClient.end().catch(() => {});
+      }
+    } else {
+      directPgStatus = "no_connection_string";
+    }
+
     const { rows } = await pool.query(
       `SELECT id, email, name, role, profile_complete, google_linked, google_auth,
               password_hash IS NOT NULL AS has_password, created_at
        FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
       [targetEmail]
     );
-    const { rows: allUsers } = await pool.query(
-      `SELECT id, email, name, role, profile_complete, google_linked, google_auth, created_at
-       FROM users ORDER BY id DESC LIMIT 25`
-    );
-    res.json({ targetEmail, count: rows.length, rows, recentUsers: allUsers });
+
+    res.json({
+      targetEmail,
+      directPgStatus,
+      directPgError,
+      directPgRows,
+      poolCount: rows.length,
+      poolRows: rows
+    });
   } catch (err) { next(err); }
 });
 
