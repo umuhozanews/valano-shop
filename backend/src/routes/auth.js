@@ -22,22 +22,19 @@ router.post("/login", async (req, res, next) => {
       return res.status(400).json({ error: "Email/Phone and password are required" });
     }
 
-    const normalizedEmail = rawIdentifier.toLowerCase();
     const cleanDigits = rawIdentifier.replace(/\D/g, "");
     const last9Digits = cleanDigits.length >= 9 ? cleanDigits.slice(-9) : cleanDigits;
-    const phoneFallbackEmail = cleanDigits ? `${cleanDigits}@inzira.rw` : "";
-    const last9FallbackEmail = last9Digits ? `${last9Digits}@inzira.rw` : "";
 
-    // Query user by normalized email, exact phone, clean phone digits, or last 9 digits of phone number
+    // Fast indexed query by email or phone
     const { rows } = await pool.query(
       `SELECT * FROM users
-       WHERE LOWER(email) = $1
+       WHERE LOWER(email) = LOWER($1)
+          OR (phone IS NOT NULL AND phone = $1)
           OR (phone IS NOT NULL AND phone = $2)
-          OR (email IS NOT NULL AND email = $3)
-          OR ($4 <> '' AND RIGHT(REGEXP_REPLACE(COALESCE(phone, ''), '\\D', 'g'), 9) = $4)
-          OR ($4 <> '' AND RIGHT(REGEXP_REPLACE(COALESCE(email, ''), '\\D', 'g'), 9) = $4)
-          OR (email IS NOT NULL AND email = $5)`,
-      [normalizedEmail, rawIdentifier, phoneFallbackEmail, last9Digits, last9FallbackEmail]
+          OR (phone IS NOT NULL AND RIGHT(phone, 9) = $3)
+          OR (email IS NOT NULL AND LOWER(email) = LOWER($4))
+       LIMIT 1`,
+      [rawIdentifier, `+${cleanDigits}`, last9Digits, `${cleanDigits}@inzira.rw`]
     );
     const user = rows[0];
 
