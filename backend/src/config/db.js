@@ -167,29 +167,38 @@ const memoryStore = {
 };
 
 async function executeQuery(text, params = []) {
-  if (pool) {
-    try {
-      return await pool.query(text, params);
-    } catch (err) {
-      if (isTransient(err)) {
-        console.warn("[PG RETRY] Transient connection error detected:", err.message, "Retrying query...");
-        try {
-          return await pool.query(text, params);
-        } catch (retryErr) {
-          if (isTransient(retryErr)) {
-            console.warn("[PG RE-INIT] Recreating pool after connection drop...");
-            try {
-              pool.end().catch(() => {});
-            } catch {}
-            pool = createPool();
-            if (pool) {
-              return await pool.query(text, params);
-            }
-          }
-          throw formatDbError(retryErr);
+  if (connectionString) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      let client = null;
+      try {
+        if (!pool) pool = createPool();
+        if (!pool) throw new Error("Database pool initialization failed");
+        
+        client = await pool.connect();
+        const res = await client.query(text, params);
+        return res;
+      } catch (err) {
+        if (client) {
+          try { client.release(true); } catch {}
+          client = null;
+        }
+
+        if (isTransient(err) && attempt < 3) {
+          console.warn(`[PG RETRY ${attempt}/3] Reconnecting after transient drop:`, err.message);
+          try {
+            if (pool) pool.end().catch(() => {});
+          } catch {}
+          pool = createPool();
+          await new Promise((r) => setTimeout(r, 150 * attempt));
+          continue;
+        }
+
+        throw formatDbError(err);
+      } finally {
+        if (client) {
+          try { client.release(); } catch {}
         }
       }
-      throw formatDbError(err);
     }
   }
 
