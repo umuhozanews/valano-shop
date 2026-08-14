@@ -40,19 +40,19 @@ router.post("/login", async (req, res, next) => {
 
     // Generic error for security (do not disclose whether account exists)
     if (!user) {
-      await logAudit(null, "LOGIN_FAILED", "users", null, null, { identifier: rawIdentifier }, req.ip);
+      logAudit(null, "LOGIN_FAILED", "users", null, null, { identifier: rawIdentifier }, req.ip).catch(() => {});
       return res.status(401).json({ error: "Invalid email/phone or password" });
     }
 
     // Explicit check for deactivated accounts
     if (user.is_active === false) {
-      await logAudit(user.id, "LOGIN_BLOCKED", "users", user.id, null, { reason: "account_deactivated" }, req.ip);
+      logAudit(user.id, "LOGIN_BLOCKED", "users", user.id, null, { reason: "account_deactivated" }, req.ip).catch(() => {});
       return res.status(403).json({ error: "Your account has been deactivated. Please contact support." });
     }
 
     // Protection for Google-Only Accounts (password_hash is NULL)
     if (!user.password_hash) {
-      await logAudit(user.id, "LOGIN_FAILED_GOOGLE_ONLY", "users", user.id, null, { reason: "password_login_attempted_on_google_account" }, req.ip);
+      logAudit(user.id, "LOGIN_FAILED_GOOGLE_ONLY", "users", user.id, null, { reason: "password_login_attempted_on_google_account" }, req.ip).catch(() => {});
       return res.status(400).json({
         error: "This account uses Google Sign-In. Please click 'Continue with Google' to log in.",
         code: "GOOGLE_AUTH_REQUIRED"
@@ -62,7 +62,7 @@ router.post("/login", async (req, res, next) => {
     // Always compare using bcrypt against stored hash
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
-      await logAudit(user.id, "LOGIN_FAILED", "users", user.id, null, { identifier: rawIdentifier }, req.ip);
+      logAudit(user.id, "LOGIN_FAILED", "users", user.id, null, { identifier: rawIdentifier }, req.ip).catch(() => {});
       return res.status(401).json({ error: "Invalid email/phone or password" });
     }
 
@@ -75,7 +75,7 @@ router.post("/login", async (req, res, next) => {
     const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: "15m" });
     const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, { expiresIn: "7d" });
 
-    await logAudit(user.id, "LOGIN", "users", user.id, null, { identifier: rawIdentifier }, req.ip);
+    logAudit(user.id, "LOGIN", "users", user.id, null, { identifier: rawIdentifier }, req.ip).catch(() => {});
 
     sendLoginAlert(user.email, user.name, req.ip).catch(e => {
       console.error("[MAIL ERROR] Background email dispatch failed:", e.message);
