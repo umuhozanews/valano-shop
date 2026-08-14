@@ -422,7 +422,8 @@ ALTER TABLE expenses ADD COLUMN IF NOT EXISTS supplier_id INTEGER;
 ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sent_via_sms BOOLEAN DEFAULT false;
 ALTER TABLE notifications ADD COLUMN IF NOT EXISTS sms_sent_at TIMESTAMP;
 
--- Settings: add language and location defaults and EBM fiscal details
+-- Settings: add language, currency and location defaults and EBM fiscal details
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'RWF';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS language VARCHAR(5) DEFAULT 'en';
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS sector_default VARCHAR(50);
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS district_default VARCHAR(50);
