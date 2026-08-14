@@ -40,8 +40,13 @@ const memoryStore = {
       password_hash: "$2a$10$sZG8ecQDj8qWGD1ZKHVxHuDbvfYeVBSgRwtz/nvAABTWo0iFie5Om",
       role: "sme_owner",
       phone: "+250780000002",
+      district: "Gasabo",
+      sector: "Retail & Groceries",
+      currency: "RWF",
+      profile_complete: true,
       is_active: true,
-      created_at: new Date().toISOString()
+      consent_status: "consented",
+      created_at: new Date(Date.now() - 30 * 86400000).toISOString()
     },
     {
       id: 2,
@@ -50,8 +55,13 @@ const memoryStore = {
       password_hash: "$2a$10$3nEecqT66.qN02W8y8Y0P.5Z9vA9oKk7q8x8G0P.5Z9vA9oKk7q8x", // rukundo2007
       role: "pulse_admin",
       phone: "+250780000001",
+      district: "Kigali",
+      sector: "Administration",
+      currency: "RWF",
+      profile_complete: true,
       is_active: true,
-      created_at: new Date().toISOString()
+      consent_status: "consented",
+      created_at: new Date(Date.now() - 60 * 86400000).toISOString()
     },
     {
       id: 3,
@@ -60,8 +70,13 @@ const memoryStore = {
       password_hash: "$2a$10$sZG8ecQDj8qWGD1ZKHVxHuDbvfYeVBSgRwtz/nvAABTWo0iFie5Om", // inzira2024
       role: "pulse_admin",
       phone: "+250780000004",
+      district: "Kigali",
+      sector: "Platform Administration",
+      currency: "RWF",
+      profile_complete: true,
       is_active: true,
-      created_at: new Date().toISOString()
+      consent_status: "consented",
+      created_at: new Date(Date.now() - 60 * 86400000).toISOString()
     },
     {
       id: 4,
@@ -70,22 +85,37 @@ const memoryStore = {
       password_hash: "$2a$10$sZG8ecQDj8qWGD1ZKHVxHuDbvfYeVBSgRwtz/nvAABTWo0iFie5Om", // inzira2024
       role: "cashier",
       phone: "+250780000003",
+      district: "Gasabo",
+      sector: "Retail",
+      currency: "RWF",
+      profile_complete: true,
       is_active: true,
-      created_at: new Date().toISOString()
+      consent_status: "consented",
+      created_at: new Date(Date.now() - 20 * 86400000).toISOString()
     }
   ],
   settings: [
-    { id: 1, shop_name: "Inzira SME Store", shop_address: "Kigali, Rwanda", shop_phone: "+250788123456", language: "en" }
+    {
+      id: 1,
+      owner_id: 1,
+      shop_name: "Inzira SME Store",
+      shop_address: "Gasabo, Kigali",
+      shop_phone: "+250780000002",
+      shop_email: "demo@inzira.rw",
+      currency: "RWF",
+      language: "en"
+    }
   ],
   stock_items: [
-    { id: 1, name: "Sugar 1kg", name_rw: "Isukari 1kg", category: "Groceries", unit: "kg", quantity: 50, cost_price_rwf: 1200, sell_price_rwf: 1500, low_stock_threshold: 10, is_active: true },
-    { id: 2, name: "Cooking Oil 1L", name_rw: "Amavuta 1L", category: "Groceries", unit: "litre", quantity: 30, cost_price_rwf: 2200, sell_price_rwf: 2800, low_stock_threshold: 5, is_active: true },
-    { id: 3, name: "Soap Bar", name_rw: "Isabuni", category: "Hygiene", unit: "pcs", quantity: 100, cost_price_rwf: 400, sell_price_rwf: 600, low_stock_threshold: 20, is_active: true },
-    { id: 4, name: "Rice 1kg", name_rw: "Umuceli 1kg", category: "Groceries", unit: "kg", quantity: 80, cost_price_rwf: 900, sell_price_rwf: 1200, low_stock_threshold: 15, is_active: true }
+    { id: 1, owner_id: 1, name: "Sugar 1kg", name_rw: "Isukari 1kg", category: "Groceries", unit: "kg", quantity: 50, cost_price_rwf: 1200, sell_price_rwf: 1500, low_stock_threshold: 10, is_active: true, created_at: new Date().toISOString() },
+    { id: 2, owner_id: 1, name: "Cooking Oil 1L", name_rw: "Amavuta 1L", category: "Groceries", unit: "litre", quantity: 30, cost_price_rwf: 2200, sell_price_rwf: 2800, low_stock_threshold: 5, is_active: true, created_at: new Date().toISOString() },
+    { id: 3, owner_id: 1, name: "Soap Bar", name_rw: "Isabuni", category: "Hygiene", unit: "pcs", quantity: 100, cost_price_rwf: 400, sell_price_rwf: 600, low_stock_threshold: 20, is_active: true, created_at: new Date().toISOString() },
+    { id: 4, owner_id: 1, name: "Rice 1kg", name_rw: "Umuceli 1kg", category: "Groceries", unit: "kg", quantity: 80, cost_price_rwf: 900, sell_price_rwf: 1200, low_stock_threshold: 15, is_active: true, created_at: new Date().toISOString() }
   ],
   sales: [
     {
       id: 101,
+      owner_id: 1,
       user_id: 1,
       customer_id: 1,
       cashier_name: "Demo Cashier",
@@ -94,11 +124,13 @@ const memoryStore = {
       payment_method: "cash",
       total_amount: 4500,
       payment_status: "completed",
+      is_voided: false,
       items_count: 2,
       created_at: new Date().toISOString()
     },
     {
       id: 102,
+      owner_id: 1,
       user_id: 1,
       customer_id: 1,
       cashier_name: "Demo Cashier",
@@ -107,17 +139,21 @@ const memoryStore = {
       payment_method: "mtn_momo",
       total_amount: 12800,
       payment_status: "completed",
+      is_voided: false,
       items_count: 3,
       created_at: new Date(Date.now() - 3600000).toISOString()
     }
   ],
   expenses: [],
   suppliers: [
-    { id: 1, name: "Inyange Industries", phone: "+250788200001", address: "Kigali", products_supplied: "Dairy" },
-    { id: 2, name: "Sulfo Rwanda", phone: "+250788200002", address: "Kigali", products_supplied: "Hygiene" }
+    { id: 1, owner_id: 1, name: "Inyange Industries", phone: "+250788200001", address: "Kigali", products_supplied: "Dairy" },
+    { id: 2, owner_id: 1, name: "Sulfo Rwanda", phone: "+250788200002", address: "Kigali", products_supplied: "Hygiene" }
   ],
   customers: [
-    { id: 1, name: "Walk-in Customer", phone: null, location: "Kigali", type: "retailer", segment: "new" }
+    { id: 1, owner_id: 1, name: "Walk-in Customer", phone: null, location: "Kigali", type: "retailer", segment: "new" }
+  ],
+  credit_scores: [
+    { id: 1, user_id: 1, score: 82, band: "green", calculated_at: new Date().toISOString() }
   ],
   audit_log: []
 };
@@ -166,39 +202,195 @@ async function executeQuery(text, params = []) {
     return { rows: [{ id: 1 }], rowCount: 1 };
   }
 
-  // Handle Aggregate / Count / KPI Queries first
-  if (normalized.includes("count(") || normalized.includes("sum(") || normalized.includes("avg(")) {
-    const totalUsers = memoryStore.users.length;
-    const totalSmes = memoryStore.users.filter(u => u.role === 'sme_owner').length || 1;
+  if (normalized.startsWith("alter table") || normalized.startsWith("create index") || normalized.startsWith("create unique index")) {
+    return { rows: [], rowCount: 0 };
+  }
+
+  // ─── INSERT INTO USERS ──────────────────────────────────────────────────────
+  if (normalized.includes("insert into users")) {
+    const isGoogle = normalized.includes("google_auth");
+    let name = params[0] || "New Merchant";
+    let email = (params[1] || `user_${Date.now()}@inzira.rw`).toLowerCase().trim();
+    let password_hash = isGoogle ? null : (params[2] || null);
+    let role = "sme_owner";
+    let phone = null;
+    let sector = null;
+    let district = null;
+    let currency = "RWF";
+    let profile_complete = !isGoogle; // Google users require setup, normal signup is complete
+
+    if (!isGoogle) {
+      // standard signup: (name, email, password_hash, role, phone, sector, district, currency, consent_status)
+      role = params[3] || "sme_owner";
+      phone = params[4] || null;
+      sector = params[5] || null;
+      district = params[6] || null;
+      currency = params[7] || "RWF";
+      profile_complete = true;
+    }
+
+    const nextId = memoryStore.users.length ? Math.max(...memoryStore.users.map(u => u.id)) + 1 : 1;
+    const newUser = {
+      id: nextId,
+      name,
+      email,
+      password_hash,
+      role,
+      phone,
+      sector,
+      district,
+      currency,
+      profile_complete,
+      is_active: true,
+      google_auth: isGoogle,
+      google_linked: isGoogle,
+      consent_status: "consented",
+      created_at: new Date().toISOString()
+    };
+
+    memoryStore.users.push(newUser);
+    return { rows: [newUser], rowCount: 1 };
+  }
+
+  // ─── UPDATE USERS ──────────────────────────────────────────────────────────
+  if (normalized.includes("update users")) {
+    if (params.length > 0) {
+      const targetId = params[params.length - 1];
+      const user = memoryStore.users.find(u => u.id === targetId || u.id === parseInt(targetId));
+      if (user) {
+        if (normalized.includes("profile_complete")) {
+          user.phone = params[0] || user.phone;
+          user.district = params[1] || user.district;
+          user.currency = params[2] || user.currency;
+          user.sector = params[3] || user.sector;
+          user.referral_code = params[4] || user.referral_code;
+          user.profile_complete = true;
+        } else if (normalized.includes("google_linked")) {
+          user.google_linked = true;
+        } else if (normalized.includes("is_active")) {
+          user.is_active = params[0];
+        } else if (normalized.includes("password_hash")) {
+          user.password_hash = params[0];
+        }
+        return { rows: [user], rowCount: 1 };
+      }
+    }
+    return { rows: [], rowCount: 0 };
+  }
+
+  // ─── INSERT / UPSERT SETTINGS ──────────────────────────────────────────────
+  if (normalized.includes("insert into settings")) {
+    const ownerId = params[0] || 1;
+    const shopName = params[1] || "My Shop";
+    const shopAddress = params[2] || "Kigali";
+    const shopPhone = params[3] || "";
+    const shopEmail = params[4] || "";
+    const curr = params[5] || "RWF";
+
+    let sett = memoryStore.settings.find(s => s.owner_id === ownerId || s.owner_id === parseInt(ownerId));
+    if (sett) {
+      sett.shop_name = shopName;
+      sett.shop_address = shopAddress;
+      sett.shop_phone = shopPhone;
+      sett.shop_email = shopEmail;
+      sett.currency = curr;
+    } else {
+      sett = {
+        id: memoryStore.settings.length + 1,
+        owner_id: parseInt(ownerId),
+        shop_name: shopName,
+        shop_address: shopAddress,
+        shop_phone: shopPhone,
+        shop_email: shopEmail,
+        currency: curr,
+        language: "en"
+      };
+      memoryStore.settings.push(sett);
+    }
+    return { rows: [sett], rowCount: 1 };
+  }
+
+  // ─── ADMIN SME DIRECTORY LISTING (`GET /api/admin/smes`) ────────────────────
+  if (normalized.includes("from users u") && normalized.includes("left join settings")) {
+    const isCountQuery = normalized.startsWith("select count(");
+
+    const smes = memoryStore.users
+      .filter(u => ['sme_owner', 'admin'].includes(u.role) && !['pulse_admin', 'databridge_advisor', 'lender'].includes(u.role))
+      .map(u => {
+        const sett = memoryStore.settings.find(s => s.owner_id === u.id) || {};
+        const score = memoryStore.credit_scores.find(cs => cs.user_id === u.id) || { score: 78, band: "green" };
+        const userSales = memoryStore.sales.filter(s => (s.owner_id === u.id || s.user_id === u.id) && !s.is_voided);
+        const userStock = memoryStore.stock_items.filter(stk => stk.owner_id === u.id && stk.is_active);
+
+        const totalSales = userSales.reduce((acc, s) => acc + (parseInt(s.total_amount) || 0), 0);
+        const itemsCount = userStock.length;
+
+        return {
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          phone: u.phone || sett.shop_phone || "N/A",
+          sector: u.sector || "General Retail",
+          district: u.district || sett.shop_address || "Kigali (Gasabo)",
+          currency: u.currency || sett.currency || "RWF",
+          is_active: u.is_active !== false,
+          profile_complete: u.profile_complete !== false,
+          consent_status: u.consent_status || "granted",
+          created_at: u.created_at || new Date().toISOString(),
+          shop_name: sett.shop_name || `${u.name}'s Shop`,
+          shop_address: sett.shop_address || u.district || "Kigali",
+          shop_phone: sett.shop_phone || u.phone || "",
+          tin_number: sett.tin_number || null,
+          score: score.score || 78,
+          band: score.band || "green",
+          calculated_at: score.calculated_at || u.created_at,
+          items_count: itemsCount,
+          total_sales: totalSales,
+          sales_count: userSales.length,
+          last_activity_at: userSales.length ? userSales[userSales.length - 1].created_at : u.created_at
+        };
+      });
+
+    if (isCountQuery) {
+      return { rows: [{ total: smes.length }], rowCount: 1 };
+    }
+
+    return { rows: smes, rowCount: smes.length };
+  }
+
+  // ─── AGGREGATE KPI STATS (`GET /api/admin/overview`) ────────────────────────
+  if (normalized.includes("count(*) as total_smes") || (normalized.includes("count(*)") && normalized.includes("from users where role = 'sme_owner'"))) {
+    const smes = memoryStore.users.filter(u => ['sme_owner', 'admin'].includes(u.role) && !['pulse_admin'].includes(u.role));
+    const new7d = smes.filter(u => new Date(u.created_at) >= new Date(Date.now() - 7 * 86400000)).length;
+    const new30d = smes.filter(u => new Date(u.created_at) >= new Date(Date.now() - 30 * 86400000)).length;
+    const active = smes.filter(u => u.is_active !== false).length;
+    const deactivated = smes.length - active;
+
     return {
       rows: [{
-        count: totalUsers,
-        total_smes: totalSmes,
-        new_this_month: totalSmes,
-        consented: totalSmes,
-        declined: 0,
-        withdrawn: 0,
-        inactive: 0,
-        total_scored: totalSmes,
-        green: totalSmes,
-        amber: 0,
-        red: 0,
-        avg_score: 78,
-        min_score: 65,
-        max_score: 92,
-        total_lenders: 1,
-        total_referrals: 0,
-        active_referrals: 0,
-        sales_30d: memoryStore.sales.length,
-        revenue_30d: 17300,
-        total: totalUsers,
-        portfolio_size: 1,
-        avg_portfolio_score: 78,
-        active_sellers: 1,
-        have_expenses: 1,
-        stock_items: memoryStore.stock_items.length,
-        scored_businesses: totalSmes,
-        scored_this_week: totalSmes
+        total_smes: smes.length,
+        new_this_week: new7d,
+        new_this_month: new30d,
+        active_smes: active,
+        deactivated_smes: deactivated,
+        consented_smes: smes.filter(u => u.consent_status === 'consented' || u.consent_status === 'granted').length
+      }],
+      rowCount: 1
+    };
+  }
+
+  if (normalized.includes("all_time_volume") && normalized.includes("from sales")) {
+    const totalVolume = memoryStore.sales.reduce((acc, s) => acc + (parseInt(s.total_amount) || 0), 0);
+    const txCount = memoryStore.sales.length;
+    return {
+      rows: [{
+        all_time_volume: totalVolume,
+        all_time_transactions: txCount,
+        volume_30d: totalVolume,
+        transactions_30d: txCount,
+        volume_7d: totalVolume,
+        transactions_7d: txCount,
+        avg_transaction_size: txCount ? Math.round(totalVolume / txCount) : 0
       }],
       rowCount: 1
     };
@@ -206,14 +398,22 @@ async function executeQuery(text, params = []) {
 
   if (normalized.includes("from users")) {
     if (params.length > 0 && typeof params[0] === "string" && params[0].includes("@")) {
-      const email = params[0].toLowerCase();
+      const email = params[0].toLowerCase().trim();
       const match = memoryStore.users.find((u) => u.email.toLowerCase() === email);
+      return { rows: match ? [match] : [], rowCount: match ? 1 : 0 };
+    }
+    if (params.length > 0 && typeof params[0] === "number") {
+      const match = memoryStore.users.find((u) => u.id === params[0]);
       return { rows: match ? [match] : [], rowCount: match ? 1 : 0 };
     }
     return { rows: memoryStore.users, rowCount: memoryStore.users.length };
   }
 
   if (normalized.includes("from settings")) {
+    if (params.length > 0) {
+      const match = memoryStore.settings.find(s => s.owner_id === params[0] || s.owner_id === parseInt(params[0]));
+      return { rows: match ? [match] : [], rowCount: match ? 1 : 0 };
+    }
     return { rows: memoryStore.settings, rowCount: memoryStore.settings.length };
   }
 
@@ -252,6 +452,7 @@ async function executeQuery(text, params = []) {
       payment_reference: params[5] || null,
       payment_status: params[6] || "completed",
       owner_id: params[7] || 1,
+      is_voided: false,
       created_at: new Date().toISOString()
     };
     memoryStore.sales.push(newSale);

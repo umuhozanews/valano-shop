@@ -122,50 +122,42 @@ router.post("/google", async (req, res, next) => {
     // Ensure database columns for Google OAuth & Unique constraint exist
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_auth BOOLEAN DEFAULT false`).catch(() => {});
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_linked BOOLEAN DEFAULT false`).catch(() => {});
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_complete BOOLEAN DEFAULT true`).catch(() => {});
     await pool.query(`ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL`).catch(() => {});
 
     let isNewRegistration = false;
     let { rows: [user] } = await pool.query("SELECT * FROM users WHERE LOWER(email)=$1", [cleanEmail]);
 
     if (!user) {
-      // Case (a): Brand New User -> Create Google-only account with NULL password_hash
+      // Case (a): Brand New Google User -> Create account with profile_complete = false
       isNewRegistration = true;
       try {
         const { rows: [created] } = await pool.query(
-          `INSERT INTO users (name, email, password_hash, role, consent_status, google_auth, google_linked)
-           VALUES ($1, $2, NULL, 'sme_owner', 'granted', true, true)
+          `INSERT INTO users (name, email, password_hash, role, consent_status, google_auth, google_linked, profile_complete)
+           VALUES ($1, $2, NULL, 'sme_owner', 'granted', true, true, false)
            RETURNING *`,
           [googleName, cleanEmail]
         );
         user = created;
-
-        if (user) {
-          await pool.query(
-            `INSERT INTO settings (owner_id, shop_name, language)
-             VALUES ($1, $2, 'en')
-             ON CONFLICT (owner_id) DO NOTHING`,
-            [user.id, `${googleName}'s Shop`]
-          ).catch(() => {});
-        }
       } catch (dbConflictErr) {
         // Fallback for double-click / concurrent registration race condition
         const { rows: [existing] } = await pool.query("SELECT * FROM users WHERE LOWER(email)=$1", [cleanEmail]);
         user = existing;
       }
       if (user) {
-        await logAudit(user.id, "REGISTER_GOOGLE", "users", user.id, null, { email: cleanEmail }, req.ip);
+        logAudit(user.id, "REGISTER_GOOGLE", "users", user.id, null, { email: cleanEmail }, req.ip).catch(() => {});
       }
     } else if (!user.google_linked || !user.google_auth) {
-      // Case (b): Existing email/password user logging in via verified Google email -> Link Account
+      // Case (b): Existing user logging in via verified Google email -> Link Account
       await pool.query(
         "UPDATE users SET google_linked = true WHERE id = $1",
         [user.id]
       ).catch(() => {});
       user.google_linked = true;
-      await logAudit(user.id, "LINK_GOOGLE_ACCOUNT", "users", user.id, null, { email: cleanEmail }, req.ip);
+      logAudit(user.id, "LINK_GOOGLE_ACCOUNT", "users", user.id, null, { email: cleanEmail }, req.ip).catch(() => {});
     } else {
       // Case (c): Returning Google User -> Simple Login
-      await logAudit(user.id, "LOGIN_GOOGLE", "users", user.id, null, { email: cleanEmail }, req.ip);
+      logAudit(user.id, "LOGIN_GOOGLE", "users", user.id, null, { email: cleanEmail }, req.ip).catch(() => {});
     }
 
     if (!user) {
@@ -181,30 +173,100 @@ router.post("/google", async (req, res, next) => {
     const accessToken = jwt.sign(userPayload, JWT_SECRET, { expiresIn: "15m" });
     const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, { expiresIn: "7d" });
 
-    // Dispatch automated welcome or login confirmation email to the verified Google email
-    if (isNewRegistration) {
-      sendWelcomeEmail(cleanEmail, googleName, `${googleName}'s Shop`, { sector: "Google Sign-In" }).catch(e => {
-        console.error("[MAIL ERROR] Background Google welcome email failed:", e.message);
-      });
-      sendAdminSignupAlert({
-        name: googleName,
-        email: cleanEmail,
-        phone: "Google Auth",
-        shop_name: `${googleName}'s Shop`,
-        sector: "Google Sign-In",
-        role: user.role || "sme_owner",
-        ip: req.ip,
-      }).catch(e => {
-        console.error("[MAIL ERROR] Background Google admin alert email failed:", e.message);
-      });
-    } else {
+    // For returning Google users, send standard login alert
+    if (!isNewRegistration) {
       sendLoginAlert(cleanEmail, googleName, req.ip).catch(e => {
         console.error("[MAIL ERROR] Background Google login alert failed:", e.message);
       });
     }
 
     const { password_hash, otp_code, otp_expires_at, ...safeUser } = user;
-    res.json({ accessToken, refreshToken, user: safeUser });
+    res.json({ accessToken, refreshToken, user: safeUser, isNewRegistration });
+  } catch (err) { next(err); }
+});
+
+// ─── Complete Shop Setup (Post-Google / Onboarding) ─────────────────────────
+router.post("/complete-setup", verifyToken, async (req, res, next) => {
+  try {
+    const {
+      shop_name,
+      district,
+      currency,
+      phone,
+      business_email,
+      sector,
+      referral_code
+    } = req.body;
+
+    const cleanShopName = String(shop_name || "").trim();
+    const cleanDistrict = String(district || "").trim();
+    const cleanCurrency = String(currency || "RWF").trim().toUpperCase();
+    const cleanPhone = String(phone || "").trim();
+    const cleanSector = String(sector || "General Retail").trim();
+    const cleanReferral = referral_code ? String(referral_code).trim() : null;
+    const cleanEmail = business_email ? String(business_email).toLowerCase().trim() : null;
+
+    if (!cleanShopName) {
+      return res.status(400).json({ error: "Business / Shop Name is required." });
+    }
+    if (!cleanDistrict) {
+      return res.status(400).json({ error: "District / Location is required." });
+    }
+    if (!cleanPhone) {
+      return res.status(400).json({ error: "Phone number is required." });
+    }
+
+    // 1. Update user row with complete shop profile
+    await pool.query(
+      `UPDATE users
+       SET phone = $1, district = $2, currency = $3, sector = $4, referral_code = $5, profile_complete = true
+       WHERE id = $6`,
+      [cleanPhone, cleanDistrict, cleanCurrency, cleanSector, cleanReferral, req.user.id]
+    );
+
+    // 2. Upsert business settings
+    await pool.query(
+      `INSERT INTO settings (owner_id, shop_name, shop_address, shop_phone, shop_email, currency, language)
+       VALUES ($1, $2, $3, $4, $5, $6, 'en')
+       ON CONFLICT (owner_id) DO UPDATE SET
+         shop_name = EXCLUDED.shop_name,
+         shop_address = EXCLUDED.shop_address,
+         shop_phone = EXCLUDED.shop_phone,
+         shop_email = EXCLUDED.shop_email,
+         currency = EXCLUDED.currency`,
+      [req.user.id, cleanShopName, cleanDistrict, cleanPhone, cleanEmail || req.user.email, cleanCurrency]
+    );
+
+    // 3. Auto-link default advisor and lenders
+    await pool.query(`
+      INSERT INTO advisor_clients (advisor_user_id, sme_user_id, notes)
+      SELECT a.id, $1, 'Assigned on Google Onboarding'
+      FROM users a WHERE a.email = 'advisor@inzira.rw'
+      ON CONFLICT (advisor_user_id, sme_user_id) DO NOTHING
+    `, [req.user.id]).catch(() => {});
+
+    // 4. Fetch updated safe user
+    const { rows: [updatedUser] } = await pool.query("SELECT * FROM users WHERE id=$1", [req.user.id]);
+    const { password_hash, otp_code, otp_expires_at, ...safeUser } = updatedUser || {};
+
+    logAudit(req.user.id, "COMPLETE_SHOP_SETUP", "users", req.user.id, null, { shop_name: cleanShopName }, req.ip).catch(() => {});
+
+    // Send Welcome & Admin Alert Emails now that full details exist
+    sendWelcomeEmail(safeUser.email, safeUser.name, cleanShopName, { sector: cleanSector }).catch(() => {});
+    sendAdminSignupAlert({
+      name: safeUser.name,
+      email: safeUser.email,
+      phone: cleanPhone,
+      shop_name: cleanShopName,
+      sector: cleanSector,
+      role: safeUser.role || "sme_owner",
+      ip: req.ip,
+    }).catch(() => {});
+
+    res.json({
+      message: "Shop setup completed successfully",
+      user: safeUser
+    });
   } catch (err) { next(err); }
 });
 
@@ -408,8 +470,8 @@ const handleRegister = async (req, res, next) => {
     let user;
     try {
       const { rows: [createdUser] } = await pool.query(
-        `INSERT INTO users (name, email, password_hash, role, phone, language, sector, district, consent_status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'granted')
+        `INSERT INTO users (name, email, password_hash, role, phone, language, sector, district, consent_status, profile_complete)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'granted', true)
          RETURNING *`,
         [fullName, normalizedEmail, hash, targetRole, rawPhone || null, language || 'en', sectorStr, district || null]
       );

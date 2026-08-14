@@ -21,8 +21,8 @@ router.get(["/overview", "/dashboard", "/kpis"], async (req, res, next) => {
           COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days') AS new_this_month,
           COUNT(*) FILTER (WHERE is_active = true) AS active_smes,
           COUNT(*) FILTER (WHERE is_active = false) AS deactivated_smes,
-          COUNT(*) FILTER (WHERE consent_status = 'consented') AS consented_smes
-        FROM users WHERE role = 'sme_owner'
+          COUNT(*) FILTER (WHERE consent_status = 'consented' OR consent_status = 'granted') AS consented_smes
+        FROM users WHERE role IN ('sme_owner', 'admin') AND role NOT IN ('pulse_admin', 'databridge_advisor', 'lender')
       `),
 
       // Platform-wide GMV sales volume across ALL SMEs combined
@@ -63,16 +63,16 @@ router.get(["/overview", "/dashboard", "/kpis"], async (req, res, next) => {
         FROM users u
         LEFT JOIN sales s ON s.owner_id = u.id AND s.created_at >= NOW() - INTERVAL '30 days' AND s.is_voided = false
         LEFT JOIN expenses e ON e.owner_id = u.id AND e.expense_date >= CURRENT_DATE - 30
-        WHERE u.role = 'sme_owner'
+        WHERE u.role IN ('sme_owner', 'admin') AND u.role NOT IN ('pulse_admin', 'databridge_advisor', 'lender')
       `),
 
       // Recent 10 Signups Feed
       pool.query(`
-        SELECT u.id, u.name, u.email, u.phone, u.sector, u.district, u.created_at, u.is_active,
+        SELECT u.id, u.name, u.email, u.phone, u.sector, u.district, u.created_at, u.is_active, COALESCE(u.profile_complete, true) AS profile_complete,
                COALESCE(sett.shop_name, u.name || '''s Shop') AS shop_name
         FROM users u
         LEFT JOIN settings sett ON sett.owner_id = u.id
-        WHERE u.role = 'sme_owner'
+        WHERE u.role IN ('sme_owner', 'admin') AND u.role NOT IN ('pulse_admin', 'databridge_advisor', 'lender')
         ORDER BY u.created_at DESC LIMIT 10
       `),
 
@@ -83,7 +83,7 @@ router.get(["/overview", "/dashboard", "/kpis"], async (req, res, next) => {
                COALESCE(SUM(s.total_amount), 0)::bigint AS total_volume
         FROM users u
         LEFT JOIN sales s ON s.owner_id = u.id AND s.is_voided = false
-        WHERE u.role = 'sme_owner'
+        WHERE u.role IN ('sme_owner', 'admin') AND u.role NOT IN ('pulse_admin', 'databridge_advisor', 'lender')
         GROUP BY 1 ORDER BY count DESC LIMIT 8
       `),
 
@@ -92,7 +92,7 @@ router.get(["/overview", "/dashboard", "/kpis"], async (req, res, next) => {
         SELECT COALESCE(u.district, 'Kigali (Gasabo)') AS district,
                COUNT(u.id)::integer AS count
         FROM users u
-        WHERE u.role = 'sme_owner'
+        WHERE u.role IN ('sme_owner', 'admin') AND u.role NOT IN ('pulse_admin', 'databridge_advisor', 'lender')
         GROUP BY 1 ORDER BY count DESC LIMIT 8
       `),
     ]);
@@ -155,7 +155,7 @@ router.get("/smes", async (req, res, next) => {
     const { search, status, sector, district, band, page = 1, limit = 50 } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    const conditions = ["u.role = 'sme_owner'"];
+    const conditions = ["(u.role IN ('sme_owner', 'admin') AND u.role NOT IN ('pulse_admin', 'databridge_advisor', 'lender'))"];
     const params = [];
 
     if (search) {
@@ -197,7 +197,7 @@ router.get("/smes", async (req, res, next) => {
       pool.query(`
         SELECT
           u.id, u.name, u.email, u.phone, u.sector, u.district, u.currency,
-          u.is_active, u.consent_status, u.created_at,
+          u.is_active, u.consent_status, u.created_at, COALESCE(u.profile_complete, true) AS profile_complete,
           COALESCE(sett.shop_name, u.name || '''s Shop') AS shop_name,
           sett.shop_address, sett.shop_phone, sett.tin_number,
           cs.score, cs.band, cs.calculated_at,
