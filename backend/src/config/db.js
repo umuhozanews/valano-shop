@@ -19,21 +19,20 @@ if (!connectionString && !isLocalDevMode) {
 
 function createPool() {
   if (!connectionString) return null;
-  const cleanConnStr = connectionString.replace(/[?&]sslmode=[^&]*/gi, "").replace(/\?$/, "");
-  const isLocal = /localhost|127\.0\.0\.1/.test(cleanConnStr);
+  const isLocal = /localhost|127\.0\.0\.1/.test(connectionString);
 
   try {
     const p = new Pool({
-      connectionString: cleanConnStr,
+      connectionString: connectionString,
       ssl: isLocal ? false : { rejectUnauthorized: false },
       max: parseInt(process.env.PG_POOL_MAX || "2", 10),
-      idleTimeoutMillis: 3000,
+      idleTimeoutMillis: 2000,
       connectionTimeoutMillis: 10000,
       allowExitOnIdle: true,
     });
 
     p.on("error", (err) => {
-      console.warn("[PG POOL IDLE CLIENT RECOVERED]", err.message);
+      console.warn("[PG POOL ERROR EVENT - HANDLED]", err.message);
     });
 
     return p;
@@ -45,29 +44,23 @@ function createPool() {
 
 let pool = createPool();
 
-const TRANSIENT_PATTERNS = [
-  "connection terminated",
-  "client was closed",
-  "terminating connection",
-  "econnreset",
-  "etimedout",
-  "epipe",
-  "connection closed",
-  "broken pipe",
-  "timeout",
-  "57p01",
-  "57p02",
-  "57p03",
-  "08006",
-  "08001",
-  "08004",
-];
-
 function isTransient(err) {
   if (!err) return false;
   const msg = String(err.message || "").toLowerCase();
   const code = String(err.code || "").toLowerCase();
-  return TRANSIENT_PATTERNS.some((p) => msg.includes(p) || code === p);
+  return (
+    msg.includes("econnreset") ||
+    msg.includes("terminated") ||
+    msg.includes("connection") ||
+    msg.includes("closed") ||
+    msg.includes("socket") ||
+    msg.includes("timeout") ||
+    msg.includes("broken") ||
+    msg.includes("pipe") ||
+    code.includes("econnreset") ||
+    code.includes("57p") ||
+    code.includes("080")
+  );
 }
 
 function formatDbError(err) {
@@ -183,7 +176,8 @@ async function executeQuery(text, params = []) {
           client = null;
         }
 
-        if (isTransient(err) && attempt < 3) {
+        const isTrans = isTransient(err);
+        if (isTrans && attempt < 3) {
           console.warn(`[PG RETRY ${attempt}/3] Reconnecting after transient drop:`, err.message);
           try {
             if (pool) pool.end().catch(() => {});
