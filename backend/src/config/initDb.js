@@ -5,8 +5,6 @@ const pool = require("./db");
 // idempotent (IF NOT EXISTS / ON CONFLICT DO NOTHING), so repeated runs are safe.
 
 const SCHEMA_SQL = `
-BEGIN;
-
 -- Core business entity (replaces separate users + branches model)
 CREATE TABLE IF NOT EXISTS users (
   id               SERIAL PRIMARY KEY,
@@ -558,6 +556,17 @@ let isInitialized = false;
 
 async function runInit() {
   if (isInitialized) return;
+
+  try {
+    const testRes = await pool.query("SELECT id FROM users LIMIT 1");
+    if (testRes && testRes.rows) {
+      isInitialized = true;
+      return;
+    }
+  } catch (checkErr) {
+    // Database tables don't exist yet, proceed with one-time bootstrap
+    console.log("[DB INIT] Running initial bootstrap schema...");
+  }
 
   try {
     await pool.query(SCHEMA_SQL);
