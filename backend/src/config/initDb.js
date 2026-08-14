@@ -556,11 +556,12 @@ SELECT id, 74, 'green', '{"positive":[{"key":"sales_growth","label_en":"Strong s
 FROM users WHERE role IN ('sme_owner','admin')
 ON CONFLICT (user_id) DO NOTHING;
 
--- Auto-link SMEs to default Advisor
+-- Auto-link all accounts to Platform Admins and Advisors
 INSERT INTO advisor_clients (advisor_user_id, sme_user_id, notes)
-SELECT a.id, s.id, 'Assigned to DataBridge Advisory'
+SELECT a.id, s.id, 'Platform Admin Oversight Link'
 FROM users a, users s
-WHERE a.email = 'advisor@inzira.rw' AND s.role IN ('sme_owner','admin')
+WHERE a.role IN ('pulse_admin', 'admin', 'databridge_advisor')
+  AND s.id <> a.id
 ON CONFLICT (advisor_user_id, sme_user_id) DO NOTHING;
 
 -- Auto-link SMEs to default Lenders

@@ -1,10 +1,13 @@
 const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 const pool = require("../config/db");
 const { verifyToken, requireRole } = require("../middleware/auth");
 const { logAudit } = require("../utils/helpers");
 const { validatePasswordStrength } = require("../utils/validation");
+
+const JWT_SECRET = process.env.JWT_SECRET || "inzira-jwt-secret-2026";
 
 router.use(verifyToken);
 router.use(requireRole("admin", "pulse_admin"));
@@ -152,11 +155,19 @@ router.get(["/overview", "/dashboard", "/kpis"], async (req, res, next) => {
 // ─── 2. SME Directory (List, Search & Filter) ─────────────────────────────────
 router.get("/smes", async (req, res, next) => {
   try {
-    const { search, status, sector, district, band, page = 1, limit = 50 } = req.query;
+    const { search, status, sector, district, band, role, page = 1, limit = 50 } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    const conditions = ["(u.role IN ('sme_owner', 'admin') AND u.role NOT IN ('pulse_admin', 'databridge_advisor', 'lender'))"];
+    const conditions = [];
     const params = [];
+
+    if (role && role !== "all") {
+      params.push(role);
+      conditions.push(`u.role = $${params.length}`);
+    } else {
+      // By default include all accounts except internal platform super-admins
+      conditions.push(`u.role NOT IN ('pulse_admin')`);
+    }
 
     if (search) {
       params.push(`%${search}%`);
@@ -449,6 +460,47 @@ router.post("/smes/:id/reset-password", async (req, res, next) => {
       message: `Password reset successfully for ${user.email}`,
       temporaryPassword: passwordToSet,
       user,
+    });
+  } catch (err) { next(err); }
+});
+
+// 4c. Impersonate / Connect Directly to Merchant Store
+router.post("/smes/:id/impersonate", async (req, res, next) => {
+  try {
+    const smeId = parseInt(req.params.id, 10);
+    if (!smeId) return res.status(400).json({ error: "Valid SME ID required" });
+
+    const { rows: [targetUser] } = await pool.query(
+      "SELECT * FROM users WHERE id=$1",
+      [smeId]
+    );
+    if (!targetUser) return res.status(404).json({ error: "User account not found" });
+
+    const ownerId = ['pulse_admin','admin'].includes(targetUser.role) ? null : targetUser.id;
+    const payload = {
+      id: targetUser.id,
+      email: targetUser.email,
+      role: targetUser.role,
+      ownerId,
+      impersonatedBy: req.user.id
+    };
+    const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: "2h" });
+
+    await logAudit(
+      req.user.id,
+      "ADMIN_IMPERSONATE_MERCHANT",
+      "users",
+      smeId,
+      null,
+      { target_email: targetUser.email, admin_id: req.user.id, admin_email: req.user.email },
+      req.ip
+    );
+
+    const { password_hash, otp_code, otp_expires_at, ...safeUser } = targetUser;
+    res.json({
+      message: `Successfully connected to ${safeUser.name}'s store`,
+      accessToken,
+      user: safeUser
     });
   } catch (err) { next(err); }
 });

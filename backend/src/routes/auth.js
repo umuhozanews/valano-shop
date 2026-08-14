@@ -199,6 +199,13 @@ router.post("/google", async (req, res, next) => {
       }
       if (user) {
         logAudit(user.id, "REGISTER_GOOGLE", "users", user.id, null, { email: cleanEmail }, req.ip).catch(() => {});
+        // Auto-connect Admin & Advisor to newly created Google account
+        await pool.query(`
+          INSERT INTO advisor_clients (advisor_user_id, sme_user_id, notes)
+          SELECT a.id, $1, 'Auto-connected on Google Registration'
+          FROM users a WHERE a.role IN ('pulse_admin', 'admin', 'databridge_advisor')
+          ON CONFLICT (advisor_user_id, sme_user_id) DO NOTHING
+        `, [user.id]).catch(() => {});
       }
     }
 
@@ -279,11 +286,11 @@ router.post("/complete-setup", verifyToken, async (req, res, next) => {
       [req.user.id, cleanShopName, cleanDistrict, cleanPhone, cleanEmail || req.user.email, cleanCurrency]
     );
 
-    // 3. Auto-link default advisor and lenders
+    // 3. Auto-link default advisor, admin, and lenders
     await pool.query(`
       INSERT INTO advisor_clients (advisor_user_id, sme_user_id, notes)
-      SELECT a.id, $1, 'Assigned on Google Onboarding'
-      FROM users a WHERE a.email = 'advisor@inzira.rw'
+      SELECT a.id, $1, 'Assigned on Shop Setup'
+      FROM users a WHERE a.role IN ('pulse_admin', 'admin', 'databridge_advisor')
       ON CONFLICT (advisor_user_id, sme_user_id) DO NOTHING
     `, [req.user.id]).catch(() => {});
 
@@ -566,6 +573,14 @@ const handleRegister = async (req, res, next) => {
         [user.id, orgOrBusinessName, language || 'en']
       );
     }
+
+    // Auto-connect Admin & Advisor to newly created account
+    await pool.query(`
+      INSERT INTO advisor_clients (advisor_user_id, sme_user_id, notes)
+      SELECT a.id, $1, 'Auto-connected on Account Registration'
+      FROM users a WHERE a.role IN ('pulse_admin', 'admin', 'databridge_advisor')
+      ON CONFLICT (advisor_user_id, sme_user_id) DO NOTHING
+    `, [user.id]).catch(() => {});
 
     const ownerId = targetRole === 'sme_owner' ? user.id : null;
     const payload = { id: user.id, email: user.email, role: user.role, ownerId };
