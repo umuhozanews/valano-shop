@@ -600,6 +600,7 @@ async function runInit() {
   }
 
   // Safe unique indexes — run after migration ensures columns exist
+  try { await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS uq_settings_owner ON settings(owner_id)"); } catch (e) { /* skip */ }
   try { await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS uq_credit_scores_user ON credit_scores(user_id) WHERE user_id IS NOT NULL"); } catch (e) { /* skip */ }
   try { await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS uq_lender_clients ON lender_clients(lender_user_id, sme_user_id) WHERE lender_user_id IS NOT NULL AND sme_user_id IS NOT NULL"); } catch (e) { /* skip */ }
 
