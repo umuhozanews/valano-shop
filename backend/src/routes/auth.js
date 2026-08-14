@@ -102,14 +102,20 @@ router.post("/google", async (req, res, next) => {
 
     let payload;
     try {
+      const allowedAudiences = [
+        GOOGLE_CLIENT_ID,
+        "566140797459-hat4bt1lcl09inbi3gql5ekp2ilh1aom.apps.googleusercontent.com",
+        "566140797459-iaml5c6201dh0qpvs86fnm1dtd25rd30.apps.googleusercontent.com",
+      ].filter(Boolean);
+
       const ticket = await googleClient.verifyIdToken({
         idToken: tokenToVerify,
-        audience: GOOGLE_CLIENT_ID || undefined,
+        audience: allowedAudiences.length > 0 ? allowedAudiences : undefined,
       });
       payload = ticket.getPayload();
     } catch (tokenErr) {
       console.error("[AUTH ERROR] Google ID Token verification failed:", tokenErr.message);
-      return res.status(401).json({ error: "Invalid or unverified Google ID token" });
+      return res.status(401).json({ error: "Invalid or unverified Google ID token: " + tokenErr.message });
     }
 
     if (!payload || !payload.email || payload.email_verified !== true) {
@@ -127,6 +133,22 @@ router.post("/google", async (req, res, next) => {
 
     let isNewRegistration = false;
     let { rows: [user] } = await pool.query("SELECT * FROM users WHERE LOWER(email)=$1", [cleanEmail]);
+
+    console.log("=== [GOOGLE AUTH DEBUG LOG START] ===");
+    console.log("1. Verified Payload Email:", payload.email);
+    console.log("2. Verified email_verified Flag:", payload.email_verified);
+    console.log("3. Clean Normalized Email:", cleanEmail);
+    console.log("4. Google User Full Name:", googleName);
+    console.log("5. Existing DB User Record:", user ? {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      profile_complete: user.profile_complete,
+      google_auth: user.google_auth,
+      google_linked: user.google_linked,
+    } : "NONE_FOUND (Treating as new Google signup)");
+    console.log("=== [GOOGLE AUTH DEBUG LOG END] ===");
 
     if (!user) {
       // Case (a): Brand New Google User -> Create account with profile_complete = false
