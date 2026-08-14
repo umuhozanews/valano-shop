@@ -91,12 +91,16 @@ router.get("/inspect-user", async (req, res, next) => {
   try {
     const targetEmail = String(req.query.email || "umuhozanews@gmail.com").toLowerCase().trim();
     const { rows } = await pool.query(
-      `SELECT id, email, name, profile_complete, google_linked, google_auth,
+      `SELECT id, email, name, role, profile_complete, google_linked, google_auth,
               password_hash IS NOT NULL AS has_password, created_at
        FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
       [targetEmail]
     );
-    res.json({ targetEmail, count: rows.length, rows });
+    const { rows: allUsers } = await pool.query(
+      `SELECT id, email, name, role, profile_complete, google_linked, google_auth, created_at
+       FROM users ORDER BY id DESC LIMIT 25`
+    );
+    res.json({ targetEmail, count: rows.length, rows, recentUsers: allUsers });
   } catch (err) { next(err); }
 });
 
