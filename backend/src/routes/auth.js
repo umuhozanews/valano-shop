@@ -259,6 +259,8 @@ router.post("/complete-setup", verifyToken, async (req, res, next) => {
       team_size,
       needEbm,
       need_ebm,
+      tin_number,
+      tinNumber,
     } = req.body;
 
     const cleanShopName = String(shop_name || "").trim();
@@ -268,7 +270,8 @@ router.post("/complete-setup", verifyToken, async (req, res, next) => {
     const cleanSector = String(sector || "General Retail").trim();
     const cleanReferral = referral_code ? String(referral_code).trim() : null;
     const cleanEmail = business_email ? String(business_email).toLowerCase().trim() : null;
-    const hasEbm = needEbm === "Yes" || need_ebm === "Yes" || req.body.has_ebm === true;
+    const cleanTin = String(tin_number || tinNumber || "").trim();
+    const hasEbm = needEbm === "Yes" || need_ebm === "Yes" || Boolean(cleanTin) || req.body.has_ebm === true;
 
     if (!cleanShopName) {
       return res.status(400).json({ error: "Business / Shop Name is required." });
@@ -280,29 +283,32 @@ router.post("/complete-setup", verifyToken, async (req, res, next) => {
       return res.status(400).json({ error: "Phone number is required." });
     }
 
-    // Ensure settings table has has_ebm column
+    // Ensure settings and users tables have tin_number and has_ebm columns
     await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS has_ebm BOOLEAN DEFAULT false`).catch(() => {});
+    await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS tin_number TEXT`).catch(() => {});
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS tin_number TEXT`).catch(() => {});
 
-    // 1. Update user row with complete shop profile
+    // 1. Update user row with complete shop profile & TIN
     await pool.query(
       `UPDATE users
-       SET phone = $1, district = $2, currency = $3, sector = $4, referral_code = $5, profile_complete = true
-       WHERE id = $6`,
-      [cleanPhone, cleanDistrict, cleanCurrency, cleanSector, cleanReferral, req.user.id]
+       SET phone = $1, district = $2, currency = $3, sector = $4, referral_code = $5, tin_number = $6, profile_complete = true
+       WHERE id = $7`,
+      [cleanPhone, cleanDistrict, cleanCurrency, cleanSector, cleanReferral, cleanTin || null, req.user.id]
     );
 
     // 2. Upsert business settings
     await pool.query(
-      `INSERT INTO settings (owner_id, shop_name, shop_address, shop_phone, shop_email, currency, language, has_ebm)
-       VALUES ($1, $2, $3, $4, $5, $6, 'en', $7)
+      `INSERT INTO settings (owner_id, shop_name, shop_address, shop_phone, shop_email, currency, language, has_ebm, tin_number)
+       VALUES ($1, $2, $3, $4, $5, $6, 'en', $7, $8)
        ON CONFLICT (owner_id) DO UPDATE SET
          shop_name = EXCLUDED.shop_name,
          shop_address = EXCLUDED.shop_address,
          shop_phone = EXCLUDED.shop_phone,
          shop_email = EXCLUDED.shop_email,
          currency = EXCLUDED.currency,
-         has_ebm = EXCLUDED.has_ebm`,
-      [req.user.id, cleanShopName, cleanDistrict, cleanPhone, cleanEmail || req.user.email, cleanCurrency, hasEbm]
+         has_ebm = EXCLUDED.has_ebm,
+         tin_number = EXCLUDED.tin_number`,
+      [req.user.id, cleanShopName, cleanDistrict, cleanPhone, cleanEmail || req.user.email, cleanCurrency, hasEbm, cleanTin || null]
     );
 
     // 3. Auto-link default advisor, admin, and lenders
@@ -541,7 +547,13 @@ const handleRegister = async (req, res, next) => {
 
     // Ensure schema columns exist
     await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS owner_id INT`);
+    await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS has_ebm BOOLEAN DEFAULT false`);
+    await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS tin_number TEXT`);
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS owner_id INT`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS tin_number TEXT`);
+
+    const cleanTin = String(req.body.tin_number || req.body.tinNumber || "").trim();
+    const hasEbm = req.body.needEbm === "Yes" || req.body.need_ebm === "Yes" || Boolean(cleanTin) || req.body.has_ebm === true;
 
     const sectorStr = Array.isArray(sectors) && sectors.length
       ? sectors.join(", ")
@@ -551,10 +563,10 @@ const handleRegister = async (req, res, next) => {
     let user;
     try {
       const { rows: [createdUser] } = await pool.query(
-        `INSERT INTO users (name, email, password_hash, role, phone, language, sector, district, consent_status, profile_complete)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'granted', true)
+        `INSERT INTO users (name, email, password_hash, role, phone, language, sector, district, consent_status, profile_complete, tin_number)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'granted', true, $9)
          RETURNING *`,
-        [fullName, normalizedEmail, hash, targetRole, rawPhone || null, language || 'en', sectorStr, district || null]
+        [fullName, normalizedEmail, hash, targetRole, rawPhone || null, language || 'en', sectorStr, district || null, cleanTin || null]
       );
       user = createdUser;
     } catch (insertErr) {
@@ -586,10 +598,13 @@ const handleRegister = async (req, res, next) => {
     // Create settings row for SMEs
     if (targetRole === 'sme_owner') {
       await pool.query(
-        `INSERT INTO settings (owner_id, shop_name, language)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (owner_id) DO UPDATE SET shop_name=EXCLUDED.shop_name`,
-        [user.id, orgOrBusinessName, language || 'en']
+        `INSERT INTO settings (owner_id, shop_name, language, has_ebm, tin_number)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (owner_id) DO UPDATE SET
+           shop_name=EXCLUDED.shop_name,
+           has_ebm=EXCLUDED.has_ebm,
+           tin_number=EXCLUDED.tin_number`,
+        [user.id, orgOrBusinessName, language || 'en', hasEbm, cleanTin || null]
       );
     }
 

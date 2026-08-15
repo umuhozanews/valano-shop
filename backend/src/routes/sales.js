@@ -363,6 +363,37 @@ router.post("/:id/void", requireRole("admin", "sme_owner", "manager", "accountan
   }
 });
 
+// DELETE /api/sales/:id — Delete / Void Sale & Restore Stock
+router.delete("/:id", requireRole("admin", "sme_owner", "manager", "accountant", "pulse_admin"), async (req, res, next) => {
+  try {
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "owner_id=$2";
+    const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
+
+    const { rows: [sale] } = await pool.query(`SELECT * FROM sales WHERE id=$1 AND ${ownerWhere}`, queryParams);
+    if (!sale) return res.status(404).json({ error: "Sale not found" });
+
+    await pool.query("BEGIN");
+    // Restore stock item quantities
+    const { rows: items } = await pool.query("SELECT * FROM sale_items WHERE sale_id=$1", [sale.id]);
+    for (const item of items) {
+      if (item.stock_item_id && /^\d+$/.test(String(item.stock_item_id))) {
+        await pool.query("UPDATE stock_items SET quantity = quantity + $1 WHERE id=$2", [item.quantity, parseInt(item.stock_item_id, 10)]);
+      }
+    }
+    await pool.query("UPDATE sales SET is_voided=true, void_reason='Deleted by merchant', voided_by=$1 WHERE id=$2", [req.user.id, sale.id]);
+    await pool.query("UPDATE invoices SET status='voided' WHERE sale_id=$1", [sale.id]);
+    await pool.query("UPDATE accounts_receivable SET status='voided' WHERE sale_id=$1", [sale.id]);
+    await pool.query("COMMIT");
+
+    await logAudit(req.user.id, "SALE_DELETED", "sales", sale.id, sale, { reason: "Deleted by merchant", restored_items_count: items.length }, req.ip);
+    res.json({ success: true, message: "Sale deleted and inventory stock restored", sale_id: sale.id });
+  } catch (err) {
+    await pool.query("ROLLBACK").catch(() => {});
+    next(err);
+  }
+});
+
 router.get("/:id/receipt-pdf", async (req, res, next) => {
   try {
     const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);

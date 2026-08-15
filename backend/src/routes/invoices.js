@@ -120,4 +120,62 @@ router.put("/:id/status", requireRole("admin", "manager", "accountant"), async (
   } catch (err) { next(err); }
 });
 
+router.delete("/:id", requireRole("admin", "sme_owner", "manager", "accountant", "pulse_admin"), async (req, res, next) => {
+  try {
+    const reason = req.body?.reason || req.query?.reason;
+    if (!reason || !String(reason).trim()) {
+      return res.status(400).json({ error: "A mandatory void/cancellation reason is required to delete an invoice." });
+    }
+
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "s.owner_id=$2";
+    const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
+
+    const { rows: [invoice] } = await pool.query(
+      `SELECT i.*, s.total_amount, s.customer_name, s.id as sale_id 
+       FROM invoices i JOIN sales s ON s.id=i.sale_id
+       WHERE i.id=$1 AND ${ownerWhere}`,
+      queryParams
+    );
+    if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+
+    await pool.query("BEGIN");
+    await pool.query("UPDATE invoices SET status='voided' WHERE id=$1", [invoice.id]);
+    await pool.query(
+      "UPDATE sales SET is_voided=true, void_reason=$1, voided_by=$2 WHERE id=$3",
+      [reason.trim(), req.user.id, invoice.sale_id]
+    );
+    await pool.query("UPDATE accounts_receivable SET status='voided' WHERE sale_id=$1", [invoice.sale_id]);
+
+    // Restore stock item quantities
+    const { rows: items } = await pool.query("SELECT * FROM sale_items WHERE sale_id=$1", [invoice.sale_id]);
+    for (const item of items) {
+      if (item.stock_item_id && /^\d+$/.test(String(item.stock_item_id))) {
+        await pool.query("UPDATE stock_items SET quantity = quantity + $1 WHERE id=$2", [item.quantity, parseInt(item.stock_item_id, 10)]);
+      }
+    }
+    await pool.query("COMMIT");
+
+    const { logAudit } = require("../utils/helpers");
+    await logAudit(
+      req.user.id,
+      "INVOICE_VOIDED",
+      "invoices",
+      invoice.id,
+      invoice,
+      { invoice_number: invoice.invoice_number, void_reason: reason.trim(), total_amount: invoice.total_amount },
+      req.ip
+    );
+
+    res.json({
+      success: true,
+      message: `Invoice ${invoice.invoice_number} voided and recorded in audit logs.`,
+      id: invoice.id,
+    });
+  } catch (err) {
+    await pool.query("ROLLBACK").catch(() => {});
+    next(err);
+  }
+});
+
 module.exports = router;

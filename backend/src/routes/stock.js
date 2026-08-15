@@ -289,18 +289,69 @@ router.post("/:id/adjust", requireRole("admin", "sme_owner", "manager", "pulse_a
   } catch (err) { next(err); }
 });
 
+// Quick Restock — Add quantity to existing stock item
+router.post("/:id/add-quantity", requireRole("admin", "sme_owner", "manager", "pulse_admin"), async (req, res, next) => {
+  try {
+    const { added_quantity, notes } = req.body;
+    const qtyToAdd = parseInt(added_quantity, 10);
+    if (isNaN(qtyToAdd) || qtyToAdd <= 0) {
+      return res.status(400).json({ error: "Please enter a valid positive quantity to add." });
+    }
+
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    const ownerWhere = isAdmin ? "1=1" : "owner_id=$2";
+    const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
+
+    const { rows: [old] } = await pool.query(`SELECT * FROM stock_items WHERE id=$1 AND ${ownerWhere}`, queryParams);
+    if (!old) return res.status(404).json({ error: "Stock item not found" });
+
+    const newQty = (old.quantity || 0) + qtyToAdd;
+    const updateOwnerWhere = isAdmin ? "1=1" : "owner_id=$3";
+    const updateParams = isAdmin ? [newQty, req.params.id] : [newQty, req.params.id, req.ownerId];
+
+    const { rows: [item] } = await pool.query(
+      `UPDATE stock_items SET quantity=$1 WHERE id=$2 AND ${updateOwnerWhere} RETURNING *`,
+      updateParams
+    );
+
+    await logAudit(
+      req.user.id,
+      "STOCK_RESTOCKED",
+      "stock_items",
+      item.id,
+      { previous_quantity: old.quantity },
+      { added_quantity: qtyToAdd, new_quantity: newQty, item_name: item.name, notes: notes || "Quick restock" },
+      req.ip
+    );
+
+    res.json({
+      success: true,
+      item,
+      message: `Successfully added +${qtyToAdd} units to ${item.name}. Total now: ${newQty} ${item.unit || "pcs"}.`
+    });
+  } catch (err) { next(err); }
+});
+
 router.delete("/:id", requireRole("admin", "sme_owner", "pulse_admin"), async (req, res, next) => {
   try {
     const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
     const ownerWhere = isAdmin ? "1=1" : "owner_id=$2";
     const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
 
-    const { rows: [item] } = await pool.query(`SELECT id FROM stock_items WHERE id=$1 AND ${ownerWhere}`, queryParams);
+    const { rows: [item] } = await pool.query(`SELECT * FROM stock_items WHERE id=$1 AND ${ownerWhere}`, queryParams);
     if (!item) return res.status(404).json({ error: "Item not found" });
 
     await pool.query(`UPDATE stock_items SET is_active=false WHERE id=$1 AND ${ownerWhere}`, queryParams);
-    await logAudit(req.user.id, "STOCK_DELETED", "stock_items", req.params.id, null, null, req.ip);
-    res.json({ message: "Item removed" });
+    await logAudit(
+      req.user.id,
+      "STOCK_DELETED",
+      "stock_items",
+      req.params.id,
+      item,
+      { deleted_at: new Date().toISOString(), reason: "Deleted by merchant", item_name: item.name, quantity_at_deletion: item.quantity },
+      req.ip
+    );
+    res.json({ success: true, message: `Product "${item.name}" deleted and recorded in logs.`, id: req.params.id });
   } catch (err) { next(err); }
 });
 
