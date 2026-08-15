@@ -172,14 +172,31 @@ router.post("/", async (req, res, next) => {
     }
 
     let total = 0;
+    const validatedItems = [];
     for (const item of items) {
       const isNumericId = item.stock_item_id && (typeof item.stock_item_id === "number" || /^\d+$/.test(String(item.stock_item_id)));
+      let unitPrice = Number(item.unit_price) || 0;
+      const qty = Math.max(1, parseInt(item.quantity, 10) || 1);
+
       if (isNumericId) {
         const stk = stockMap.get(parseInt(item.stock_item_id, 10));
-        if (stk && stk.quantity < item.quantity)
-          throw Object.assign(new Error(`Insufficient stock for ${stk.name}`), { status: 400 });
+        if (stk) {
+          if (stk.quantity < qty) {
+            throw Object.assign(new Error(`Insufficient stock for ${stk.name}`), { status: 400 });
+          }
+          // Server-side price enforcement: always use the authoritative price from DB
+          unitPrice = Number(stk.sell_price_rwf) || unitPrice;
+        }
       }
-      total += (Number(item.unit_price) || 0) * (Number(item.quantity) || 1);
+
+      const subtotal = unitPrice * qty;
+      total += subtotal;
+      validatedItems.push({
+        stock_item_id: isNumericId ? parseInt(item.stock_item_id, 10) : null,
+        quantity: qty,
+        unit_price: unitPrice,
+        subtotal,
+      });
     }
 
     // Safe customer resolution
@@ -219,24 +236,23 @@ router.post("/", async (req, res, next) => {
         req.user.id, custId, payment_method, total,
         !!is_offline, payment_reference || null,
         payment_method === "credit" ? "pending" : "completed",
-        req.ownerId || 1,
-        String(idempotencyKey),
+        req.ownerId || 1, String(idempotencyKey),
       ]
     );
 
-    // Bulk insert all sale_items in one query
-    const siValues = items.map((_, i) => {
+    // Bulk insert all sale_items using server-calculated prices
+    const siValues = validatedItems.map((_, i) => {
       const b = i * 5;
       return `($${b+1},$${b+2},$${b+3},$${b+4},$${b+5})`;
     }).join(",");
     await pool.query(
       `INSERT INTO sale_items (sale_id, stock_item_id, quantity, unit_price, subtotal) VALUES ${siValues}`,
-      items.flatMap(item => [
+      validatedItems.flatMap(item => [
         sale.id,
-        item.stock_item_id && /^\d+$/.test(String(item.stock_item_id)) ? parseInt(item.stock_item_id, 10) : null,
-        Number(item.quantity) || 1,
-        Number(item.unit_price) || 0,
-        (Number(item.unit_price) || 0) * (Number(item.quantity) || 1)
+        item.stock_item_id,
+        item.quantity,
+        item.unit_price,
+        item.subtotal,
       ])
     );
 
