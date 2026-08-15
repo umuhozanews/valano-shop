@@ -1,4 +1,3 @@
-// Verified Git Commit Author: cyberninja-07 <outofthebo@gmail.com>
 const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
@@ -6,11 +5,22 @@ const jwt = require("jsonwebtoken");
 const pool = require("../config/db");
 const { JWT_SECRET, JWT_REFRESH_SECRET } = require("../config/env");
 const { verifyToken } = require("../middleware/auth");
+const { authRateLimiter, blockFieldTampering } = require("../middleware/security");
 const { logAudit } = require("../utils/helpers");
 const { isValidEmail, validatePasswordStrength } = require("../utils/validation");
 const { sendLoginAlert, sendWelcomeEmail, sendAdminSignupAlert, sendTestEmail } = require("../utils/mailer");
 
 const VALID_ROLES = ['sme_owner','manager','cashier','accountant','databridge_advisor','lender','pulse_admin','admin'];
+
+// Apply field tampering protection across all auth routes
+router.use(blockFieldTampering);
+
+// Apply strict rate limiting to prevent brute force login/registration/OTP abuse
+router.use("/login", authRateLimiter);
+router.use("/register", authRateLimiter);
+router.use("/signup", authRateLimiter);
+router.use("/google", authRateLimiter);
+router.use("/otp", authRateLimiter);
 
 // ─── Login ────────────────────────────────────────────────────────────────────
 router.post("/login", async (req, res, next) => {

@@ -5,10 +5,23 @@ const compression = require("compression");
 const path = require("path");
 const logger = require("./src/middleware/logger");
 const errorHandler = require("./src/middleware/errorHandler");
+const {
+  securityHeaders,
+  botProtection,
+  sanitizeInput,
+  trimApiResponse,
+  apiRateLimiter,
+} = require("./src/middleware/security");
 const routes = require("./src/routes/index.js");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// 1. Security Headers & Force HTTPS
+app.use(securityHeaders);
+
+// 2. Data Minimization (Trim sensitive database secrets from all responses)
+app.use(trimApiResponse);
 
 app.use(compression());
 const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:3000").split(",").map(s => s.trim());
@@ -23,8 +36,17 @@ app.use(cors({
   },
   credentials: true,
 }));
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true }));
+
+app.use(express.json({ limit: "5mb" }));
+app.use(express.urlencoded({ extended: true, limit: "5mb" }));
+
+// 3. Bot Protection & Input Sanitization
+app.use(botProtection);
+app.use(sanitizeInput);
+
+// 4. General API Rate Limiter
+app.use("/api", apiRateLimiter);
+
 app.use(logger);
 
 // Serve compiled static web app
