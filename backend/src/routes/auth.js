@@ -254,7 +254,11 @@ router.post("/complete-setup", verifyToken, async (req, res, next) => {
       phone,
       business_email,
       sector,
-      referral_code
+      referral_code,
+      teamSize,
+      team_size,
+      needEbm,
+      need_ebm,
     } = req.body;
 
     const cleanShopName = String(shop_name || "").trim();
@@ -264,6 +268,7 @@ router.post("/complete-setup", verifyToken, async (req, res, next) => {
     const cleanSector = String(sector || "General Retail").trim();
     const cleanReferral = referral_code ? String(referral_code).trim() : null;
     const cleanEmail = business_email ? String(business_email).toLowerCase().trim() : null;
+    const hasEbm = needEbm === "Yes" || need_ebm === "Yes" || req.body.has_ebm === true;
 
     if (!cleanShopName) {
       return res.status(400).json({ error: "Business / Shop Name is required." });
@@ -275,6 +280,9 @@ router.post("/complete-setup", verifyToken, async (req, res, next) => {
       return res.status(400).json({ error: "Phone number is required." });
     }
 
+    // Ensure settings table has has_ebm column
+    await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS has_ebm BOOLEAN DEFAULT false`).catch(() => {});
+
     // 1. Update user row with complete shop profile
     await pool.query(
       `UPDATE users
@@ -285,15 +293,16 @@ router.post("/complete-setup", verifyToken, async (req, res, next) => {
 
     // 2. Upsert business settings
     await pool.query(
-      `INSERT INTO settings (owner_id, shop_name, shop_address, shop_phone, shop_email, currency, language)
-       VALUES ($1, $2, $3, $4, $5, $6, 'en')
+      `INSERT INTO settings (owner_id, shop_name, shop_address, shop_phone, shop_email, currency, language, has_ebm)
+       VALUES ($1, $2, $3, $4, $5, $6, 'en', $7)
        ON CONFLICT (owner_id) DO UPDATE SET
          shop_name = EXCLUDED.shop_name,
          shop_address = EXCLUDED.shop_address,
          shop_phone = EXCLUDED.shop_phone,
          shop_email = EXCLUDED.shop_email,
-         currency = EXCLUDED.currency`,
-      [req.user.id, cleanShopName, cleanDistrict, cleanPhone, cleanEmail || req.user.email, cleanCurrency]
+         currency = EXCLUDED.currency,
+         has_ebm = EXCLUDED.has_ebm`,
+      [req.user.id, cleanShopName, cleanDistrict, cleanPhone, cleanEmail || req.user.email, cleanCurrency, hasEbm]
     );
 
     // 3. Auto-link default advisor, admin, and lenders
