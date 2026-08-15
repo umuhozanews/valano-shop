@@ -331,6 +331,64 @@ const INDEX_SQL = [
   "CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_idempotency ON sales(idempotency_key) WHERE idempotency_key IS NOT NULL",
 ];
 
+// Row Level Security (RLS) SQL definitions for multi-tenant data isolation
+const RLS_SQL = [
+  "ALTER TABLE IF EXISTS sales ENABLE ROW LEVEL SECURITY;",
+  "ALTER TABLE IF EXISTS sale_items ENABLE ROW LEVEL SECURITY;",
+  "ALTER TABLE IF EXISTS stock_items ENABLE ROW LEVEL SECURITY;",
+  "ALTER TABLE IF EXISTS expenses ENABLE ROW LEVEL SECURITY;",
+  "ALTER TABLE IF EXISTS customers ENABLE ROW LEVEL SECURITY;",
+  "ALTER TABLE IF EXISTS suppliers ENABLE ROW LEVEL SECURITY;",
+  "ALTER TABLE IF EXISTS invoices ENABLE ROW LEVEL SECURITY;",
+  "ALTER TABLE IF EXISTS notifications ENABLE ROW LEVEL SECURITY;",
+  "ALTER TABLE IF EXISTS accounts_receivable ENABLE ROW LEVEL SECURITY;",
+  "ALTER TABLE IF EXISTS accounts_payable ENABLE ROW LEVEL SECURITY;",
+  "ALTER TABLE IF EXISTS settings ENABLE ROW LEVEL SECURITY;",
+  "ALTER TABLE IF EXISTS health_score_log ENABLE ROW LEVEL SECURITY;",
+  `DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'tenant_isolation_sales') THEN
+      CREATE POLICY tenant_isolation_sales ON sales
+        USING (owner_id IS NULL OR owner_id = NULLIF(current_setting('app.current_user_id', true), '')::integer OR NULLIF(current_setting('app.current_user_role', true), '') = 'pulse_admin');
+    END IF;
+  END $$;`,
+  `DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'tenant_isolation_stock') THEN
+      CREATE POLICY tenant_isolation_stock ON stock_items
+        USING (owner_id IS NULL OR owner_id = NULLIF(current_setting('app.current_user_id', true), '')::integer OR NULLIF(current_setting('app.current_user_role', true), '') = 'pulse_admin');
+    END IF;
+  END $$;`,
+  `DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'tenant_isolation_expenses') THEN
+      CREATE POLICY tenant_isolation_expenses ON expenses
+        USING (owner_id IS NULL OR owner_id = NULLIF(current_setting('app.current_user_id', true), '')::integer OR NULLIF(current_setting('app.current_user_role', true), '') = 'pulse_admin');
+    END IF;
+  END $$;`,
+  `DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'tenant_isolation_customers') THEN
+      CREATE POLICY tenant_isolation_customers ON customers
+        USING (owner_id IS NULL OR owner_id = NULLIF(current_setting('app.current_user_id', true), '')::integer OR NULLIF(current_setting('app.current_user_role', true), '') = 'pulse_admin');
+    END IF;
+  END $$;`,
+  `DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'tenant_isolation_suppliers') THEN
+      CREATE POLICY tenant_isolation_suppliers ON suppliers
+        USING (owner_id IS NULL OR owner_id = NULLIF(current_setting('app.current_user_id', true), '')::integer OR NULLIF(current_setting('app.current_user_role', true), '') = 'pulse_admin');
+    END IF;
+  END $$;`,
+  `DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'tenant_isolation_invoices') THEN
+      CREATE POLICY tenant_isolation_invoices ON invoices
+        USING (owner_id IS NULL OR owner_id = NULLIF(current_setting('app.current_user_id', true), '')::integer OR NULLIF(current_setting('app.current_user_role', true), '') = 'pulse_admin');
+    END IF;
+  END $$;`,
+  `DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'tenant_isolation_settings') THEN
+      CREATE POLICY tenant_isolation_settings ON settings
+        USING (owner_id IS NULL OR owner_id = NULLIF(current_setting('app.current_user_id', true), '')::integer OR NULLIF(current_setting('app.current_user_role', true), '') = 'pulse_admin');
+    END IF;
+  END $$;`
+];
+
 // Migration SQL: safely evolves existing databases
 // All ALTER statements use IF NOT EXISTS / IF EXISTS — safe to re-run
 const MIGRATION_SQL = `
@@ -600,6 +658,11 @@ async function runInit() {
   // Run indexes individually — skip any that fail (column may not exist in old schema)
   for (const sql of INDEX_SQL) {
     try { await pool.query(sql); } catch (e) { /* skip silently */ }
+  }
+
+  // Row Level Security (RLS) Activation and Policies
+  for (const sql of RLS_SQL) {
+    try { await pool.query(sql); } catch (e) { /* skip if RLS already enabled or restricted */ }
   }
 
   // Safe unique indexes — run after migration ensures columns exist
