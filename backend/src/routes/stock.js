@@ -300,28 +300,26 @@ router.post("/:id/add-quantity", requireRole("admin", "sme_owner", "manager", "a
     }
 
     const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
-    const ownerWhere = isAdmin ? "1=1" : "owner_id=$2";
-    const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
-
     const rawId = String(req.params.id || "").trim();
     const isNum = /^\d+$/.test(rawId) && Number(rawId) < 2147483647;
+    const prodName = String(name || (!isNum ? rawId : "")).trim();
 
     let old = null;
+
+    // 1. Try finding by exact numeric id (matching owner or null legacy owner)
     if (isNum) {
-      const { rows } = await pool.query(`SELECT * FROM stock_items WHERE id=$1 AND ${ownerWhere}`, [parseInt(rawId, 10), ...(isAdmin ? [] : [req.ownerId])]);
-      old = rows[0];
-    }
-    if (!old && name) {
       const { rows } = await pool.query(
-        `SELECT * FROM stock_items WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) AND ${isAdmin ? "1=1" : "owner_id=$2"}`,
-        [String(name).trim(), ...(isAdmin ? [] : [req.ownerId])]
+        `SELECT * FROM stock_items WHERE id=$1 AND ${isAdmin ? "1=1" : "(owner_id=$2 OR owner_id IS NULL)"}`,
+        [parseInt(rawId, 10), ...(isAdmin ? [] : [req.ownerId])]
       );
       old = rows[0];
     }
-    if (!old && !isNum && rawId) {
+
+    // 2. Try finding by product name if not found by id
+    if (!old && prodName) {
       const { rows } = await pool.query(
-        `SELECT * FROM stock_items WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) AND ${isAdmin ? "1=1" : "owner_id=$2"}`,
-        [rawId, ...(isAdmin ? [] : [req.ownerId])]
+        `SELECT * FROM stock_items WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) AND ${isAdmin ? "1=1" : "(owner_id=$2 OR owner_id IS NULL)"} ORDER BY id ASC`,
+        [prodName, ...(isAdmin ? [] : [req.ownerId])]
       );
       old = rows[0];
     }
@@ -329,14 +327,22 @@ router.post("/:id/add-quantity", requireRole("admin", "sme_owner", "manager", "a
     let item = null;
     if (old) {
       const newQty = (Number(old.quantity) || 0) + qtyToAdd;
-      const updateOwnerWhere = isAdmin ? "1=1" : "owner_id=$3";
-      const updateParams = isAdmin ? [newQty, old.id] : [newQty, old.id, req.ownerId];
-
       const { rows } = await pool.query(
-        `UPDATE stock_items SET quantity=$1, is_active=true WHERE id=$2 AND ${updateOwnerWhere} RETURNING *`,
-        updateParams
+        `UPDATE stock_items 
+         SET quantity=$1, is_active=true, owner_id=COALESCE(owner_id, $3)
+         WHERE id=$2 RETURNING *`,
+        [newQty, old.id, req.ownerId || old.owner_id || 1]
       );
       item = rows[0];
+
+      // Cleanup any duplicate rows with the exact same name
+      const cleanN = prodName || old.name;
+      if (cleanN) {
+        await pool.query(
+          `DELETE FROM stock_items WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) AND id != $2 AND (owner_id=$3 OR owner_id IS NULL)`,
+          [cleanN, old.id, req.ownerId]
+        ).catch(() => {});
+      }
 
       await logAudit(
         req.user.id,
@@ -349,13 +355,13 @@ router.post("/:id/add-quantity", requireRole("admin", "sme_owner", "manager", "a
       );
     } else {
       // If product doesn't exist on server yet, create it with the added quantity
-      const prodName = name || rawId || "Stock Item";
+      const targetName = prodName || rawId || "Stock Item";
       const barcode = `INZ${Date.now()}${Math.floor(Math.random() * 1000)}`;
       const { rows } = await pool.query(
         `INSERT INTO stock_items (name, category, unit, barcode, quantity, cost_price_rwf, sell_price_rwf, low_stock_threshold, owner_id)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
         [
-          prodName, category || "General", unit || "pcs", barcode,
+          targetName, category || "General", unit || "pcs", barcode,
           qtyToAdd, parseInt(cost_price_rwf) || 0, parseInt(sell_price_rwf) || 0, 5, req.ownerId
         ]
       );
