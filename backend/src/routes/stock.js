@@ -291,9 +291,9 @@ router.post("/:id/adjust", requireRole("admin", "sme_owner", "manager", "pulse_a
 });
 
 // Quick Restock — Add quantity to existing stock item
-router.post("/:id/add-quantity", requireRole("admin", "sme_owner", "manager", "pulse_admin"), async (req, res, next) => {
+router.post("/:id/add-quantity", requireRole("admin", "sme_owner", "manager", "accountant", "cashier", "pulse_admin"), async (req, res, next) => {
   try {
-    const { added_quantity, notes } = req.body;
+    const { added_quantity, notes, name, category, unit, cost_price_rwf, sell_price_rwf } = req.body;
     const qtyToAdd = parseInt(added_quantity, 10);
     if (isNaN(qtyToAdd) || qtyToAdd <= 0) {
       return res.status(400).json({ error: "Please enter a valid positive quantity to add." });
@@ -303,44 +303,96 @@ router.post("/:id/add-quantity", requireRole("admin", "sme_owner", "manager", "p
     const ownerWhere = isAdmin ? "1=1" : "owner_id=$2";
     const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
 
-    const { rows: [old] } = await pool.query(`SELECT * FROM stock_items WHERE id=$1 AND ${ownerWhere}`, queryParams);
-    if (!old) return res.status(404).json({ error: "Stock item not found" });
+    const rawId = String(req.params.id || "").trim();
+    const isNum = /^\d+$/.test(rawId) && Number(rawId) < 2147483647;
 
-    const newQty = (old.quantity || 0) + qtyToAdd;
-    const updateOwnerWhere = isAdmin ? "1=1" : "owner_id=$3";
-    const updateParams = isAdmin ? [newQty, req.params.id] : [newQty, req.params.id, req.ownerId];
+    let old = null;
+    if (isNum) {
+      const { rows } = await pool.query(`SELECT * FROM stock_items WHERE id=$1 AND ${ownerWhere}`, [parseInt(rawId, 10), ...(isAdmin ? [] : [req.ownerId])]);
+      old = rows[0];
+    }
+    if (!old && name) {
+      const { rows } = await pool.query(
+        `SELECT * FROM stock_items WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) AND ${isAdmin ? "1=1" : "owner_id=$2"}`,
+        [String(name).trim(), ...(isAdmin ? [] : [req.ownerId])]
+      );
+      old = rows[0];
+    }
+    if (!old && !isNum && rawId) {
+      const { rows } = await pool.query(
+        `SELECT * FROM stock_items WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) AND ${isAdmin ? "1=1" : "owner_id=$2"}`,
+        [rawId, ...(isAdmin ? [] : [req.ownerId])]
+      );
+      old = rows[0];
+    }
 
-    const { rows: [item] } = await pool.query(
-      `UPDATE stock_items SET quantity=$1 WHERE id=$2 AND ${updateOwnerWhere} RETURNING *`,
-      updateParams
-    );
+    let item = null;
+    if (old) {
+      const newQty = (Number(old.quantity) || 0) + qtyToAdd;
+      const updateOwnerWhere = isAdmin ? "1=1" : "owner_id=$3";
+      const updateParams = isAdmin ? [newQty, old.id] : [newQty, old.id, req.ownerId];
 
-    await logAudit(
-      req.user.id,
-      "STOCK_RESTOCKED",
-      "stock_items",
-      item.id,
-      { previous_quantity: old.quantity },
-      { added_quantity: qtyToAdd, new_quantity: newQty, item_name: item.name, notes: notes || "Quick restock" },
-      req.ip
-    );
+      const { rows } = await pool.query(
+        `UPDATE stock_items SET quantity=$1, is_active=true WHERE id=$2 AND ${updateOwnerWhere} RETURNING *`,
+        updateParams
+      );
+      item = rows[0];
+
+      await logAudit(
+        req.user.id,
+        "STOCK_RESTOCKED",
+        "stock_items",
+        item.id,
+        { previous_quantity: old.quantity },
+        { added_quantity: qtyToAdd, new_quantity: newQty, item_name: item.name, notes: notes || "Quick restock" },
+        req.ip
+      );
+    } else {
+      // If product doesn't exist on server yet, create it with the added quantity
+      const prodName = name || rawId || "Stock Item";
+      const barcode = `INZ${Date.now()}${Math.floor(Math.random() * 1000)}`;
+      const { rows } = await pool.query(
+        `INSERT INTO stock_items (name, category, unit, barcode, quantity, cost_price_rwf, sell_price_rwf, low_stock_threshold, owner_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+        [
+          prodName, category || "General", unit || "pcs", barcode,
+          qtyToAdd, parseInt(cost_price_rwf) || 0, parseInt(sell_price_rwf) || 0, 5, req.ownerId
+        ]
+      );
+      item = rows[0];
+      await logAudit(req.user.id, "STOCK_CREATED", "stock_items", item.id, null, item, req.ip);
+    }
 
     res.json({
       success: true,
       item,
-      message: `Successfully added +${qtyToAdd} units to ${item.name}. Total now: ${newQty} ${item.unit || "pcs"}.`
+      message: `Successfully added +${qtyToAdd} units to ${item.name}. Total now: ${item.quantity} ${item.unit || "pcs"}.`
     });
   } catch (err) { next(err); }
 });
 
-router.delete("/:id", requireRole("admin", "sme_owner", "pulse_admin"), async (req, res, next) => {
+router.delete("/:id", requireRole("admin", "sme_owner", "manager", "accountant", "cashier", "pulse_admin"), async (req, res, next) => {
   try {
     const reason = req.body?.reason || req.query?.reason || "Deleted by merchant";
     const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
     const ownerWhere = isAdmin ? "1=1" : "owner_id=$2";
     const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
 
-    const { rows: [item] } = await pool.query(`SELECT * FROM stock_items WHERE id=$1 AND ${ownerWhere}`, queryParams);
+    const rawId = String(req.params.id || "").trim();
+    const isNum = /^\d+$/.test(rawId) && Number(rawId) < 2147483647;
+
+    let item = null;
+    if (isNum) {
+      const { rows } = await pool.query(`SELECT * FROM stock_items WHERE id=$1 AND ${ownerWhere}`, [parseInt(rawId, 10), ...(isAdmin ? [] : [req.ownerId])]);
+      item = rows[0];
+    }
+    if (!item) {
+      const { rows } = await pool.query(
+        `SELECT * FROM stock_items WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) AND ${isAdmin ? "1=1" : "owner_id=$2"}`,
+        [rawId, ...(isAdmin ? [] : [req.ownerId])]
+      );
+      item = rows[0];
+    }
     if (!item) return res.status(404).json({ error: "Item not found" });
 
     // Capture full snapshot and insert into dedicated append-only deletion_logs
@@ -353,17 +405,17 @@ router.delete("/:id", requireRole("admin", "sme_owner", "pulse_admin"), async (r
       reason,
     });
 
-    await pool.query(`UPDATE stock_items SET is_active=false WHERE id=$1 AND ${ownerWhere}`, queryParams);
+    await pool.query(`UPDATE stock_items SET is_active=false WHERE id=$1`, [item.id]);
     await logAudit(
       req.user.id,
       "STOCK_DELETED",
       "stock_items",
-      req.params.id,
+      item.id,
       item,
       { deleted_at: new Date().toISOString(), reason, item_name: item.name, quantity_at_deletion: item.quantity },
       req.ip
     );
-    res.json({ success: true, message: `Product "${item.name}" deleted and recorded in permanent deletion logs.`, id: req.params.id });
+    res.json({ success: true, message: `Product "${item.name}" deleted and recorded in permanent deletion logs.`, id: item.id });
   } catch (err) { next(err); }
 });
 
