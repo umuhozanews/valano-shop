@@ -155,46 +155,60 @@ router.post("/", async (req, res, next) => {
       });
     }
 
-    // Batch-lock all numeric stock items in one query
-    const stockItemIds = [
-      ...new Set(
-        items
-          .filter(i => i.stock_item_id && (typeof i.stock_item_id === "number" || /^\d+$/.test(String(i.stock_item_id))))
-          .map(i => parseInt(i.stock_item_id, 10))
-      )
-    ];
-    const stockMap = new Map();
-    if (stockItemIds.length) {
-      const { rows: stockRows } = await pool.query(
-        "SELECT * FROM stock_items WHERE id = ANY($1) AND is_active=true",
-        [stockItemIds]
-      );
-      stockRows.forEach(s => stockMap.set(s.id, s));
-    }
-
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
     let total = 0;
     const validatedItems = [];
-    for (const item of items) {
-      const isNumericId = item.stock_item_id && (typeof item.stock_item_id === "number" || /^\d+$/.test(String(item.stock_item_id)));
-      let unitPrice = Number(item.unit_price) || 0;
-      const qty = Math.max(1, parseInt(item.quantity, 10) || 1);
 
-      if (isNumericId) {
-        const stk = stockMap.get(parseInt(item.stock_item_id, 10));
-        if (stk) {
-          if (stk.quantity < qty) {
-            throw Object.assign(new Error(`Insufficient stock for ${stk.name}`), { status: 400 });
-          }
-          // Server-side price enforcement: always use the authoritative price from DB
-          unitPrice = Number(stk.sell_price_rwf) || unitPrice;
-        }
+    // 1. Lock and validate stock sufficiency for EACH line item inside transaction
+    for (const item of items) {
+      const requestedQty = Math.max(1, parseInt(item.quantity, 10) || 1);
+      const rawStockId = String(item.stock_item_id || item.id || "").trim();
+      const isNum = /^\d+$/.test(rawStockId) && Number(rawStockId) < 2147483647;
+      const prodName = String(item.item_name || item.name || "").trim();
+
+      let stk = null;
+      if (isNum) {
+        const { rows } = await pool.query(
+          `SELECT * FROM stock_items 
+           WHERE id = $1 AND ${isAdmin ? "1=1" : "(owner_id = $2 OR owner_id IS NULL)"} AND is_active = true 
+           FOR UPDATE`,
+          [parseInt(rawStockId, 10), req.ownerId || 1]
+        );
+        stk = rows[0];
       }
 
-      const subtotal = unitPrice * qty;
+      if (!stk && prodName) {
+        const { rows } = await pool.query(
+          `SELECT * FROM stock_items 
+           WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) AND ${isAdmin ? "1=1" : "(owner_id = $2 OR owner_id IS NULL)"} AND is_active = true 
+           ORDER BY id ASC 
+           FOR UPDATE`,
+          [prodName, req.ownerId || 1]
+        );
+        stk = rows[0];
+      }
+
+      let unitPrice = Number(item.unit_price) || 0;
+
+      if (stk) {
+        const availableQty = Number(stk.quantity) || 0;
+        if (availableQty < requestedQty) {
+          const err = new Error(`Insufficient stock for "${stk.name}". Available: ${availableQty} ${stk.unit || "units"}, Requested: ${requestedQty}.`);
+          err.status = 400;
+          err.expose = true;
+          err.code = "INSUFFICIENT_STOCK";
+          throw err;
+        }
+        unitPrice = Number(stk.sell_price_rwf) || unitPrice;
+      }
+
+      const subtotal = unitPrice * requestedQty;
       total += subtotal;
       validatedItems.push({
-        stock_item_id: isNumericId ? parseInt(item.stock_item_id, 10) : null,
-        quantity: qty,
+        stock_item_id: stk ? stk.id : (isNum ? parseInt(rawStockId, 10) : null),
+        stock_record: stk,
+        item_name: stk ? stk.name : (prodName || "Item"),
+        quantity: requestedQty,
         unit_price: unitPrice,
         subtotal,
       });
@@ -257,44 +271,15 @@ router.post("/", async (req, res, next) => {
       ])
     );
 
-    // Deduct stock quantities for each sold line item (by stock_item_id or product name)
-    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
-    for (const item of items) {
-      const soldQty = Math.max(1, parseInt(item.quantity, 10) || 1);
-      const rawStockId = String(item.stock_item_id || item.id || "").trim();
-      const isNum = /^\d+$/.test(rawStockId) && Number(rawStockId) < 2147483647;
-      const prodName = String(item.item_name || item.name || "").trim();
-
-      let updated = false;
-
-      // 1. Deduct by integer stock_item_id
-      if (isNum) {
+    // Deduct stock quantities for each validated stock item
+    for (const vItem of validatedItems) {
+      if (vItem.stock_record) {
         const { rows } = await pool.query(
           `UPDATE stock_items 
-           SET quantity = GREATEST(0, quantity - $1), owner_id = COALESCE(owner_id, $3)
-           WHERE id = $2 AND ${isAdmin ? "1=1" : "(owner_id = $3 OR owner_id IS NULL)"}
+           SET quantity = quantity - $1, owner_id = COALESCE(owner_id, $3)
+           WHERE id = $2 
            RETURNING *`,
-          [soldQty, parseInt(rawStockId, 10), req.ownerId || 1]
-        );
-        if (rows.length > 0) {
-          updated = true;
-          const s = rows[0];
-          if (s.quantity === 0) {
-            await notifyAdminsAndManagers("OUT_OF_STOCK", "Out of Stock Alert", `${s.name} is out of stock`);
-          } else if (s.quantity <= s.low_stock_threshold) {
-            await notifyAdminsAndManagers("LOW_STOCK", "Low Stock Alert", `${s.name} has only ${s.quantity} left`);
-          }
-        }
-      }
-
-      // 2. If not deducted by ID, deduct by product name
-      if (!updated && prodName) {
-        const { rows } = await pool.query(
-          `UPDATE stock_items 
-           SET quantity = GREATEST(0, quantity - $1), owner_id = COALESCE(owner_id, $3)
-           WHERE LOWER(TRIM(name)) = LOWER(TRIM($2)) AND ${isAdmin ? "1=1" : "(owner_id = $3 OR owner_id IS NULL)"}
-           RETURNING *`,
-          [soldQty, prodName, req.ownerId || 1]
+          [vItem.quantity, vItem.stock_record.id, req.ownerId || 1]
         );
         if (rows.length > 0) {
           const s = rows[0];
