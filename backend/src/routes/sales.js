@@ -136,7 +136,7 @@ router.post("/", async (req, res, next) => {
       `SELECT s.*, i.invoice_number 
        FROM sales s 
        LEFT JOIN invoices i ON i.sale_id = s.id 
-       WHERE s.idempotency_key = $1 AND s.owner_id = $2 FOR UPDATE`,
+       WHERE s.idempotency_key = $1 AND s.owner_id = $2`,
       [String(idempotencyKey), req.ownerId || 1]
     );
 
@@ -166,7 +166,7 @@ router.post("/", async (req, res, next) => {
     const stockMap = new Map();
     if (stockItemIds.length) {
       const { rows: stockRows } = await pool.query(
-        "SELECT * FROM stock_items WHERE id = ANY($1) AND is_active=true FOR UPDATE",
+        "SELECT * FROM stock_items WHERE id = ANY($1) AND is_active=true",
         [stockItemIds]
       );
       stockRows.forEach(s => stockMap.set(s.id, s));
