@@ -5,7 +5,7 @@ const { verifyToken, requireRole } = require("../middleware/auth");
 const { logAudit, paginate } = require("../utils/helpers");
 const { ensureTenantColumns, addOwnerFilter } = require("../utils/tenant");
 
-router.use(verifyToken, requireRole("admin", "sme_owner", "manager", "accountant", "pulse_admin"));
+router.use(verifyToken, requireRole("admin", "sme_owner", "manager", "accountant", "cashier", "pulse_admin"));
 
 const STATUS_FLOW = ["draft", "ordered", "in_transit", "arrived", "received", "stocked"];
 
@@ -99,50 +99,96 @@ router.get("/:id", async (req, res, next) => {
 
 // POST /api/purchase-orders — Create new purchase order
 router.post("/", async (req, res, next) => {
-  const client = await pool.connect();
   try {
-    const { supplier_id, order_date, arrival_date, notes, status = "ordered", items = [] } = req.body;
-    if (!supplier_id || !order_date) {
-      return res.status(400).json({ error: "supplier_id and order_date are required" });
-    }
+    await ensureTenantColumns();
+    const { supplier_id, supplier_name, order_date, arrival_date, notes, status = "ordered", items = [] } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: "At least one item line is required for a purchase order." });
     }
 
+    // Resolve or auto-create supplier
+    let finalSupplierId = null;
+    const isNumSup = supplier_id && /^\d+$/.test(String(supplier_id)) && Number(supplier_id) < 2147483647;
+    if (isNumSup) {
+      const { rows } = await pool.query("SELECT id FROM suppliers WHERE id = $1", [parseInt(supplier_id, 10)]);
+      if (rows.length > 0) finalSupplierId = rows[0].id;
+    }
+
+    if (!finalSupplierId) {
+      const supLookup = String(supplier_name || supplier_id || "General Supplier").trim();
+      const { rows: existing } = await pool.query(
+        "SELECT id FROM suppliers WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) AND (owner_id = $2 OR owner_id IS NULL)",
+        [supLookup, req.ownerId || 1]
+      );
+      if (existing.length > 0) {
+        finalSupplierId = existing[0].id;
+      } else {
+        const { rows: [created] } = await pool.query(
+          "INSERT INTO suppliers (name, owner_id) VALUES ($1,$2) RETURNING id",
+          [supLookup, req.ownerId || 1]
+        );
+        finalSupplierId = created?.id;
+      }
+    }
+
+    if (!finalSupplierId) {
+      const { rows: [def] } = await pool.query(
+        "SELECT id FROM suppliers WHERE (owner_id = $1 OR owner_id IS NULL) LIMIT 1",
+        [req.ownerId || 1]
+      );
+      if (def) {
+        finalSupplierId = def.id;
+      } else {
+        const { rows: [created] } = await pool.query(
+          "INSERT INTO suppliers (name, owner_id) VALUES ($1,$2) RETURNING id",
+          ["Default Supplier", req.ownerId || 1]
+        );
+        finalSupplierId = created?.id;
+      }
+    }
+
+    const cleanDate = order_date || new Date().toISOString().split("T")[0];
     const cleanStatus = STATUS_FLOW.includes(status) ? status : "ordered";
 
-    await client.query("BEGIN");
-
-    const { rows: [order] } = await client.query(
+    const { rows: [order] } = await pool.query(
       `INSERT INTO purchase_orders (supplier_id, order_date, arrival_date, notes, status, created_by, owner_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [supplier_id, order_date, arrival_date || null, notes || null, cleanStatus, req.user.id, req.ownerId]
+      [finalSupplierId, cleanDate, arrival_date || null, notes || null, cleanStatus, req.user.id, req.ownerId || 1]
     );
 
     const insertedItems = [];
     for (const item of items) {
       const qty = parseInt(item.quantity, 10) || 1;
       const unitCost = parseInt(item.unit_cost_rwf, 10) || 0;
-      const itemName = String(item.item_name || "").trim() || "Item";
+      const itemName = String(item.item_name || item.name || "").trim() || "Item";
 
-      const { rows: [inserted] } = await client.query(
+      let stockItemId = null;
+      const isNumStock = item.stock_item_id && /^\d+$/.test(String(item.stock_item_id)) && Number(item.stock_item_id) < 2147483647;
+      if (isNumStock) {
+        stockItemId = parseInt(item.stock_item_id, 10);
+      } else {
+        const { rows: stkRows } = await pool.query(
+          "SELECT id FROM stock_items WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) AND (owner_id = $2 OR owner_id IS NULL)",
+          [itemName, req.ownerId || 1]
+        );
+        if (stkRows.length > 0) stockItemId = stkRows[0].id;
+      }
+
+      const { rows: [inserted] } = await pool.query(
         `INSERT INTO purchase_order_items (order_id, stock_item_id, item_name, quantity, unit_cost_rwf)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
-        [order.id, item.stock_item_id || null, itemName, qty, unitCost]
+        [order.id, stockItemId, itemName, qty, unitCost]
       );
       insertedItems.push(inserted);
     }
 
-    // Fetch supplier info for response
-    const { rows: [supplier] } = await client.query(
+    const { rows: [supplier] } = await pool.query(
       `SELECT name, phone, email FROM suppliers WHERE id = $1`,
-      [supplier_id]
+      [finalSupplierId]
     );
-
-    await client.query("COMMIT");
 
     await logAudit(
       req.user.id,
@@ -162,16 +208,12 @@ router.post("/", async (req, res, next) => {
       items: insertedItems
     });
   } catch (err) {
-    await client.query("ROLLBACK");
     next(err);
-  } finally {
-    client.release();
   }
 });
 
 // PUT /api/purchase-orders/:id/status — Advance PO status with atomic stocking
 router.put("/:id/status", async (req, res, next) => {
-  const client = await pool.connect();
   try {
     const { status } = req.body;
     if (!STATUS_FLOW.includes(status)) {
@@ -179,34 +221,31 @@ router.put("/:id/status", async (req, res, next) => {
     }
 
     const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
-    const ownerWhere = isAdmin ? "1=1" : "owner_id = $2";
-    const lockParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
+    const selectOwnerWhere = isAdmin ? "1=1" : "owner_id = $2";
+    const selectParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
 
-    await client.query("BEGIN");
-
-    const { rows: [order] } = await client.query(
-      `SELECT * FROM purchase_orders WHERE id = $1 AND ${ownerWhere} FOR UPDATE`,
-      lockParams
+    const { rows: [order] } = await pool.query(
+      `SELECT * FROM purchase_orders WHERE id = $1 AND ${selectOwnerWhere}`,
+      selectParams
     );
     if (!order) {
-      await client.query("ROLLBACK");
       return res.status(404).json({ error: "Purchase order not found" });
     }
 
     if (order.status === "stocked" && status === "stocked") {
-      await client.query("ROLLBACK");
       return res.status(400).json({ error: "Purchase order is already stocked into inventory." });
     }
 
+    const updateOwnerWhere = isAdmin ? "1=1" : "owner_id = $3";
     const updateParams = isAdmin ? [status, req.params.id] : [status, req.params.id, req.ownerId];
-    const { rows: [updated] } = await client.query(
-      `UPDATE purchase_orders SET status = $1 WHERE id = $2 AND ${ownerWhere} RETURNING *`,
+    const { rows: [updated] } = await pool.query(
+      `UPDATE purchase_orders SET status = $1 WHERE id = $2 AND ${updateOwnerWhere} RETURNING *`,
       updateParams
     );
 
     // Atomically increment stock quantities when transitioning to stocked
     if (status === "stocked" && order.status !== "stocked") {
-      const { rows: items } = await client.query(
+      const { rows: items } = await pool.query(
         `SELECT * FROM purchase_order_items WHERE order_id = $1 AND stock_item_id IS NOT NULL`,
         [order.id]
       );
@@ -215,24 +254,19 @@ router.put("/:id/status", async (req, res, next) => {
         const stkParams = isAdmin
           ? [item.quantity, item.stock_item_id]
           : [item.quantity, item.stock_item_id, req.ownerId];
-        await client.query(
+        await pool.query(
           `UPDATE stock_items SET quantity = quantity + $1 WHERE id = $2 AND ${stockOwnerWhere}`,
           stkParams
         );
       }
     }
 
-    await client.query("COMMIT");
-
     const auditAction = status === "stocked" ? "PO_STOCKED" : "PO_STATUS_UPDATED";
     await logAudit(req.user.id, auditAction, "purchase_orders", order.id, order, { status }, req.ip);
 
     res.json(updated);
   } catch (err) {
-    await client.query("ROLLBACK");
     next(err);
-  } finally {
-    client.release();
   }
 });
 

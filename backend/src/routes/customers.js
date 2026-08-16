@@ -7,7 +7,7 @@ const { ensureTenantColumns, addOwnerFilter } = require("../utils/tenant");
 
 router.use(verifyToken);
 
-router.get("/", requireRole("admin", "sme_owner", "manager", "accountant", "pulse_admin"), async (req, res, next) => {
+router.get("/", requireRole("admin", "sme_owner", "manager", "accountant", "cashier", "pulse_admin"), async (req, res, next) => {
   try {
     await ensureTenantColumns();
     const { search, type, segment, page, limit } = req.query;
@@ -64,19 +64,19 @@ router.get("/", requireRole("admin", "sme_owner", "manager", "accountant", "puls
            COUNT(*)::text as cnt
          FROM stats
          GROUP BY 1`,
-        params
+        summaryParams
       ),
     ]);
     res.json({ data: data.rows, total: parseInt(cnt.rows[0].count), summary: summary.rows });
   } catch (err) { next(err); }
 });
 
-router.get("/top", requireRole("admin", "sme_owner", "manager", "accountant", "pulse_admin"), async (req, res, next) => {
+router.get("/top", requireRole("admin", "sme_owner", "manager", "accountant", "cashier", "pulse_admin"), async (req, res, next) => {
   try {
     await ensureTenantColumns();
-    const conds = []; const params = [];
-    addOwnerFilter(conds, params, req, 'c');
-    const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+    const conds = ["1=1"]; const params = [];
+    addOwnerFilter(conds, params, req.ownerId, 'c');
+    const where = `WHERE ${conds.join(" AND ")}`;
     const { rows } = await pool.query(
       `SELECT c.*, COUNT(s.id) as orders, COALESCE(SUM(s.total_amount),0) as spent
        FROM customers c LEFT JOIN sales s ON s.customer_id=c.id AND s.is_voided=false
@@ -88,7 +88,7 @@ router.get("/top", requireRole("admin", "sme_owner", "manager", "accountant", "p
   } catch (err) { next(err); }
 });
 
-router.get("/:id", requireRole("admin", "sme_owner", "manager", "accountant", "pulse_admin"), async (req, res, next) => {
+router.get("/:id", requireRole("admin", "sme_owner", "manager", "accountant", "cashier", "pulse_admin"), async (req, res, next) => {
   try {
     const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
     const cOwnerWhere = isAdmin ? "1=1" : "c.owner_id=$2";
@@ -122,15 +122,33 @@ router.get("/:id", requireRole("admin", "sme_owner", "manager", "accountant", "p
   } catch (err) { next(err); }
 });
 
-router.post("/", async (req, res, next) => {
+router.post("/", requireRole("admin", "sme_owner", "manager", "accountant", "cashier", "pulse_admin"), async (req, res, next) => {
   try {
     await ensureTenantColumns();
     const { name, phone, location, type, notes, credit_limit, tin_number } = req.body;
-    if (!name) return res.status(400).json({ error: "Customer name required" });
+    if (!name || !String(name).trim()) return res.status(400).json({ error: "Customer name required" });
+
+    // Check if customer with same name already exists for this tenant
+    const { rows: existing } = await pool.query(
+      `SELECT * FROM customers WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) AND (owner_id = $2 OR owner_id IS NULL)`,
+      [String(name).trim(), req.ownerId || 1]
+    );
+    if (existing.length > 0) {
+      // If phone was provided and existing didn't have phone, update it
+      if (phone && !existing[0].phone) {
+        const { rows: [updated] } = await pool.query(
+          `UPDATE customers SET phone = $1 WHERE id = $2 RETURNING *`,
+          [String(phone).trim(), existing[0].id]
+        );
+        return res.status(200).json(updated || existing[0]);
+      }
+      return res.status(200).json(existing[0]);
+    }
+
     const cleanTin = tin_number && String(tin_number).trim().length > 0 ? String(tin_number).trim() : null;
     const { rows: [c] } = await pool.query(
       "INSERT INTO customers (name, phone, location, type, notes, credit_limit, tin_number, owner_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *",
-      [name, phone || null, location || null, type || "retailer", notes || null, credit_limit || 0, cleanTin, req.ownerId]
+      [String(name).trim(), phone ? String(phone).trim() : null, location || null, type || "retailer", notes || null, credit_limit || 0, cleanTin, req.ownerId || 1]
     );
     res.status(201).json(c);
   } catch (err) { next(err); }
