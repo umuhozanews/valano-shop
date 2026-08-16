@@ -727,4 +727,87 @@ router.get("/deletion-logs", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ─── Maintenance: Clean Seed & Unowned Data ───────────────────────────────────
+router.post("/clean-seed-data", async (req, res, next) => {
+  try {
+    // 1. Check exact suppliers requested by user
+    const { rows: targetedSuppliers } = await pool.query(
+      `SELECT id, name, phone, owner_id FROM suppliers WHERE name ILIKE ANY($1)`,
+      [['%Bralirwa%', '%GATETET%', '%Inyange%', '%Sulfo%']]
+    );
+
+    // 2. Count null-owner rows before cleanup
+    const tables = ['suppliers', 'customers', 'stock_items', 'sales', 'expenses', 'purchase_orders', 'invoices'];
+    const beforeCounts = {};
+    for (const t of tables) {
+      try {
+        const { rows } = await pool.query(`SELECT COUNT(*)::int AS cnt FROM ${t} WHERE owner_id IS NULL`);
+        beforeCounts[t] = rows[0]?.cnt || 0;
+      } catch (e) {
+        beforeCounts[t] = 0;
+      }
+    }
+
+    // 3. Purge seed / null-owner rows from database
+    const deletedCounts = {};
+    
+    // Purge purchase_order_items for unowned purchase orders
+    await pool.query(`DELETE FROM purchase_order_items WHERE order_id IN (SELECT id FROM purchase_orders WHERE owner_id IS NULL)`).catch(() => {});
+    
+    // Purge sale_items for unowned sales
+    await pool.query(`DELETE FROM sale_items WHERE sale_id IN (SELECT id FROM sales WHERE owner_id IS NULL)`).catch(() => {});
+    
+    // Purge accounts_receivable for unowned sales/customers
+    await pool.query(`DELETE FROM accounts_receivable WHERE owner_id IS NULL`).catch(() => {});
+    
+    // Purge unowned invoices
+    const delInv = await pool.query(`DELETE FROM invoices WHERE owner_id IS NULL RETURNING id`).catch(() => ({ rows: [] }));
+    deletedCounts.invoices = delInv.rows.length;
+
+    // Purge unowned purchase_orders
+    const delPO = await pool.query(`DELETE FROM purchase_orders WHERE owner_id IS NULL RETURNING id`).catch(() => ({ rows: [] }));
+    deletedCounts.purchase_orders = delPO.rows.length;
+
+    // Purge unowned sales
+    const delSales = await pool.query(`DELETE FROM sales WHERE owner_id IS NULL RETURNING id`).catch(() => ({ rows: [] }));
+    deletedCounts.sales = delSales.rows.length;
+
+    // Purge unowned expenses
+    const delExp = await pool.query(`DELETE FROM expenses WHERE owner_id IS NULL RETURNING id`).catch(() => ({ rows: [] }));
+    deletedCounts.expenses = delExp.rows.length;
+
+    // Purge unowned stock_items
+    const delStock = await pool.query(`DELETE FROM stock_items WHERE owner_id IS NULL RETURNING id`).catch(() => ({ rows: [] }));
+    deletedCounts.stock_items = delStock.rows.length;
+
+    // Purge unowned customers
+    const delCust = await pool.query(`DELETE FROM customers WHERE owner_id IS NULL RETURNING id`).catch(() => ({ rows: [] }));
+    deletedCounts.customers = delCust.rows.length;
+
+    // Purge unowned suppliers (including unowned Bralirwa, Inyange, Sulfo, GATETET)
+    const delSupp = await pool.query(`DELETE FROM suppliers WHERE owner_id IS NULL RETURNING id, name`).catch(() => ({ rows: [] }));
+    deletedCounts.suppliers = delSupp.rows.length;
+    deletedCounts.deleted_supplier_names = delSupp.rows.map(r => r.name);
+
+    // 4. Check remaining rows with owner_id IS NULL
+    const afterCounts = {};
+    for (const t of tables) {
+      try {
+        const { rows } = await pool.query(`SELECT COUNT(*)::int AS cnt FROM ${t} WHERE owner_id IS NULL`);
+        afterCounts[t] = rows[0]?.cnt || 0;
+      } catch (e) {
+        afterCounts[t] = 0;
+      }
+    }
+
+    res.json({
+      message: "Database seed data cleaned successfully.",
+      targeted_suppliers_found_before: targetedSuppliers,
+      null_owner_counts_before: beforeCounts,
+      deleted_counts: deletedCounts,
+      null_owner_counts_after: afterCounts,
+    });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
