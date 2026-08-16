@@ -28,7 +28,7 @@ function addOwnerFilter(conds, params, reqOrOwnerId, alias = '') {
   if (ownerId !== null && ownerId !== undefined) {
     params.push(ownerId);
     const col = alias ? `${alias}.owner_id` : 'owner_id';
-    conds.push(`${col} = $${params.length}`);
+    conds.push(`(${col} = $${params.length} OR ${col} IS NULL)`);
   }
 }
 
