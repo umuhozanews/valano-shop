@@ -365,15 +365,30 @@ router.post("/:id/void", requireRole("admin", "sme_owner", "manager", "accountan
 });
 
 // DELETE /api/sales/:id — Delete / Void Sale, Log Snapshot, & Restore Stock
-router.delete("/:id", requireRole("admin", "sme_owner", "manager", "accountant", "pulse_admin"), async (req, res, next) => {
+router.delete("/:id", requireRole("admin", "sme_owner", "manager", "accountant", "cashier", "pulse_admin"), async (req, res, next) => {
   try {
     const reason = req.body?.reason || req.query?.reason || "Deleted by merchant";
     const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
     const ownerWhere = isAdmin ? "1=1" : "s.owner_id=$2";
     const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
 
-    const { rows: [sale] } = await pool.query(`SELECT s.* FROM sales s WHERE s.id=$1 AND ${ownerWhere}`, queryParams);
-    if (!sale) return res.status(404).json({ error: "Sale not found" });
+    const rawId = String(req.params.id || "").trim();
+    const isNumeric = /^\d+$/.test(rawId);
+    const numId = isNumeric ? parseInt(rawId, 10) : null;
+
+    let sale = null;
+    if (numId !== null) {
+      const { rows } = await pool.query(`SELECT s.* FROM sales s WHERE s.id=$1 AND ${ownerWhere}`, queryParams);
+      sale = rows[0];
+    }
+    if (!sale) {
+      const { rows } = await pool.query(
+        `SELECT s.* FROM sales s WHERE s.invoice_number=$1 AND ${isAdmin ? "1=1" : "s.owner_id=$2"}`,
+        [rawId, ...(isAdmin ? [] : [req.ownerId])]
+      );
+      sale = rows[0];
+    }
+    if (!sale) return res.status(404).json({ error: `Sale "${rawId}" not found` });
 
     // Fetch related records for complete snapshot before deletion/voiding
     const [itemsRes, invoiceRes, arRes] = await Promise.all([

@@ -121,7 +121,7 @@ router.put("/:id/status", requireRole("admin", "manager", "accountant"), async (
   } catch (err) { next(err); }
 });
 
-router.delete("/:id", requireRole("admin", "sme_owner", "manager", "accountant", "pulse_admin"), async (req, res, next) => {
+router.delete("/:id", requireRole("admin", "sme_owner", "manager", "accountant", "cashier", "pulse_admin"), async (req, res, next) => {
   try {
     const reason = req.body?.reason || req.query?.reason || "Deleted by merchant";
 
@@ -129,23 +129,71 @@ router.delete("/:id", requireRole("admin", "sme_owner", "manager", "accountant",
     const ownerWhere = isAdmin ? "1=1" : "s.owner_id=$2";
     const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
 
-    const { rows: [invoice] } = await pool.query(
-      `SELECT i.*, s.total_amount, s.customer_name, s.id as sale_id, s.owner_id as sale_owner_id
-       FROM invoices i JOIN sales s ON s.id=i.sale_id
-       WHERE i.id=$1 AND ${ownerWhere}`,
-      queryParams
-    );
-    if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+    const rawId = String(req.params.id || "").trim();
+    const isNumeric = /^\d+$/.test(rawId);
+    const numId = isNumeric ? parseInt(rawId, 10) : null;
+
+    let invoice = null;
+
+    // 1. Try finding via invoices table joined with sales by integer id or sale_id
+    if (numId !== null) {
+      const { rows } = await pool.query(
+        `SELECT i.*, s.total_amount, s.customer_name, s.id as sale_id, s.owner_id as sale_owner_id, s.invoice_number as s_inv_num
+         FROM invoices i JOIN sales s ON s.id=i.sale_id
+         WHERE (i.id=$1 OR i.sale_id=$1) AND ${ownerWhere}`,
+        queryParams
+      );
+      invoice = rows[0];
+    }
+
+    // 2. Try finding by invoice_number
+    if (!invoice) {
+      const { rows } = await pool.query(
+        `SELECT i.*, s.total_amount, s.customer_name, s.id as sale_id, s.owner_id as sale_owner_id, s.invoice_number as s_inv_num
+         FROM invoices i JOIN sales s ON s.id=i.sale_id
+         WHERE (i.invoice_number=$1 OR s.invoice_number=$1) AND ${isAdmin ? "1=1" : "s.owner_id=$2"}`,
+        [rawId, ...(isAdmin ? [] : [req.ownerId])]
+      );
+      invoice = rows[0];
+    }
+
+    // 3. If still not found, check if a sale exists directly (standalone POS sale)
+    if (!invoice) {
+      if (numId !== null) {
+        const { rows } = await pool.query(
+          `SELECT NULL as id, s.invoice_number, s.total_amount, s.customer_name, s.id as sale_id, s.owner_id as sale_owner_id, s.created_at as issued_at, s.invoice_number as s_inv_num
+           FROM sales s
+           WHERE s.id=$1 AND ${isAdmin ? "1=1" : "s.owner_id=$2"}`,
+          queryParams
+        );
+        invoice = rows[0];
+      }
+      if (!invoice) {
+        const { rows } = await pool.query(
+          `SELECT NULL as id, s.invoice_number, s.total_amount, s.customer_name, s.id as sale_id, s.owner_id as sale_owner_id, s.created_at as issued_at, s.invoice_number as s_inv_num
+           FROM sales s
+           WHERE s.invoice_number=$1 AND ${isAdmin ? "1=1" : "s.owner_id=$2"}`,
+          [rawId, ...(isAdmin ? [] : [req.ownerId])]
+        );
+        invoice = rows[0];
+      }
+    }
+
+    if (!invoice) return res.status(404).json({ error: `Invoice "${rawId}" not found` });
+
+    const saleId = invoice.sale_id;
+    const invId = invoice.id;
+    const invNumber = invoice.invoice_number || invoice.s_inv_num || `INV-${saleId}`;
 
     // Fetch related records for full snapshot
     const [itemsRes, arRes] = await Promise.all([
-      pool.query("SELECT si.*, stk.name as item_name, stk.unit, stk.barcode FROM sale_items si LEFT JOIN stock_items stk ON stk.id=si.stock_item_id WHERE si.sale_id=$1", [invoice.sale_id]),
-      pool.query("SELECT * FROM accounts_receivable WHERE sale_id=$1", [invoice.sale_id]),
+      pool.query("SELECT si.*, stk.name as item_name, stk.unit, stk.barcode FROM sale_items si LEFT JOIN stock_items stk ON stk.id=si.stock_item_id WHERE si.sale_id=$1", [saleId]),
+      pool.query("SELECT * FROM accounts_receivable WHERE sale_id=$1", [saleId]),
     ]);
 
     const snapshot = {
       invoice,
-      sale_id: invoice.sale_id,
+      sale_id: saleId,
       items: itemsRes.rows,
       accounts_receivable: arRes.rows[0] || null,
     };
@@ -153,7 +201,7 @@ router.delete("/:id", requireRole("admin", "sme_owner", "manager", "accountant",
     // Log permanent snapshot into deletion_logs
     await logDeletion({
       entity_type: "invoice",
-      entity_id: invoice.id,
+      entity_id: invId || saleId,
       deleted_data: snapshot,
       deleted_by: req.user.id,
       owner_id: invoice.owner_id || invoice.sale_owner_id || req.ownerId,
@@ -161,12 +209,15 @@ router.delete("/:id", requireRole("admin", "sme_owner", "manager", "accountant",
     });
 
     await pool.query("BEGIN");
-    await pool.query("UPDATE invoices SET status='voided' WHERE id=$1", [invoice.id]);
+    if (invId) {
+      await pool.query("UPDATE invoices SET status='voided' WHERE id=$1", [invId]);
+    }
+    await pool.query("UPDATE invoices SET status='voided' WHERE sale_id=$1", [saleId]);
     await pool.query(
       "UPDATE sales SET is_voided=true, void_reason=$1, voided_by=$2 WHERE id=$3",
-      [String(reason).trim(), req.user.id, invoice.sale_id]
+      [String(reason).trim(), req.user.id, saleId]
     );
-    await pool.query("UPDATE accounts_receivable SET status='voided' WHERE sale_id=$1", [invoice.sale_id]);
+    await pool.query("UPDATE accounts_receivable SET status='voided' WHERE sale_id=$1", [saleId]);
 
     // Restore stock item quantities
     for (const item of itemsRes.rows) {
@@ -181,16 +232,17 @@ router.delete("/:id", requireRole("admin", "sme_owner", "manager", "accountant",
       req.user.id,
       "INVOICE_VOIDED",
       "invoices",
-      invoice.id,
+      invId || saleId,
       invoice,
-      { invoice_number: invoice.invoice_number, void_reason: String(reason).trim(), total_amount: invoice.total_amount },
+      { invoice_number: invNumber, void_reason: String(reason).trim(), total_amount: invoice.total_amount },
       req.ip
     );
 
     res.json({
       success: true,
-      message: `Invoice ${invoice.invoice_number} deleted, stock restored, and recorded in permanent deletion logs.`,
-      id: invoice.id,
+      message: `Invoice ${invNumber} voided, stock restored, and recorded in permanent deletion logs.`,
+      id: invId || saleId,
+      invoice_number: invNumber,
     });
   } catch (err) {
     await pool.query("ROLLBACK").catch(() => {});
