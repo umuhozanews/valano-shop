@@ -656,4 +656,75 @@ router.get("/audit", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ─── 7. Permanent Append-Only Deletion Logs ───────────────────────────────────
+// Note: This endpoint is strictly read-only. No UPDATE or DELETE routes exist.
+router.get("/deletion-logs", async (req, res, next) => {
+  try {
+    const { entity_type, owner_id, start_date, end_date, search, page = 1, limit = 50 } = req.query;
+    const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+
+    const conditions = [];
+    const params = [];
+
+    if (entity_type && entity_type !== "all") {
+      params.push(entity_type.toLowerCase().trim());
+      conditions.push(`dl.entity_type = $${params.length}`);
+    }
+
+    if (owner_id && owner_id !== "all") {
+      params.push(parseInt(owner_id, 10));
+      conditions.push(`dl.owner_id = $${params.length}`);
+    }
+
+    if (start_date) {
+      params.push(start_date);
+      conditions.push(`DATE(dl.deleted_at) >= $${params.length}`);
+    }
+
+    if (end_date) {
+      params.push(end_date);
+      conditions.push(`DATE(dl.deleted_at) <= $${params.length}`);
+    }
+
+    if (search && search.trim()) {
+      params.push(`%${search.trim()}%`);
+      conditions.push(`(u.name ILIKE $${params.length} OR u.email ILIKE $${params.length} OR o.name ILIKE $${params.length} OR dl.reason ILIKE $${params.length} OR dl.entity_type ILIKE $${params.length})`);
+    }
+
+    const where = conditions.length ? "WHERE " + conditions.join(" AND ") : "";
+
+    const [logsRes, countRes] = await Promise.all([
+      pool.query(`
+        SELECT dl.*,
+               u.name AS deleted_by_name, u.email AS deleted_by_email, u.role AS deleted_by_role,
+               o.name AS owner_name, o.email AS owner_email,
+               COALESCE(sett.shop_name, o.name || '''s Store') AS shop_name
+        FROM deletion_logs dl
+        LEFT JOIN users u ON u.id = dl.deleted_by
+        LEFT JOIN users o ON o.id = dl.owner_id
+        LEFT JOIN settings sett ON sett.owner_id = dl.owner_id
+        ${where}
+        ORDER BY dl.deleted_at DESC
+        LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+      `, [...params, parseInt(limit, 10), offset]),
+
+      pool.query(`
+        SELECT COUNT(*) AS total
+        FROM deletion_logs dl
+        LEFT JOIN users u ON u.id = dl.deleted_by
+        LEFT JOIN users o ON o.id = dl.owner_id
+        LEFT JOIN settings sett ON sett.owner_id = dl.owner_id
+        ${where}
+      `, params),
+    ]);
+
+    res.json({
+      data: logsRes.rows,
+      total: parseInt(countRes.rows[0]?.total || 0, 10),
+      page: parseInt(page, 10),
+      limit: parseInt(limit, 10),
+    });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

@@ -5,6 +5,7 @@ const { verifyToken, requireRole } = require("../middleware/auth");
 const { logAudit, paginate, notifyAdminsAndManagers } = require("../utils/helpers");
 const { generateBarcodeBuffer } = require("../utils/barcode");
 const { ensureTenantColumns, addOwnerFilter } = require("../utils/tenant");
+const { logDeletion } = require("../utils/deletion");
 const multer = require("multer");
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -334,12 +335,23 @@ router.post("/:id/add-quantity", requireRole("admin", "sme_owner", "manager", "p
 
 router.delete("/:id", requireRole("admin", "sme_owner", "pulse_admin"), async (req, res, next) => {
   try {
+    const reason = req.body?.reason || req.query?.reason || "Deleted by merchant";
     const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
     const ownerWhere = isAdmin ? "1=1" : "owner_id=$2";
     const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
 
     const { rows: [item] } = await pool.query(`SELECT * FROM stock_items WHERE id=$1 AND ${ownerWhere}`, queryParams);
     if (!item) return res.status(404).json({ error: "Item not found" });
+
+    // Capture full snapshot and insert into dedicated append-only deletion_logs
+    await logDeletion({
+      entity_type: "stock",
+      entity_id: item.id,
+      deleted_data: item,
+      deleted_by: req.user.id,
+      owner_id: item.owner_id || req.ownerId,
+      reason,
+    });
 
     await pool.query(`UPDATE stock_items SET is_active=false WHERE id=$1 AND ${ownerWhere}`, queryParams);
     await logAudit(
@@ -348,10 +360,10 @@ router.delete("/:id", requireRole("admin", "sme_owner", "pulse_admin"), async (r
       "stock_items",
       req.params.id,
       item,
-      { deleted_at: new Date().toISOString(), reason: "Deleted by merchant", item_name: item.name, quantity_at_deletion: item.quantity },
+      { deleted_at: new Date().toISOString(), reason, item_name: item.name, quantity_at_deletion: item.quantity },
       req.ip
     );
-    res.json({ success: true, message: `Product "${item.name}" deleted and recorded in logs.`, id: req.params.id });
+    res.json({ success: true, message: `Product "${item.name}" deleted and recorded in permanent deletion logs.`, id: req.params.id });
   } catch (err) { next(err); }
 });
 

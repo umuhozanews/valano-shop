@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { ensureDeletionLogsTable } = require("./deletion");
 let _migrated = false;
 const TENANT_TABLES = ['stock_items','sales','expenses','customers','suppliers','invoices','purchase_orders','journal_entries','notifications'];
 
@@ -7,6 +8,7 @@ async function ensureTenantColumns() {
   for (const t of TENANT_TABLES) {
     await pool.query(`ALTER TABLE ${t} ADD COLUMN IF NOT EXISTS owner_id INT`).catch(() => {});
   }
+  await ensureDeletionLogsTable().catch(() => {});
   _migrated = true;
 }
 

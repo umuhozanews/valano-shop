@@ -35,6 +35,10 @@ export default function StockList() {
   const [form,    setForm]    = useState(EMPTY_FORM);
   const [saving,  setSaving]  = useState(false);
 
+  const [restockItem, setRestockItem] = useState(null);
+  const [restockQty, setRestockQty] = useState("10");
+  const [restocking, setRestocking] = useState(false);
+
   const canEdit = ["pulse_admin","sme_owner","admin","manager"].includes(user?.role);
 
   const fetchData = useCallback(async () => {
@@ -81,6 +85,24 @@ export default function StockList() {
     finally   { setSaving(false); }
   }
 
+  async function handleConfirmRestock(e) {
+    if (e) e.preventDefault();
+    if (!restockItem) return;
+    const qty = parseInt(restockQty, 10);
+    if (isNaN(qty) || qty <= 0) return toast.error("Please enter a valid quantity to add.");
+    setRestocking(true);
+    try {
+      await api.post(`/stock/${restockItem.id}/add-quantity`, { added_quantity: qty });
+      toast.success(`Added +${qty} ${restockItem.unit || "units"} to "${restockItem.name}"`);
+      setRestockItem(null);
+      fetchData();
+    } catch (e) {
+      toast.error(e.response?.data?.error || "Failed to restock");
+    } finally {
+      setRestocking(false);
+    }
+  }
+
   async function handleDelete(id) {
     if (!confirm("Delete this product?")) return;
     try { await api.delete(`/stock/${id}`); toast.success("Product deleted"); fetchData(); }
@@ -118,11 +140,20 @@ export default function StockList() {
     { key:"sell_price_rwf",  label:"Sell",   render:v => formatRWF(v) },
     { key:"status",       label:"Status",    render:v => <Badge status={STATUS_MAP[v]||"neutral"} label={v?.replace(/_/g," ")||"—"} /> },
     { key:"id", label:"", render:(v,r) => (
-      <div className="flex gap-1">
-        <button onClick={() => navigate(`/app/stock/${v}`)} className="p-1 text-text-secondary hover:text-primary rounded"><Clock size={14}/></button>
+      <div className="flex items-center gap-1.5">
+        {canEdit && (
+          <button
+            onClick={() => { setRestockItem(r); setRestockQty("10"); }}
+            className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded text-[11px] font-bold transition flex items-center gap-1"
+            title="Quick Restock"
+          >
+            <Plus size={12} /> Restock
+          </button>
+        )}
+        <button onClick={() => navigate(`/app/stock/${v}`)} className="p-1 text-text-secondary hover:text-primary rounded" title="View History"><Clock size={14}/></button>
         {canEdit && <>
-          <button onClick={() => openEdit(r)} className="p-1 text-text-secondary hover:text-primary rounded"><Edit size={14}/></button>
-          <button onClick={() => handleDelete(v)} className="p-1 text-text-secondary hover:text-danger rounded"><Trash2 size={14}/></button>
+          <button onClick={() => openEdit(r)} className="p-1 text-text-secondary hover:text-primary rounded" title="Edit"><Edit size={14}/></button>
+          <button onClick={() => handleDelete(v)} className="p-1 text-text-secondary hover:text-danger rounded" title="Delete"><Trash2 size={14}/></button>
         </>}
       </div>
     )},
@@ -210,6 +241,73 @@ export default function StockList() {
           <Input label="Cost Price (RWF)"   type="number" value={form.cost_price_rwf}      onChange={e=>setForm(f=>({...f,cost_price_rwf:e.target.value}))} />
           <Input label="Selling Price (RWF)" type="number" value={form.sell_price_rwf}     onChange={e=>setForm(f=>({...f,sell_price_rwf:e.target.value}))} required />
         </div>
+      </Modal>
+
+      {/* Quick Restock Modal */}
+      <Modal
+        open={Boolean(restockItem)}
+        onClose={() => setRestockItem(null)}
+        title={restockItem ? `Restock: ${restockItem.name}` : "Restock Product"}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setRestockItem(null)}>Cancel</Button>
+            <Button loading={restocking} onClick={handleConfirmRestock}>
+              Confirm +{restockQty || 0} Restock
+            </Button>
+          </>
+        }
+      >
+        {restockItem && (
+          <form onSubmit={handleConfirmRestock} className="space-y-4">
+            <div className="p-3 bg-neutral-50 rounded-lg border border-border flex items-center justify-between text-xs">
+              <div>
+                <p className="font-semibold text-text-primary">{restockItem.name}</p>
+                <p className="text-text-secondary">{restockItem.category || "General"} · {restockItem.unit || "pcs"}</p>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] text-text-secondary uppercase block font-semibold">Current in Stock</span>
+                <span className="text-sm font-bold text-text-primary">{restockItem.quantity} {restockItem.unit || "pcs"}</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-medium text-text-primary mb-1.5">Quick Add Presets:</label>
+              <div className="grid grid-cols-5 gap-1.5">
+                {[5, 10, 25, 50, 100].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setRestockQty(String(preset))}
+                    className={`py-1.5 px-2 rounded text-xs font-semibold border transition ${
+                      Number(restockQty) === preset
+                        ? "bg-primary text-white border-primary"
+                        : "bg-surface text-text-primary border-border hover:bg-neutral-100"
+                    }`}
+                  >
+                    +{preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <Input
+              label={`Quantity to Add (${restockItem.unit || "units"})`}
+              type="number"
+              min="1"
+              required
+              value={restockQty}
+              onChange={(e) => setRestockQty(e.target.value)}
+              placeholder="e.g. 50"
+            />
+
+            <div className="p-2.5 rounded bg-emerald-50 border border-emerald-200 text-xs flex items-center justify-between font-semibold text-emerald-800">
+              <span>New Total Stock:</span>
+              <span className="text-sm font-bold">
+                {(Number(restockItem.quantity) || 0) + (Number(restockQty) || 0)} {restockItem.unit || "pcs"}
+              </span>
+            </div>
+          </form>
+        )}
       </Modal>
     </PageWrapper>
   );

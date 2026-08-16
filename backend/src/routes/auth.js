@@ -81,7 +81,7 @@ router.post("/login", async (req, res, next) => {
       ? null
       : (user.role === 'sme_owner' ? user.id : (user.owner_id || null));
 
-    const payload = { id: user.id, email: user.email, role: user.role, ownerId };
+    const payload = { id: user.id, email: user.email, role: user.role, ownerId, token_version: user.token_version || 1 };
     const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: "15m" });
     const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, { expiresIn: "7d" });
 
@@ -779,24 +779,238 @@ router.put("/consent", verifyToken, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ─── SME owner: list their own team ───────────────────────────────────────────
+// ─── SME owner & Admin: Team / Workers Management ────────────────────────────
+// GET /api/auth/team — List team members scoped to owner
 router.get("/team", verifyToken, async (req, res, next) => {
+  try {
+    if (!['sme_owner','admin','pulse_admin','manager'].includes(req.user.role))
+      return res.status(403).json({ error: "Insufficient permissions" });
+
+    const ownerId = ['pulse_admin','admin'].includes(req.user.role)
+      ? (req.query.owner_id || req.user.id)
+      : (req.ownerId || req.user.id);
+
+    const { rows } = await pool.query(
+      `SELECT u.id, u.name, u.email, u.role, u.phone, u.is_active, u.token_version, u.created_at,
+              COALESCE(sales_agg.sales_count, 0)::int as sales_count,
+              COALESCE(sales_agg.total_revenue, 0)::bigint as total_revenue,
+              COALESCE(act_agg.total_actions, 0)::int as total_actions,
+              act_agg.last_action_at
+       FROM users u
+       LEFT JOIN (
+         SELECT user_id, COUNT(*) as sales_count, SUM(total_amount) as total_revenue
+         FROM sales WHERE is_voided = false
+         GROUP BY user_id
+       ) sales_agg ON sales_agg.user_id = u.id
+       LEFT JOIN (
+         SELECT user_id, COUNT(*) as total_actions, MAX(created_at) as last_action_at
+         FROM audit_log
+         GROUP BY user_id
+       ) act_agg ON act_agg.user_id = u.id
+       WHERE u.owner_id = $1
+       ORDER BY u.created_at DESC`,
+      [ownerId]
+    );
+    res.json(rows);
+  } catch (err) { next(err); }
+});
+
+// POST /api/auth/team — Add new worker with dedicated login credentials
+router.post("/team", verifyToken, async (req, res, next) => {
+  try {
+    if (!['sme_owner','admin','pulse_admin','manager'].includes(req.user.role))
+      return res.status(403).json({ error: "Insufficient permissions to add team workers" });
+
+    const { name, email, phone, password, role } = req.body;
+
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({ error: "Worker full name is required." });
+    }
+
+    if (!password || String(password).length < 6) {
+      return res.status(400).json({ error: "Password must be at least 6 characters long." });
+    }
+
+    // Map verbose roles from UI to database roles
+    let cleanRole = "cashier";
+    const rawRole = String(role || "").toLowerCase();
+    if (rawRole.includes("manager")) cleanRole = "manager";
+    else if (rawRole.includes("accountant")) cleanRole = "accountant";
+    else if (rawRole.includes("worker")) cleanRole = "worker";
+    else if (rawRole.includes("cashier")) cleanRole = "cashier";
+
+    // Clean email / phone
+    const cleanName = String(name).trim();
+    const cleanPhone = phone && String(phone).trim() ? String(phone).trim() : null;
+    let cleanEmail = email && String(email).trim() ? String(email).trim().toLowerCase() : null;
+
+    if (!cleanEmail && !cleanPhone) {
+      return res.status(400).json({ error: "Please provide either an email address or phone number for worker login." });
+    }
+
+    // Fallback email if only phone was supplied
+    if (!cleanEmail) {
+      const sanitizedPhone = (cleanPhone || "").replace(/\D/g, "");
+      cleanEmail = `worker.${sanitizedPhone || Date.now()}@inzira.team`;
+    }
+
+    // Check uniqueness of email
+    const { rows: existingEmail } = await pool.query(
+      "SELECT id FROM users WHERE LOWER(email) = LOWER($1)",
+      [cleanEmail]
+    );
+    if (existingEmail.length > 0) {
+      return res.status(409).json({ error: `An account with email "${cleanEmail}" already exists.` });
+    }
+
+    // Check uniqueness of phone if provided
+    if (cleanPhone) {
+      const { rows: existingPhone } = await pool.query(
+        "SELECT id FROM users WHERE phone = $1",
+        [cleanPhone]
+      );
+      if (existingPhone.length > 0) {
+        return res.status(409).json({ error: `An account with phone number "${cleanPhone}" already exists.` });
+      }
+    }
+
+    const hash = await bcrypt.hash(password, 10);
+    const ownerId = ['pulse_admin','admin'].includes(req.user.role)
+      ? (req.body.owner_id || req.user.id)
+      : (req.ownerId || req.user.id);
+
+    const { rows: [worker] } = await pool.query(
+      `INSERT INTO users (name, email, phone, password_hash, role, owner_id, is_active, token_version, profile_complete)
+       VALUES ($1, $2, $3, $4, $5, $6, true, 1, true)
+       RETURNING id, name, email, phone, role, owner_id, is_active, token_version, created_at`,
+      [cleanName, cleanEmail, cleanPhone, hash, cleanRole, ownerId]
+    );
+
+    await logAudit(
+      req.user.id,
+      "WORKER_CREATED",
+      "users",
+      worker.id,
+      null,
+      { name: cleanName, email: cleanEmail, phone: cleanPhone, role: cleanRole, owner_id: ownerId },
+      req.ip
+    );
+
+    res.status(201).json({
+      success: true,
+      message: `Worker "${cleanName}" created successfully with role ${cleanRole}.`,
+      worker,
+    });
+  } catch (err) { next(err); }
+});
+
+// PUT /api/auth/team/:id/toggle-active — Activate / Deactivate worker & revoke token
+router.put("/team/:id/toggle-active", verifyToken, async (req, res, next) => {
+  try {
+    if (!['sme_owner','admin','pulse_admin','manager'].includes(req.user.role))
+      return res.status(403).json({ error: "Insufficient permissions" });
+
+    const ownerId = ['pulse_admin','admin'].includes(req.user.role)
+      ? null
+      : (req.ownerId || req.user.id);
+
+    const ownerWhere = ownerId ? "AND owner_id = $2" : "";
+    const params = ownerId ? [req.params.id, ownerId] : [req.params.id];
+
+    const { rows: [target] } = await pool.query(
+      `SELECT id, name, email, is_active, token_version, owner_id FROM users WHERE id = $1 ${ownerWhere}`,
+      params
+    );
+    if (!target) return res.status(404).json({ error: "Worker not found on your team." });
+
+    const newStatus = !target.is_active;
+    const newVersion = (target.token_version || 1) + 1;
+
+    const { rows: [updated] } = await pool.query(
+      `UPDATE users
+       SET is_active = $1, token_version = $2
+       WHERE id = $3
+       RETURNING id, name, email, role, phone, is_active, token_version, created_at`,
+      [newStatus, newVersion, target.id]
+    );
+
+    const action = newStatus ? "WORKER_ACTIVATED" : "WORKER_DEACTIVATED";
+    await logAudit(req.user.id, action, "users", target.id, target, { is_active: newStatus, token_version: newVersion }, req.ip);
+
+    res.json({
+      success: true,
+      message: `Worker ${target.name} has been ${newStatus ? "activated" : "deactivated"}. ${!newStatus ? "All active sessions revoked." : ""}`,
+      worker: updated,
+    });
+  } catch (err) { next(err); }
+});
+
+// GET /api/auth/team/:id/activity — Full activity log for a specific worker
+router.get("/team/:id/activity", verifyToken, async (req, res, next) => {
+  try {
+    if (!['sme_owner','admin','pulse_admin','manager'].includes(req.user.role))
+      return res.status(403).json({ error: "Insufficient permissions" });
+
+    const ownerId = ['pulse_admin','admin'].includes(req.user.role)
+      ? null
+      : (req.ownerId || req.user.id);
+
+    const ownerWhere = ownerId ? "AND owner_id = $2" : "";
+    const params = ownerId ? [req.params.id, ownerId] : [req.params.id];
+
+    const { rows: [worker] } = await pool.query(
+      `SELECT id, name, email, role, phone, is_active, created_at FROM users WHERE id = $1 ${ownerWhere}`,
+      params
+    );
+    if (!worker) return res.status(404).json({ error: "Worker not found on your team." });
+
+    // Fetch activity records specifically tagged with this worker's user_id
+    const { rows: activities } = await pool.query(
+      `SELECT al.*, u.name as user_name, u.role as user_role
+       FROM audit_log al
+       LEFT JOIN users u ON u.id = al.user_id
+       WHERE al.user_id = $1
+       ORDER BY al.created_at DESC
+       LIMIT 100`,
+      [worker.id]
+    );
+
+    res.json({
+      worker,
+      activities,
+      total_actions: activities.length,
+    });
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/auth/team/:id — Remove worker from team
+router.delete("/team/:id", verifyToken, async (req, res, next) => {
   try {
     if (!['sme_owner','admin','pulse_admin'].includes(req.user.role))
       return res.status(403).json({ error: "Insufficient permissions" });
 
     const ownerId = ['pulse_admin','admin'].includes(req.user.role)
-      ? (req.query.owner_id || null)
-      : req.user.id;
+      ? null
+      : (req.ownerId || req.user.id);
 
-    const { rows } = await pool.query(
-      `SELECT id, name, email, role, phone, is_active, created_at
-       FROM users
-       WHERE owner_id=$1
-       ORDER BY created_at DESC`,
-      [ownerId]
+    const ownerWhere = ownerId ? "AND owner_id = $2" : "";
+    const params = ownerId ? [req.params.id, ownerId] : [req.params.id];
+
+    const { rows: [target] } = await pool.query(
+      `SELECT id, name, email, is_active, token_version FROM users WHERE id = $1 ${ownerWhere}`,
+      params
     );
-    res.json(rows);
+    if (!target) return res.status(404).json({ error: "Worker not found on your team." });
+
+    // Deactivate worker and increment token version to kill sessions
+    await pool.query(
+      `UPDATE users SET is_active = false, token_version = COALESCE(token_version, 1) + 1 WHERE id = $1`,
+      [target.id]
+    );
+
+    await logAudit(req.user.id, "WORKER_REMOVED", "users", target.id, target, { is_active: false }, req.ip);
+
+    res.json({ success: true, message: `Worker ${target.name} removed from your team.` });
   } catch (err) { next(err); }
 });
 

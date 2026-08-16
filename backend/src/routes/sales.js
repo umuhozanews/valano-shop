@@ -6,6 +6,7 @@ const { logAudit, paginate, generateInvoiceNumber, createNotification, notifyAdm
 const { createInvoicePDF } = require("../utils/pdf");
 const { journalForSale, journalForSaleVoid } = require("../utils/journal");
 const { ensureTenantColumns, addOwnerFilter } = require("../utils/tenant");
+const { logDeletion } = require("../utils/deletion");
 
 router.get("/:id/qr", async (req, res, next) => {
   try {
@@ -363,31 +364,55 @@ router.post("/:id/void", requireRole("admin", "sme_owner", "manager", "accountan
   }
 });
 
-// DELETE /api/sales/:id — Delete / Void Sale & Restore Stock
+// DELETE /api/sales/:id — Delete / Void Sale, Log Snapshot, & Restore Stock
 router.delete("/:id", requireRole("admin", "sme_owner", "manager", "accountant", "pulse_admin"), async (req, res, next) => {
   try {
+    const reason = req.body?.reason || req.query?.reason || "Deleted by merchant";
     const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
-    const ownerWhere = isAdmin ? "1=1" : "owner_id=$2";
+    const ownerWhere = isAdmin ? "1=1" : "s.owner_id=$2";
     const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
 
-    const { rows: [sale] } = await pool.query(`SELECT * FROM sales WHERE id=$1 AND ${ownerWhere}`, queryParams);
+    const { rows: [sale] } = await pool.query(`SELECT s.* FROM sales s WHERE s.id=$1 AND ${ownerWhere}`, queryParams);
     if (!sale) return res.status(404).json({ error: "Sale not found" });
+
+    // Fetch related records for complete snapshot before deletion/voiding
+    const [itemsRes, invoiceRes, arRes] = await Promise.all([
+      pool.query("SELECT si.*, stk.name as item_name, stk.unit, stk.barcode FROM sale_items si LEFT JOIN stock_items stk ON stk.id=si.stock_item_id WHERE si.sale_id=$1", [sale.id]),
+      pool.query("SELECT * FROM invoices WHERE sale_id=$1", [sale.id]),
+      pool.query("SELECT * FROM accounts_receivable WHERE sale_id=$1", [sale.id]),
+    ]);
+
+    const snapshot = {
+      sale,
+      items: itemsRes.rows,
+      invoice: invoiceRes.rows[0] || null,
+      accounts_receivable: arRes.rows[0] || null,
+    };
+
+    // Capture permanent snapshot into append-only deletion_logs
+    await logDeletion({
+      entity_type: "sale",
+      entity_id: sale.id,
+      deleted_data: snapshot,
+      deleted_by: req.user.id,
+      owner_id: sale.owner_id || req.ownerId,
+      reason,
+    });
 
     await pool.query("BEGIN");
     // Restore stock item quantities
-    const { rows: items } = await pool.query("SELECT * FROM sale_items WHERE sale_id=$1", [sale.id]);
-    for (const item of items) {
+    for (const item of itemsRes.rows) {
       if (item.stock_item_id && /^\d+$/.test(String(item.stock_item_id))) {
         await pool.query("UPDATE stock_items SET quantity = quantity + $1 WHERE id=$2", [item.quantity, parseInt(item.stock_item_id, 10)]);
       }
     }
-    await pool.query("UPDATE sales SET is_voided=true, void_reason='Deleted by merchant', voided_by=$1 WHERE id=$2", [req.user.id, sale.id]);
+    await pool.query("UPDATE sales SET is_voided=true, void_reason=$1, voided_by=$2 WHERE id=$3", [reason, req.user.id, sale.id]);
     await pool.query("UPDATE invoices SET status='voided' WHERE sale_id=$1", [sale.id]);
     await pool.query("UPDATE accounts_receivable SET status='voided' WHERE sale_id=$1", [sale.id]);
     await pool.query("COMMIT");
 
-    await logAudit(req.user.id, "SALE_DELETED", "sales", sale.id, sale, { reason: "Deleted by merchant", restored_items_count: items.length }, req.ip);
-    res.json({ success: true, message: "Sale deleted and inventory stock restored", sale_id: sale.id });
+    await logAudit(req.user.id, "SALE_DELETED", "sales", sale.id, sale, { reason, restored_items_count: itemsRes.rows.length }, req.ip);
+    res.json({ success: true, message: "Sale deleted, inventory stock restored, and recorded in permanent deletion logs.", sale_id: sale.id });
   } catch (err) {
     await pool.query("ROLLBACK").catch(() => {});
     next(err);

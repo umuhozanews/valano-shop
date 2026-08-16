@@ -14,7 +14,9 @@ const ROLE_HIERARCHY = {
   viewer: 1,
 };
 
-function verifyToken(req, res, next) {
+const pool = require("../config/db");
+
+async function verifyToken(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ error: "No token provided", code: "UNAUTHORIZED" });
@@ -24,6 +26,23 @@ function verifyToken(req, res, next) {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
+
+    // Check user active status & session token version
+    if (decoded.id) {
+      const { rows: [dbUser] } = await pool.query(
+        "SELECT is_active, token_version FROM users WHERE id=$1",
+        [decoded.id]
+      ).catch(() => ({ rows: [] }));
+
+      if (dbUser) {
+        if (dbUser.is_active === false) {
+          return res.status(403).json({ error: "Your account has been deactivated. Please contact your employer.", code: "ACCOUNT_DEACTIVATED" });
+        }
+        if (decoded.token_version && dbUser.token_version && decoded.token_version < dbUser.token_version) {
+          return res.status(401).json({ error: "Session has been revoked. Please sign in again.", code: "SESSION_REVOKED" });
+        }
+      }
+    }
 
     const isAdmin = ['pulse_admin', 'admin'].includes(decoded.role);
     if (isAdmin) {

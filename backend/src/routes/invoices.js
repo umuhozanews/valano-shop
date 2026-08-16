@@ -5,6 +5,7 @@ const { verifyToken, requireRole } = require("../middleware/auth");
 const { paginate } = require("../utils/helpers");
 const { createInvoicePDF } = require("../utils/pdf");
 const { ensureTenantColumns, addOwnerFilter } = require("../utils/tenant");
+const { logDeletion } = require("../utils/deletion");
 
 router.use(verifyToken);
 
@@ -122,34 +123,53 @@ router.put("/:id/status", requireRole("admin", "manager", "accountant"), async (
 
 router.delete("/:id", requireRole("admin", "sme_owner", "manager", "accountant", "pulse_admin"), async (req, res, next) => {
   try {
-    const reason = req.body?.reason || req.query?.reason;
-    if (!reason || !String(reason).trim()) {
-      return res.status(400).json({ error: "A mandatory void/cancellation reason is required to delete an invoice." });
-    }
+    const reason = req.body?.reason || req.query?.reason || "Deleted by merchant";
 
     const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
     const ownerWhere = isAdmin ? "1=1" : "s.owner_id=$2";
     const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
 
     const { rows: [invoice] } = await pool.query(
-      `SELECT i.*, s.total_amount, s.customer_name, s.id as sale_id 
+      `SELECT i.*, s.total_amount, s.customer_name, s.id as sale_id, s.owner_id as sale_owner_id
        FROM invoices i JOIN sales s ON s.id=i.sale_id
        WHERE i.id=$1 AND ${ownerWhere}`,
       queryParams
     );
     if (!invoice) return res.status(404).json({ error: "Invoice not found" });
 
+    // Fetch related records for full snapshot
+    const [itemsRes, arRes] = await Promise.all([
+      pool.query("SELECT si.*, stk.name as item_name, stk.unit, stk.barcode FROM sale_items si LEFT JOIN stock_items stk ON stk.id=si.stock_item_id WHERE si.sale_id=$1", [invoice.sale_id]),
+      pool.query("SELECT * FROM accounts_receivable WHERE sale_id=$1", [invoice.sale_id]),
+    ]);
+
+    const snapshot = {
+      invoice,
+      sale_id: invoice.sale_id,
+      items: itemsRes.rows,
+      accounts_receivable: arRes.rows[0] || null,
+    };
+
+    // Log permanent snapshot into deletion_logs
+    await logDeletion({
+      entity_type: "invoice",
+      entity_id: invoice.id,
+      deleted_data: snapshot,
+      deleted_by: req.user.id,
+      owner_id: invoice.owner_id || invoice.sale_owner_id || req.ownerId,
+      reason: String(reason).trim(),
+    });
+
     await pool.query("BEGIN");
     await pool.query("UPDATE invoices SET status='voided' WHERE id=$1", [invoice.id]);
     await pool.query(
       "UPDATE sales SET is_voided=true, void_reason=$1, voided_by=$2 WHERE id=$3",
-      [reason.trim(), req.user.id, invoice.sale_id]
+      [String(reason).trim(), req.user.id, invoice.sale_id]
     );
     await pool.query("UPDATE accounts_receivable SET status='voided' WHERE sale_id=$1", [invoice.sale_id]);
 
     // Restore stock item quantities
-    const { rows: items } = await pool.query("SELECT * FROM sale_items WHERE sale_id=$1", [invoice.sale_id]);
-    for (const item of items) {
+    for (const item of itemsRes.rows) {
       if (item.stock_item_id && /^\d+$/.test(String(item.stock_item_id))) {
         await pool.query("UPDATE stock_items SET quantity = quantity + $1 WHERE id=$2", [item.quantity, parseInt(item.stock_item_id, 10)]);
       }
@@ -163,13 +183,13 @@ router.delete("/:id", requireRole("admin", "sme_owner", "manager", "accountant",
       "invoices",
       invoice.id,
       invoice,
-      { invoice_number: invoice.invoice_number, void_reason: reason.trim(), total_amount: invoice.total_amount },
+      { invoice_number: invoice.invoice_number, void_reason: String(reason).trim(), total_amount: invoice.total_amount },
       req.ip
     );
 
     res.json({
       success: true,
-      message: `Invoice ${invoice.invoice_number} voided and recorded in audit logs.`,
+      message: `Invoice ${invoice.invoice_number} deleted, stock restored, and recorded in permanent deletion logs.`,
       id: invoice.id,
     });
   } catch (err) {

@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
-import { Users, TrendingUp, Activity, Shield, Search } from "lucide-react";
+import { Users, TrendingUp, Activity, Shield, Search, Trash2, Lock, Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import PageWrapper from "../../components/layout/PageWrapper";
 import Card from "../../components/ui/Card";
 import Badge from "../../components/ui/Badge";
+import Modal from "../../components/ui/Modal";
+import Button from "../../components/ui/Button";
 import api from "../../utils/api";
 import { formatRWF } from "../../utils/formatters";
 import toast from "react-hot-toast";
@@ -33,6 +35,15 @@ export default function AdminDashboard() {
   const [smePage,   setSmePage]   = useState(1);
   const [smeTotal,  setSmeTotal]  = useState(0);
 
+  // Permanent Deletion Logs State
+  const [deletionLogs, setDeletionLogs] = useState([]);
+  const [deletionTotal, setDeletionTotal] = useState(0);
+  const [deletionPage, setDeletionPage] = useState(1);
+  const [deletionType, setDeletionType] = useState("all");
+  const [deletionSearch, setDeletionSearch] = useState("");
+  const [selectedSnapshot, setSelectedSnapshot] = useState(null);
+  const [deletionLoading, setDeletionLoading] = useState(false);
+
   async function loadOverview() {
     try {
       const { data } = await api.get("/v2/admin/dashboard");
@@ -45,6 +56,26 @@ export default function AdminDashboard() {
       const { data } = await api.get("/v2/admin/smes", { params: { page: smePage, limit: 20, search: smeSearch || undefined } });
       setSmes(data.smes || data.data || []); setSmeTotal(data.total || 0);
     } catch { toast.error("Failed to load SMEs"); }
+  }
+
+  async function loadDeletions() {
+    setDeletionLoading(true);
+    try {
+      const { data } = await api.get("/admin/deletion-logs", {
+        params: {
+          page: deletionPage,
+          limit: 20,
+          entity_type: deletionType !== "all" ? deletionType : undefined,
+          search: deletionSearch || undefined,
+        },
+      });
+      setDeletionLogs(data.data || []);
+      setDeletionTotal(data.total || 0);
+    } catch {
+      toast.error("Failed to load deletion logs");
+    } finally {
+      setDeletionLoading(false);
+    }
   }
 
   async function loadLenders() {
@@ -71,6 +102,7 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => { if (tab === "smes") loadSmes(); }, [tab, smePage, smeSearch]);
+  useEffect(() => { if (tab === "deletions") loadDeletions(); }, [tab, deletionPage, deletionType, deletionSearch]);
 
   async function changeRole(userId, role) {
     try {
@@ -101,10 +133,11 @@ export default function AdminDashboard() {
       {/* Tab nav */}
       <div className="flex gap-1 border-b border-border mb-5">
         {[
-          { key:"overview", label:"Platform Overview" },
-          { key:"smes",     label:"SME Management" },
-          { key:"lenders",  label:"Lender Management" },
-          { key:"model",    label:"Model Performance" },
+          { key:"overview",  label:"Platform Overview" },
+          { key:"smes",      label:"SME Management" },
+          { key:"lenders",   label:"Lender Management" },
+          { key:"model",     label:"Model Performance" },
+          { key:"deletions", label:"Deletion Logs" },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
             className={`px-4 py-2 text-[11px] font-medium border-b-2 transition-colors ${tab===t.key?"border-primary text-primary":"border-transparent text-text-secondary hover:text-text-primary"}`}>
@@ -313,6 +346,132 @@ export default function AdminDashboard() {
           )}
         </div>
       )}
+
+      {/* ── Deletion Logs (Append-Only) ─────────────────────────── */}
+      {tab === "deletions" && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-1 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold uppercase flex items-center gap-1">
+                <Lock size={11} /> Append-Only Immutable Records
+              </span>
+              <span className="text-[11px] text-text-secondary">
+                {deletionTotal} total recorded deletion{deletionTotal === 1 ? "" : "s"}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
+                <input
+                  value={deletionSearch}
+                  onChange={(e) => { setDeletionSearch(e.target.value); setDeletionPage(1); }}
+                  placeholder="Search deletions…"
+                  className="w-48 h-8 pl-8 pr-3 border border-border rounded text-[11px] bg-surface focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              <select
+                value={deletionType}
+                onChange={(e) => { setDeletionType(e.target.value); setDeletionPage(1); }}
+                className="h-8 px-2.5 border border-border rounded text-[11px] bg-surface"
+              >
+                <option value="all">All Types</option>
+                <option value="stock">Stock Items</option>
+                <option value="sale">Sales</option>
+                <option value="invoice">Invoices</option>
+              </select>
+            </div>
+          </div>
+
+          <Card>
+            {deletionLoading ? (
+              <div className="py-12 text-center text-[11px] text-text-secondary">Loading deletion records…</div>
+            ) : !deletionLogs.length ? (
+              <div className="py-12 text-center text-[11px] text-text-secondary">No deletion logs recorded</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-border text-[10px] font-bold text-text-secondary uppercase">
+                      <th className="pb-2.5">Entity</th>
+                      <th className="pb-2.5">SME Shop</th>
+                      <th className="pb-2.5">Deleted By</th>
+                      <th className="pb-2.5">Reason</th>
+                      <th className="pb-2.5">Snapshot</th>
+                      <th className="pb-2.5 text-right">Deleted At</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {deletionLogs.map((log) => {
+                      let parsed = {};
+                      try {
+                        parsed = typeof log.deleted_data === "string" ? JSON.parse(log.deleted_data) : log.deleted_data || {};
+                      } catch {
+                        parsed = log.deleted_data || {};
+                      }
+                      return (
+                        <tr key={log.id} className="hover:bg-neutral-50/50">
+                          <td className="py-3 font-semibold text-text-primary">
+                            <span className="capitalize">{log.entity_type}</span> #{log.entity_id}
+                          </td>
+                          <td className="py-3 text-text-secondary">
+                            {log.shop_name || log.owner_name || `SME #${log.owner_id || "—"}`}
+                          </td>
+                          <td className="py-3 text-text-secondary">
+                            {log.deleted_by_name || log.deleted_by_email || `User #${log.deleted_by || "—"}`}
+                          </td>
+                          <td className="py-3 text-text-secondary max-w-[180px] truncate" title={log.reason}>
+                            {log.reason || "Deleted by merchant"}
+                          </td>
+                          <td className="py-3">
+                            <button
+                              onClick={() => setSelectedSnapshot({ ...log, parsed })}
+                              className="px-2.5 py-1 bg-surface border border-border hover:border-primary rounded text-[11px] font-medium flex items-center gap-1 transition"
+                            >
+                              <Eye size={12} /> Snapshot
+                            </button>
+                          </td>
+                          <td className="py-3 text-right text-text-secondary font-mono text-[11px]">
+                            {log.deleted_at?.slice(0, 16).replace("T", " ")}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {/* Snapshot Modal */}
+      <Modal
+        open={Boolean(selectedSnapshot)}
+        onClose={() => setSelectedSnapshot(null)}
+        title={selectedSnapshot ? `Deleted ${selectedSnapshot.entity_type?.toUpperCase()} #${selectedSnapshot.entity_id} Snapshot` : "Deleted Snapshot"}
+        footer={<Button variant="secondary" onClick={() => setSelectedSnapshot(null)}>Close</Button>}
+      >
+        {selectedSnapshot && (
+          <div className="space-y-3">
+            <div className="p-3 bg-neutral-50 rounded border border-border text-xs space-y-1">
+              <div className="flex justify-between">
+                <span className="font-semibold text-text-primary capitalize">{selectedSnapshot.entity_type} #{selectedSnapshot.entity_id}</span>
+                <span className="text-text-secondary">{selectedSnapshot.deleted_at?.slice(0, 16).replace("T", " ")}</span>
+              </div>
+              <p className="text-text-secondary">SME: {selectedSnapshot.shop_name || selectedSnapshot.owner_name} · By: {selectedSnapshot.deleted_by_name || selectedSnapshot.deleted_by_email}</p>
+              <p className="text-text-secondary">Reason: <span className="italic">{selectedSnapshot.reason || "Deleted by merchant"}</span></p>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-text-primary mb-1">Permanent JSONB Snapshot Payload:</label>
+              <pre className="p-3 bg-neutral-900 text-emerald-400 font-mono text-xs rounded overflow-auto max-h-72">
+                {JSON.stringify(selectedSnapshot.parsed || selectedSnapshot.deleted_data, null, 2)}
+              </pre>
+            </div>
+          </div>
+        )}
+      </Modal>
     </PageWrapper>
   );
 }

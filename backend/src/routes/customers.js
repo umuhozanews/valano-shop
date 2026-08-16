@@ -125,11 +125,12 @@ router.get("/:id", requireRole("admin", "sme_owner", "manager", "accountant", "p
 router.post("/", async (req, res, next) => {
   try {
     await ensureTenantColumns();
-    const { name, phone, location, type, notes, credit_limit } = req.body;
+    const { name, phone, location, type, notes, credit_limit, tin_number } = req.body;
     if (!name) return res.status(400).json({ error: "Customer name required" });
+    const cleanTin = tin_number && String(tin_number).trim().length > 0 ? String(tin_number).trim() : null;
     const { rows: [c] } = await pool.query(
-      "INSERT INTO customers (name, phone, location, type, notes, credit_limit, owner_id) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *",
-      [name, phone || null, location || null, type || "retailer", notes || null, credit_limit || 0, req.ownerId]
+      "INSERT INTO customers (name, phone, location, type, notes, credit_limit, tin_number, owner_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *",
+      [name, phone || null, location || null, type || "retailer", notes || null, credit_limit || 0, cleanTin, req.ownerId]
     );
     res.status(201).json(c);
   } catch (err) { next(err); }
@@ -137,15 +138,16 @@ router.post("/", async (req, res, next) => {
 
 router.put("/:id", requireRole("admin", "sme_owner", "manager", "accountant", "pulse_admin"), async (req, res, next) => {
   try {
-    const { name, phone, location, type, segment, notes, credit_limit } = req.body;
+    const { name, phone, location, type, segment, notes, credit_limit, tin_number } = req.body;
+    const cleanTin = tin_number !== undefined ? (String(tin_number).trim() || null) : null;
     const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
-    const ownerWhere = isAdmin ? "1=1" : "owner_id=$9";
-    const params = [name, phone || null, location || null, type, segment, notes || null, credit_limit || 0, req.params.id];
+    const ownerWhere = isAdmin ? "1=1" : "owner_id=$10";
+    const params = [name, phone || null, location || null, type, segment, notes || null, credit_limit || 0, cleanTin, req.params.id];
     if (!isAdmin) params.push(req.ownerId);
 
     const { rows: [c] } = await pool.query(
-      `UPDATE customers SET name=$1, phone=$2, location=$3, type=$4, segment=$5, notes=$6, credit_limit=$7
-       WHERE id=$8 AND ${ownerWhere} RETURNING *`,
+      `UPDATE customers SET name=$1, phone=$2, location=$3, type=$4, segment=$5, notes=$6, credit_limit=$7, tin_number=COALESCE($8, tin_number)
+       WHERE id=$9 AND ${ownerWhere} RETURNING *`,
       params
     );
     if (!c) return res.status(404).json({ error: "Customer not found" });
