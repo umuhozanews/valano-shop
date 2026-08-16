@@ -257,24 +257,52 @@ router.post("/", async (req, res, next) => {
       ])
     );
 
-    // Batch update stock quantities and check low-stock for numeric stock items
-    const stockUpdates = items.filter(i => i.stock_item_id && /^\d+$/.test(String(i.stock_item_id)));
-    if (stockUpdates.length) {
-      await pool.query(
-        `UPDATE stock_items SET quantity = quantity - u.qty
-         FROM (SELECT unnest($1::int[]) as id, unnest($2::numeric[]) as qty) u
-         WHERE stock_items.id = u.id`,
-        [stockUpdates.map(i => parseInt(i.stock_item_id, 10)), stockUpdates.map(i => Number(i.quantity) || 1)]
-      );
-      const { rows: updatedStocks } = await pool.query(
-        "SELECT * FROM stock_items WHERE id = ANY($1)",
-        [stockUpdates.map(i => parseInt(i.stock_item_id, 10))]
-      );
-      for (const s of updatedStocks) {
-        if (s.quantity === 0) {
-          await notifyAdminsAndManagers("OUT_OF_STOCK", "Out of Stock Alert", `${s.name} is out of stock`);
-        } else if (s.quantity <= s.low_stock_threshold) {
-          await notifyAdminsAndManagers("LOW_STOCK", "Low Stock Alert", `${s.name} has only ${s.quantity} left`);
+    // Deduct stock quantities for each sold line item (by stock_item_id or product name)
+    const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
+    for (const item of items) {
+      const soldQty = Math.max(1, parseInt(item.quantity, 10) || 1);
+      const rawStockId = String(item.stock_item_id || item.id || "").trim();
+      const isNum = /^\d+$/.test(rawStockId) && Number(rawStockId) < 2147483647;
+      const prodName = String(item.item_name || item.name || "").trim();
+
+      let updated = false;
+
+      // 1. Deduct by integer stock_item_id
+      if (isNum) {
+        const { rows } = await pool.query(
+          `UPDATE stock_items 
+           SET quantity = GREATEST(0, quantity - $1), owner_id = COALESCE(owner_id, $3)
+           WHERE id = $2 AND ${isAdmin ? "1=1" : "(owner_id = $3 OR owner_id IS NULL)"}
+           RETURNING *`,
+          [soldQty, parseInt(rawStockId, 10), req.ownerId || 1]
+        );
+        if (rows.length > 0) {
+          updated = true;
+          const s = rows[0];
+          if (s.quantity === 0) {
+            await notifyAdminsAndManagers("OUT_OF_STOCK", "Out of Stock Alert", `${s.name} is out of stock`);
+          } else if (s.quantity <= s.low_stock_threshold) {
+            await notifyAdminsAndManagers("LOW_STOCK", "Low Stock Alert", `${s.name} has only ${s.quantity} left`);
+          }
+        }
+      }
+
+      // 2. If not deducted by ID, deduct by product name
+      if (!updated && prodName) {
+        const { rows } = await pool.query(
+          `UPDATE stock_items 
+           SET quantity = GREATEST(0, quantity - $1), owner_id = COALESCE(owner_id, $3)
+           WHERE LOWER(TRIM(name)) = LOWER(TRIM($2)) AND ${isAdmin ? "1=1" : "(owner_id = $3 OR owner_id IS NULL)"}
+           RETURNING *`,
+          [soldQty, prodName, req.ownerId || 1]
+        );
+        if (rows.length > 0) {
+          const s = rows[0];
+          if (s.quantity === 0) {
+            await notifyAdminsAndManagers("OUT_OF_STOCK", "Out of Stock Alert", `${s.name} is out of stock`);
+          } else if (s.quantity <= s.low_stock_threshold) {
+            await notifyAdminsAndManagers("LOW_STOCK", "Low Stock Alert", `${s.name} has only ${s.quantity} left`);
+          }
         }
       }
     }
