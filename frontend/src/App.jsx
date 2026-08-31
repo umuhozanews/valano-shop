@@ -68,6 +68,10 @@ const AdvisoryPublic    = L(() => import("./pages/intelligence/AdvisoryPublic"))
 // Settings
 const SettingsPage      = L(() => import("./pages/settings/SettingsPage"));
 
+// Online shop: the owner-facing manager, and the public site itself
+const WebsitePage       = L(() => import("./pages/website/WebsitePage"));
+const Storefront        = L(() => import("./storefront/Storefront"));
+
 // ── Role groups ───────────────────────────────────────────────────────────────
 const ALL    = ["pulse_admin","sme_owner","admin","manager","cashier","accountant","viewer","databridge_advisor","lender"];
 const OWNER  = ["pulse_admin","sme_owner","admin"];
@@ -150,10 +154,18 @@ export default function App() {
           <Route path="/app/advisor"          element={<P roles={["databridge_advisor","pulse_admin"]}><AdvisorDashboard /></P>} />
           <Route path="/app/advisor/sme/:id"  element={<P roles={["databridge_advisor","pulse_admin"]}><AdvisorSmeDetail /></P>} />
 
+          {/* Online shop management */}
+          <Route path="/app/website"          element={<P roles={OWNER}><WebsitePage /></P>} />
+
           {/* Settings */}
           <Route path="/app/settings"         element={<P roles={["pulse_admin","sme_owner","admin","databridge_advisor","lender"]}><SettingsPage /></P>} />
 
           <Route path="/app" element={<AppRoot />} />
+
+          {/* Public SME storefronts — no auth required. The trailing splat lets the
+              storefront own its internal routes (product, category, checkout…). */}
+          <Route path="/shop/:slug/*"         element={<Storefront />} />
+
           {/* Public advisory share link — no auth required */}
           <Route path="/advisory/:token"      element={<AdvisoryPublic />} />
           <Route path="*"    element={<Navigate to="/app/login" replace />} />

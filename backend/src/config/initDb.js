@@ -544,6 +544,46 @@ ALTER TABLE expenses ADD COLUMN IF NOT EXISTS expense_date DATE;
 
 -- Purchase orders: ensure created_by exists
 ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+
+-- Storefront: every SME gets a public website driven by its settings + inventory
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS store_slug          VARCHAR(60);
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS store_published     BOOLEAN DEFAULT true;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS store_headline      TEXT;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS store_tagline       TEXT;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS store_about         TEXT;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS store_announcement  TEXT;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS store_brand_color   VARCHAR(9);
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS store_accent_color  VARCHAR(9);
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS store_whatsapp      VARCHAR(20);
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS store_hours         VARCHAR(120);
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS store_delivery_note TEXT;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS store_hero_slides   JSONB;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS store_socials       JSONB;
+
+-- Stock items: attributes that only matter on the public website. Existing
+-- inventory is published by default so a new SME's site is never empty.
+ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS is_published      BOOLEAN DEFAULT true;
+ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS is_featured       BOOLEAN DEFAULT false;
+ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS brand             VARCHAR(80);
+ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS description       TEXT;
+ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS compare_price_rwf BIGINT;
+UPDATE stock_items SET is_published = true WHERE is_published IS NULL;
+
+-- Orders placed by shoppers on an SME's public website
+CREATE TABLE IF NOT EXISTS store_orders (
+  id             SERIAL PRIMARY KEY,
+  owner_id       INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  reference      VARCHAR(30) UNIQUE NOT NULL,
+  customer_name  VARCHAR(120) NOT NULL,
+  customer_phone VARCHAR(30)  NOT NULL,
+  customer_email VARCHAR(120),
+  delivery_note  TEXT,
+  items          JSONB       NOT NULL DEFAULT '[]',
+  total_amount   BIGINT      NOT NULL DEFAULT 0,
+  status         VARCHAR(20) NOT NULL DEFAULT 'pending',
+  source         VARCHAR(20) NOT NULL DEFAULT 'website',
+  created_at     TIMESTAMP DEFAULT NOW()
+);
 `;
 
 const SEED_SQL = `
@@ -667,6 +707,8 @@ async function runInit() {
 
   // Safe unique indexes — run after migration ensures columns exist
   try { await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS uq_settings_owner ON settings(owner_id)"); } catch (e) { /* skip */ }
+  try { await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS uq_settings_store_slug ON settings(store_slug) WHERE store_slug IS NOT NULL"); } catch (e) { /* skip */ }
+  try { await pool.query("CREATE INDEX IF NOT EXISTS idx_store_orders_owner ON store_orders(owner_id, created_at DESC)"); } catch (e) { /* skip */ }
   try { await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS uq_credit_scores_user ON credit_scores(user_id) WHERE user_id IS NOT NULL"); } catch (e) { /* skip */ }
   try { await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS uq_lender_clients ON lender_clients(lender_user_id, sme_user_id) WHERE lender_user_id IS NOT NULL AND sme_user_id IS NOT NULL"); } catch (e) { /* skip */ }
 

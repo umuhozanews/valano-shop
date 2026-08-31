@@ -5,6 +5,20 @@ const { verifyToken, requireRole } = require("../middleware/auth");
 const { logAudit } = require("../utils/helpers");
 const multer = require("multer");
 const { uploadToCloudinary } = require("../utils/cloudinary");
+const {
+  ensureStoreColumns,
+  ensureSlug,
+  saveStorefrontSettings,
+  storefrontSettingsView,
+} = require("../utils/storefront");
+
+// The dashboard needs an absolute link an SME can copy or share.
+function publicBaseUrl(req) {
+  const configured = (process.env.FRONTEND_URL || "").split(",")[0].trim();
+  if (configured) return configured.replace(/\/$/, "");
+  const proto = req.headers["x-forwarded-proto"] || req.protocol || "https";
+  return `${proto}://${req.headers.host || ""}`;
+}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -57,8 +71,20 @@ router.get("/", async (req, res, next) => {
       vat_rate: settings?.vat_rate ? parseFloat(settings.vat_rate) : 18.0,
     };
 
+    // Storefront slice — every SME owner gets a slug on first read so the
+    // dashboard can always show them their live website address.
+    let storefront = null;
+    if (ownerId) {
+      await ensureStoreColumns().catch(() => {});
+      const slug = await ensureSlug(ownerId, mergedSettings.shop_name).catch(() => null);
+      storefront = storefrontSettingsView(
+        { ...(settings || {}), store_slug: settings?.store_slug || slug },
+        { baseUrl: publicBaseUrl(req) }
+      );
+    }
+
     const { rows: rates } = await pool.query("SELECT * FROM exchange_rates ORDER BY from_currency").catch(() => ({ rows: [] }));
-    res.json({ settings: mergedSettings, exchangeRates: rates });
+    res.json({ settings: mergedSettings, storefront, exchangeRates: rates });
   } catch (err) { next(err); }
 });
 
@@ -155,6 +181,38 @@ router.put("/", requireRole("admin", "sme_owner", "pulse_admin"), async (req, re
     await logAudit(req.user.id, "SETTINGS_UPDATED", "settings", s?.id, null, req.body, req.ip);
     res.json(s);
   } catch (err) { next(err); }
+});
+
+// Storefront configuration lives on its own endpoint so the public-website
+// fields can be saved without touching the fiscal/EBM settings form.
+router.put("/storefront", requireRole("admin", "sme_owner", "pulse_admin"), async (req, res, next) => {
+  try {
+    const ownerId = req.ownerId || (req.user.role === "sme_owner" ? req.user.id : null);
+    if (!ownerId) {
+      return res.status(400).json({ error: "A storefront belongs to an SME account", code: "NO_OWNER_SCOPE" });
+    }
+
+    await ensureStoreColumns();
+    await pool.query(
+      `INSERT INTO settings (owner_id, shop_name) VALUES ($1, 'My Store')
+       ON CONFLICT (owner_id) DO NOTHING`,
+      [ownerId]
+    ).catch(() => {});
+
+    const updated = await saveStorefrontSettings(ownerId, req.body || {});
+    if (!updated) {
+      return res.status(400).json({ error: "No storefront changes were provided" });
+    }
+
+    await ensureSlug(ownerId, updated.shop_name).catch(() => {});
+    await logAudit(req.user.id, "STOREFRONT_UPDATED", "settings", updated.id, null, req.body, req.ip);
+
+    const { rows: [fresh] } = await pool.query("SELECT * FROM settings WHERE owner_id=$1", [ownerId]);
+    res.json(storefrontSettingsView(fresh || updated, { baseUrl: publicBaseUrl(req) }));
+  } catch (err) {
+    if (err?.status === 400) return res.status(400).json({ error: err.message });
+    next(err);
+  }
 });
 
 router.post("/logo", requireRole("admin", "sme_owner", "pulse_admin"), upload.single("logo"), async (req, res, next) => {

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Search, Edit, Clock, Trash2 } from "lucide-react";
+import { Plus, Search, Edit, Clock, Trash2, Store } from "lucide-react";
 import PageWrapper from "../../components/layout/PageWrapper";
 import Table from "../../components/ui/Table";
 import Badge from "../../components/ui/Badge";
@@ -17,7 +17,10 @@ import { useLanguage } from "../../context/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 
 const STATUS_MAP   = { in_stock: "success", low_stock: "warning", out_of_stock: "danger" };
-const EMPTY_FORM   = { name:"", name_rw:"", category:"", unit:"pcs", quantity:0, cost_price_rwf:"", sell_price_rwf:"", low_stock_threshold:5 };
+const EMPTY_FORM   = {
+  name:"", name_rw:"", category:"", unit:"pcs", quantity:0, cost_price_rwf:"", sell_price_rwf:"", low_stock_threshold:5,
+  image_url:"", brand:"", description:"", compare_price_rwf:"", is_published:true, is_featured:false,
+};
 
 export default function StockList() {
   const { t } = useLanguage();
@@ -76,6 +79,12 @@ export default function StockList() {
         cost_price_rwf:      parseFloat(form.cost_price_rwf) || 0,
         sell_price_rwf:      parseFloat(form.sell_price_rwf) || 0,
         low_stock_threshold: parseInt(form.low_stock_threshold) || 5,
+        image_url:           form.image_url?.trim() || null,
+        brand:               form.brand?.trim() || null,
+        description:         form.description?.trim() || null,
+        compare_price_rwf:   form.compare_price_rwf ? parseInt(form.compare_price_rwf) : null,
+        is_published:        form.is_published !== false,
+        is_featured:         form.is_featured === true,
       };
       if (editItem) await api.put(`/stock/${editItem.id}`, payload);
       else          await api.post("/stock", payload);
@@ -120,6 +129,12 @@ export default function StockList() {
       cost_price_rwf:      item.cost_price_rwf,
       sell_price_rwf:      item.sell_price_rwf,
       low_stock_threshold: item.low_stock_threshold,
+      image_url:           item.image_url || "",
+      brand:               item.brand || "",
+      description:         item.description || "",
+      compare_price_rwf:   item.compare_price_rwf || "",
+      is_published:        item.is_published !== false,
+      is_featured:         item.is_featured === true,
     });
     setShowModal(true);
   }
@@ -240,6 +255,42 @@ export default function StockList() {
           <Input label="Low Stock Alert at" type="number" value={form.low_stock_threshold} onChange={e=>setForm(f=>({...f,low_stock_threshold:e.target.value}))} />
           <Input label="Cost Price (RWF)"   type="number" value={form.cost_price_rwf}      onChange={e=>setForm(f=>({...f,cost_price_rwf:e.target.value}))} />
           <Input label="Selling Price (RWF)" type="number" value={form.sell_price_rwf}     onChange={e=>setForm(f=>({...f,sell_price_rwf:e.target.value}))} required />
+
+          {/* Fields below only affect how this product looks on the public website */}
+          <div className="col-span-2 mt-2 flex items-center gap-2 border-t border-border pt-3">
+            <Store size={14} className="text-primary" />
+            <p className="text-[11px] font-semibold text-text-primary">Online Shop</p>
+            <span className="text-[11px] text-text-secondary">— how this product appears on your website</span>
+          </div>
+
+          <div className="col-span-2">
+            <Input label="Product Image URL" value={form.image_url} placeholder="https://… (paste an image link)"
+              hint="Products with a photo sell far better online"
+              onChange={e=>setForm(f=>({...f,image_url:e.target.value}))} />
+          </div>
+          <Input label="Brand (optional)" value={form.brand} placeholder="e.g. Samsung"
+            onChange={e=>setForm(f=>({...f,brand:e.target.value}))} />
+          <Input label="Was Price (RWF, optional)" type="number" value={form.compare_price_rwf}
+            placeholder="Shows a crossed-out old price"
+            onChange={e=>setForm(f=>({...f,compare_price_rwf:e.target.value}))} />
+
+          <div className="col-span-2">
+            <label className="block text-[11px] font-medium text-text-primary mb-1">Description (optional)</label>
+            <textarea rows={3} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}
+              placeholder="Describe the product for online shoppers…"
+              className="w-full p-2.5 border border-border rounded-card text-[12px] bg-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" />
+          </div>
+
+          <label className="flex items-center gap-2.5 cursor-pointer rounded-card border border-border bg-surface px-3 h-9">
+            <input type="checkbox" checked={form.is_published !== false} className="h-4 w-4 accent-primary"
+              onChange={e=>setForm(f=>({...f,is_published:e.target.checked}))} />
+            <span className="text-[11px] text-text-primary">Show on website</span>
+          </label>
+          <label className="flex items-center gap-2.5 cursor-pointer rounded-card border border-border bg-surface px-3 h-9">
+            <input type="checkbox" checked={form.is_featured === true} className="h-4 w-4 accent-primary"
+              onChange={e=>setForm(f=>({...f,is_featured:e.target.checked}))} />
+            <span className="text-[11px] text-text-primary">Feature in homepage banner</span>
+          </label>
         </div>
       </Modal>
 

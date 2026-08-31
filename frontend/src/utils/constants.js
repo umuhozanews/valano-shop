@@ -72,6 +72,12 @@ export const NAV_ITEMS = [
     ],
   },
   {
+    section: "ONLINE SHOP", tKey: "nav_online_shop",
+    items: [
+      { label: "My Website", tKey: "my_website", icon: "Store", path: "/app/website", roles: OWNER_OPS },
+    ],
+  },
+  {
     section: "CRM", tKey: "nav_crm",
     items: [
       { label: "Customers",    tKey: "customers",   icon: "UserCheck",  path: "/app/customers",   roles: OWNER_FIN },

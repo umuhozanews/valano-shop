@@ -1,6 +1,9 @@
 const express = require("express");
 const router = express.Router();
 
+// ── Public storefront (unauthenticated) ───────────────────────────────────────
+router.use("/shop",               require("./shop"));
+
 // ── Core SME routes ───────────────────────────────────────────────────────────
 router.use("/auth",               require("./auth"));
 router.use("/dashboard",          require("./dashboard"));
@@ -15,6 +18,7 @@ router.use("/reports",            require("./reports"));
 router.use("/notifications",      require("./notifications"));
 router.use("/audit",              require("./audit"));
 router.use("/settings",           require("./settings"));
+router.use("/store-orders",       require("./store-orders"));
 router.use("/purchase-orders",    require("./purchase-orders"));
 router.use("/accounts-receivable",require("./accounts-receivable"));
 router.use("/accounts-payable",   require("./accounts-payable"));

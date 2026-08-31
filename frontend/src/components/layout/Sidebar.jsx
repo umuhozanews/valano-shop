@@ -2,7 +2,7 @@ import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard, Package, ShoppingCart, Truck, Globe, UserCheck,
   FileText, CreditCard, TrendingUp, BarChart2, ClipboardList, Shield,
-  Bell, Settings, Activity, Scale, Receipt, X,
+  Bell, Settings, Activity, Scale, Receipt, Store, BookOpen, X,
 } from "lucide-react";
 import { NAV_ITEMS } from "../../utils/constants";
 import { useAuth } from "../../context/AuthContext";
@@ -11,7 +11,7 @@ import { useLanguage } from "../../context/LanguageContext";
 const ICONS = {
   LayoutDashboard, Package, ShoppingCart, Truck, Globe, UserCheck,
   FileText, CreditCard, TrendingUp, BarChart2, ClipboardList, Shield,
-  Bell, Settings, Activity, Scale, Receipt,
+  Bell, Settings, Activity, Scale, Receipt, Store, BookOpen,
 };
 
 function NavItem({ item, onClose }) {

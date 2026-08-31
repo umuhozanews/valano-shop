@@ -196,14 +196,18 @@ router.get("/print-labels", async (req, res, next) => {
 router.post("/", requireRole("admin", "sme_owner", "manager", "pulse_admin"), async (req, res, next) => {
   try {
     await ensureTenantColumns();
-    const { name, name_rw, category, unit, quantity, cost_price_rwf, sell_price_rwf, low_stock_threshold, image_url } = req.body;
+    const {
+      name, name_rw, category, unit, quantity, cost_price_rwf, sell_price_rwf, low_stock_threshold, image_url,
+      brand, description, compare_price_rwf, is_published, is_featured,
+    } = req.body;
     if (!name) return res.status(400).json({ error: "Product name required" });
 
     const barcode = `INZ${Date.now()}${Math.floor(Math.random() * 1000)}`;
 
     const { rows: [item] } = await pool.query(
-      `INSERT INTO stock_items (name, name_rw, category, unit, barcode, image_url, quantity, cost_price_rwf, sell_price_rwf, low_stock_threshold, owner_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+      `INSERT INTO stock_items (name, name_rw, category, unit, barcode, image_url, quantity, cost_price_rwf, sell_price_rwf, low_stock_threshold, owner_id,
+         brand, description, compare_price_rwf, is_published, is_featured)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
       [
         name, name_rw || null, category || null, unit || "pcs",
         barcode, image_url || null,
@@ -212,6 +216,11 @@ router.post("/", requireRole("admin", "sme_owner", "manager", "pulse_admin"), as
         parseInt(sell_price_rwf) || 0,
         parseInt(low_stock_threshold) || 5,
         req.ownerId,
+        brand || null,
+        description || null,
+        compare_price_rwf ? parseInt(compare_price_rwf) : null,
+        is_published !== false && is_published !== "false",
+        is_featured === true || is_featured === "true",
       ]
     );
     await logAudit(req.user.id, "STOCK_CREATED", "stock_items", item.id, null, item, req.ip);
@@ -221,7 +230,10 @@ router.post("/", requireRole("admin", "sme_owner", "manager", "pulse_admin"), as
 
 router.put("/:id", requireRole("admin", "sme_owner", "manager", "pulse_admin"), async (req, res, next) => {
   try {
-    const { name, name_rw, category, unit, quantity, cost_price_rwf, sell_price_rwf, low_stock_threshold, image_url } = req.body;
+    const {
+      name, name_rw, category, unit, quantity, cost_price_rwf, sell_price_rwf, low_stock_threshold, image_url,
+      brand, description, compare_price_rwf, is_published, is_featured,
+    } = req.body;
     const isAdmin = ['pulse_admin', 'admin'].includes(req.user.role);
     const ownerWhere = isAdmin ? "1=1" : "owner_id=$2";
     const queryParams = isAdmin ? [req.params.id] : [req.params.id, req.ownerId];
@@ -229,7 +241,7 @@ router.put("/:id", requireRole("admin", "sme_owner", "manager", "pulse_admin"), 
     const { rows: [old] } = await pool.query(`SELECT * FROM stock_items WHERE id=$1 AND ${ownerWhere}`, queryParams);
     if (!old) return res.status(404).json({ error: "Item not found" });
 
-    const updateOwnerWhere = isAdmin ? "1=1" : "owner_id=$11";
+    const updateOwnerWhere = isAdmin ? "1=1" : "owner_id=$16";
     const updateParams = [
       name || old.name,
       name_rw !== undefined ? name_rw : old.name_rw,
@@ -240,6 +252,11 @@ router.put("/:id", requireRole("admin", "sme_owner", "manager", "pulse_admin"), 
       sell_price_rwf !== undefined ? parseInt(sell_price_rwf) : old.sell_price_rwf,
       low_stock_threshold !== undefined ? parseInt(low_stock_threshold) : old.low_stock_threshold,
       image_url || null,
+      brand !== undefined ? brand : old.brand,
+      description !== undefined ? description : old.description,
+      compare_price_rwf !== undefined ? (compare_price_rwf ? parseInt(compare_price_rwf) : null) : old.compare_price_rwf,
+      is_published !== undefined ? (is_published !== false && is_published !== "false") : old.is_published !== false,
+      is_featured !== undefined ? (is_featured === true || is_featured === "true") : old.is_featured === true,
       req.params.id,
     ];
     if (!isAdmin) updateParams.push(req.ownerId);
@@ -247,8 +264,9 @@ router.put("/:id", requireRole("admin", "sme_owner", "manager", "pulse_admin"), 
     const { rows: [item] } = await pool.query(
       `UPDATE stock_items SET name=$1, name_rw=$2, category=$3, unit=$4,
         quantity=$5, cost_price_rwf=$6, sell_price_rwf=$7, low_stock_threshold=$8,
-        image_url=COALESCE($9, image_url)
-       WHERE id=$10 AND ${updateOwnerWhere} RETURNING *`,
+        image_url=COALESCE($9, image_url),
+        brand=$10, description=$11, compare_price_rwf=$12, is_published=$13, is_featured=$14
+       WHERE id=$15 AND ${updateOwnerWhere} RETURNING *`,
       updateParams
     );
     await logAudit(req.user.id, "STOCK_UPDATED", "stock_items", item.id, old, item, req.ip);

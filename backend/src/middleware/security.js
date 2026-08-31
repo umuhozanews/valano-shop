@@ -255,6 +255,7 @@ const secureUpload = multer({
 
 module.exports = {
   securityHeaders,
+  createRateLimiter,
   authRateLimiter,
   apiRateLimiter,
   botProtection,
