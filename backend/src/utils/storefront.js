@@ -11,6 +11,29 @@ const RESERVED_SLUGS = new Set([
   "assets", "static", "health", "advisory", "www", "new", "about", "contact",
 ]);
 
+const DEFAULT_DELIVERY_FEE = 1500;
+const DEFAULT_MIN_FREE_DELIVERY = 50000;
+
+// Named colour schemes the SME can pick instead of hand-typing hex codes.
+const THEME_PRESETS = {
+  teal_lime: { label: "Teal & Lime", brand: "#006C49", accent: "#C6F24E" },
+  orange:    { label: "Sunset Orange", brand: "#E2560F", accent: "#FFE1CC" },
+  sapphire:  { label: "Sapphire Blue", brand: "#1D4ED8", accent: "#DBEAFE" },
+  plum:      { label: "Deep Plum", brand: "#6D28D9", accent: "#EDE9FE" },
+  charcoal:  { label: "Charcoal", brand: "#1F2937", accent: "#E5E7EB" },
+};
+
+// Zone fees are derived from the SME's base fee rather than hard-coded, so an
+// SME that only changes one number still gets a sensible Kigali/upcountry spread.
+const DEFAULT_ZONE_TEMPLATE = [
+  { name: "Nyarugenge / City Centre", multiplier: 1 },
+  { name: "Kimironko", multiplier: 1.2 },
+  { name: "Remera", multiplier: 1.2 },
+  { name: "Kicukiro", multiplier: 1.4 },
+  { name: "Gasabo (other sectors)", multiplier: 1.6 },
+  { name: "Upcountry (Rubavu, Musanze, Huye…)", multiplier: 3 },
+];
+
 let _storeColumnsReady = false;
 let _slugBackfillDone = false;
 
@@ -31,6 +54,10 @@ const STORE_COLUMN_SQL = [
   "ALTER TABLE settings ADD COLUMN IF NOT EXISTS store_delivery_note TEXT",
   "ALTER TABLE settings ADD COLUMN IF NOT EXISTS store_hero_slides JSONB",
   "ALTER TABLE settings ADD COLUMN IF NOT EXISTS store_socials JSONB",
+  `ALTER TABLE settings ADD COLUMN IF NOT EXISTS store_delivery_fee BIGINT DEFAULT ${DEFAULT_DELIVERY_FEE}`,
+  `ALTER TABLE settings ADD COLUMN IF NOT EXISTS store_min_free_delivery BIGINT DEFAULT ${DEFAULT_MIN_FREE_DELIVERY}`,
+  "ALTER TABLE settings ADD COLUMN IF NOT EXISTS store_delivery_zones JSONB",
+  "ALTER TABLE settings ADD COLUMN IF NOT EXISTS store_pickup_enabled BOOLEAN DEFAULT true",
   "ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS is_published BOOLEAN DEFAULT true",
   "ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT false",
   "ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS brand VARCHAR(80)",
@@ -50,7 +77,16 @@ const STORE_COLUMN_SQL = [
      source         VARCHAR(20) NOT NULL DEFAULT 'website',
      created_at     TIMESTAMP DEFAULT NOW()
    )`,
+  // Delivery details and the link to the POS sale the order was converted into.
+  "ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS fulfillment VARCHAR(20) DEFAULT 'delivery'",
+  "ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS delivery_address TEXT",
+  "ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS delivery_zone VARCHAR(120)",
+  "ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS delivery_fee BIGINT DEFAULT 0",
+  "ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS sale_id INTEGER",
+  "ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS fulfilled_at TIMESTAMP",
   "CREATE UNIQUE INDEX IF NOT EXISTS uq_settings_store_slug ON settings(store_slug) WHERE store_slug IS NOT NULL",
+  // One web order can only ever produce one sale, even under concurrent clicks.
+  "CREATE UNIQUE INDEX IF NOT EXISTS uq_store_orders_sale ON store_orders(sale_id) WHERE sale_id IS NOT NULL",
 ];
 
 async function ensureStoreColumns() {
@@ -170,6 +206,83 @@ function parseJsonColumn(value, fallback) {
   }
 }
 
+// RWF has no minor unit, so every money figure stays an integer. Fees are also
+// snapped to 500 so derived zone prices read like real Rwandan delivery prices.
+function toInt(value, fallback = 0) {
+  const n = Math.round(Number(value));
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function roundFee(value) {
+  return Math.max(0, Math.round(toInt(value) / 500) * 500);
+}
+
+function baseDeliveryFee(store) {
+  const fee = store.store_delivery_fee;
+  return fee === null || fee === undefined ? DEFAULT_DELIVERY_FEE : Math.max(0, toInt(fee));
+}
+
+function minFreeDelivery(store) {
+  const min = store.store_min_free_delivery;
+  return min === null || min === undefined ? DEFAULT_MIN_FREE_DELIVERY : Math.max(0, toInt(min));
+}
+
+// An SME that has configured nothing still gets a working zone selector.
+function deliveryZones(store) {
+  const authored = parseJsonColumn(store.store_delivery_zones, null);
+  if (Array.isArray(authored) && authored.length) {
+    const zones = authored
+      .filter((zone) => zone && String(zone.name || "").trim())
+      .slice(0, 20)
+      .map((zone) => ({
+        name: String(zone.name).trim().slice(0, 120),
+        fee: Math.max(0, toInt(zone.fee)),
+      }));
+    if (zones.length) return zones;
+  }
+
+  const base = baseDeliveryFee(store);
+  return DEFAULT_ZONE_TEMPLATE.map((zone) => ({
+    name: zone.name,
+    fee: roundFee(base * zone.multiplier),
+  }));
+}
+
+function pickupEnabled(store) {
+  return store.store_pickup_enabled !== false;
+}
+
+// The authoritative delivery price. The browser sends a zone *name* and never a
+// fee, and this is the only place a fee is produced — for the quote shown on the
+// storefront and again when the order is written, so the two cannot disagree.
+function quoteDelivery(store, { subtotal = 0, fulfillment = "delivery", zone = null } = {}) {
+  const zones = deliveryZones(store);
+  const freeOver = minFreeDelivery(store);
+  const wantsPickup = String(fulfillment).toLowerCase() === "pickup";
+  const mode = wantsPickup && pickupEnabled(store) ? "pickup" : "delivery";
+
+  if (mode === "pickup") {
+    return { fulfillment: "pickup", zone: null, fee: 0, freeApplied: false, freeOver };
+  }
+
+  const wanted = String(zone || "").trim().toLowerCase();
+  const matched = zones.find((entry) => entry.name.toLowerCase() === wanted) || null;
+
+  // A zone the shopper picked can disappear if the SME edits its zones while the
+  // page is open. Charging the base fee keeps the order placeable instead of
+  // failing the checkout — the merchant still sees the typed address.
+  const fee = matched ? matched.fee : baseDeliveryFee(store);
+  const freeApplied = freeOver > 0 && toInt(subtotal) >= freeOver;
+
+  return {
+    fulfillment: "delivery",
+    zone: matched ? matched.name : null,
+    fee: freeApplied ? 0 : Math.max(0, toInt(fee)),
+    freeApplied,
+    freeOver,
+  };
+}
+
 function shapeProduct(row) {
   const price = toNumber(row.sell_price_rwf);
   const compareAt = toNumber(row.compare_price_rwf);
@@ -266,9 +379,16 @@ function deriveBrands(products) {
 }
 
 function buildTrustBadges(store) {
+  const freeOver = minFreeDelivery(store);
   return [
     { icon: "shield-check", title: "Genuine Products", detail: "Every item verified before sale" },
-    { icon: "truck", title: "Fast Delivery", detail: store.store_delivery_note || "Delivery across Rwanda" },
+    {
+      icon: "truck",
+      title: freeOver > 0 ? "Free Delivery Available" : "Fast Delivery",
+      detail: freeOver > 0
+        ? `Free on orders over ${freeOver.toLocaleString("en-RW")} RWF`
+        : store.store_delivery_note || "Delivery across Rwanda",
+    },
     { icon: "lock", title: "Secure Payment", detail: "Mobile money, cash or bank transfer" },
     { icon: "award", title: "Fair Pricing", detail: "Clear prices, no hidden charges" },
     { icon: "message-circle", title: "Customer Support", detail: store.store_hours || "Mon–Sat, 8am–6pm" },
@@ -298,6 +418,15 @@ function buildStorePayload(store, productRows) {
       hours: store.store_hours || "Mon–Sat, 8am–6pm",
       deliveryNote: store.store_delivery_note || "Delivery available across Rwanda.",
       currency: store.currency || "RWF",
+      // An RRA TIN on the settings row means this is a registered business that
+      // issues EBM receipts, which is what the badge actually claims.
+      verified: Boolean(String(store.tin_number || "").trim()),
+      delivery: {
+        fee: baseDeliveryFee(store),
+        freeOver: minFreeDelivery(store),
+        zones: deliveryZones(store),
+        pickupAvailable: pickupEnabled(store),
+      },
       socials: {
         facebook: socials.facebook || null,
         instagram: socials.instagram || null,
@@ -375,6 +504,19 @@ function sanitizeHeroSlides(value) {
     .filter((slide) => slide.title || slide.image);
 }
 
+// Storing an empty array is meaningful: it means "no zones, use the flat fee".
+function sanitizeDeliveryZones(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((zone) => zone && typeof zone === "object")
+    .map((zone) => ({
+      name: String(zone.name || "").trim().slice(0, 120),
+      fee: Math.max(0, Math.min(10_000_000, Math.round(Number(zone.fee)) || 0)),
+    }))
+    .filter((zone) => zone.name)
+    .slice(0, 20);
+}
+
 function sanitizeSocials(value) {
   const source = value && typeof value === "object" ? value : {};
   const out = {};
@@ -429,14 +571,40 @@ async function saveStorefrontSettings(ownerId, body = {}) {
   if ("store_hours" in body) push("store_hours", body.store_hours ? String(body.store_hours).slice(0, 120) : null);
   if ("store_whatsapp" in body) push("store_whatsapp", normalizePhone(body.store_whatsapp));
   if ("store_published" in body) push("store_published", body.store_published !== false && body.store_published !== "false");
+  if ("store_pickup_enabled" in body) {
+    push("store_pickup_enabled", body.store_pickup_enabled !== false && body.store_pickup_enabled !== "false");
+  }
 
-  for (const key of ["store_brand_color", "store_accent_color"]) {
+  for (const key of ["store_delivery_fee", "store_min_free_delivery"]) {
     if (!(key in body)) continue;
-    const color = String(body[key] || "").trim();
-    if (color && !HEX_COLOR.test(color)) {
-      throw new StorefrontValidationError("Colours must be hex values such as #006C49.");
+    const amount = Math.round(Number(body[key]));
+    if (!Number.isFinite(amount) || amount < 0) {
+      throw new StorefrontValidationError("Delivery amounts must be whole numbers of RWF, and cannot be negative.");
     }
-    push(key, color || null);
+    push(key, Math.min(amount, 10_000_000));
+  }
+
+  if ("store_delivery_zones" in body) {
+    push("store_delivery_zones", JSON.stringify(sanitizeDeliveryZones(body.store_delivery_zones)));
+  }
+
+  // Picking a preset just resolves to the two colour columns, so the rest of the
+  // app keeps reading colours from one place and a preset is never a third source
+  // of truth. An explicit colour in the same request wins over the preset.
+  const preset = THEME_PRESETS[body.store_theme_preset] || null;
+  for (const [key, presetKey] of [["store_brand_color", "brand"], ["store_accent_color", "accent"]]) {
+    let color = null;
+    if (key in body) {
+      color = String(body[key] || "").trim();
+      if (color && !HEX_COLOR.test(color)) {
+        throw new StorefrontValidationError("Colours must be hex values such as #006C49.");
+      }
+    } else if (preset) {
+      color = preset[presetKey];
+    } else {
+      continue;
+    }
+    push(key, color || (preset ? preset[presetKey] : null));
   }
 
   if ("store_hero_slides" in body) {
@@ -462,7 +630,7 @@ function storefrontSettingsView(settingsRow, { baseUrl } = {}) {
   const slug = row.store_slug || null;
   return {
     store_slug: slug,
-    store_url: slug ? `${(baseUrl || "").replace(/\/$/, "")}/shop/${slug}` : null,
+    store_url: slug ? `${(baseUrl || "").replace(/\/$/, "")}/store/${slug}` : null,
     store_published: row.store_published !== false,
     store_headline: row.store_headline || null,
     store_tagline: row.store_tagline || null,
@@ -475,13 +643,23 @@ function storefrontSettingsView(settingsRow, { baseUrl } = {}) {
     store_delivery_note: row.store_delivery_note || null,
     store_hero_slides: parseJsonColumn(row.store_hero_slides, []),
     store_socials: parseJsonColumn(row.store_socials, {}),
+    store_delivery_fee: baseDeliveryFee(row),
+    store_min_free_delivery: minFreeDelivery(row),
+    store_pickup_enabled: pickupEnabled(row),
+    // Always the resolved list, so the editor shows the defaults an SME is
+    // actually charging rather than an empty grid it has to fill in first.
+    store_delivery_zones: deliveryZones(row),
+    theme_presets: Object.entries(THEME_PRESETS).map(([id, preset]) => ({ id, ...preset })),
   };
 }
 
 module.exports = {
   DEFAULT_BRAND_COLOR,
   DEFAULT_ACCENT_COLOR,
+  THEME_PRESETS,
   StorefrontValidationError,
+  quoteDelivery,
+  deliveryZones,
   ensureStoreColumns,
   ensureSettingsRow,
   slugify,

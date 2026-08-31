@@ -3,10 +3,12 @@ import { Link } from "react-router-dom";
 import { Minus, Plus, ShoppingBag, Trash2, X } from "lucide-react";
 import { useStore } from "../StoreContext";
 import { formatMoney } from "../lib/format";
+import { amountToFreeDelivery } from "../lib/delivery";
 import { ProductImage } from "./Bits";
 
 export default function CartDrawer() {
-  const { cart, currency, base } = useStore();
+  const { cart, currency, base, store, delivery } = useStore();
+  const shortfall = amountToFreeDelivery(store, cart.subtotal);
 
   useEffect(() => {
     if (!cart.isOpen) return undefined;
@@ -120,7 +122,17 @@ export default function CartDrawer() {
                   {formatMoney(cart.total, currency)}
                 </span>
               </div>
-              <p className="mt-1 text-xs text-store-muted">Delivery is arranged with the shop after you order.</p>
+              {shortfall != null ? (
+                <p className="mt-2 rounded-xl bg-store-brand/10 px-3 py-2 text-xs font-medium text-store-brand">
+                  Add {formatMoney(shortfall, currency)} more to get free delivery.
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-store-muted">
+                  {delivery.freeApplied
+                    ? "Free delivery applies to this order."
+                    : "Delivery is calculated at checkout."}
+                </p>
+              )}
               <Link
                 to={`${base}/checkout`}
                 onClick={cart.close}

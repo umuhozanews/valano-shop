@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { fetchStore } from "./lib/storeApi";
+import { quoteDelivery } from "./lib/delivery";
 
 const StoreContext = createContext(null);
 
@@ -24,12 +25,14 @@ function readCart(slug) {
   }
 }
 
-export function StoreProvider({ slug, children }) {
+export function StoreProvider({ slug, basePath = "", children }) {
   const [status, setStatus] = useState("loading");
   const [payload, setPayload] = useState(null);
   const [error, setError] = useState(null);
   const [cart, setCart] = useState(() => readCart(slug));
   const [cartOpen, setCartOpen] = useState(false);
+  const [fulfillment, setFulfillment] = useState("delivery");
+  const [zone, setZone] = useState(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -111,23 +114,51 @@ export function StoreProvider({ slug, children }) {
       .filter(Boolean);
   }, [cart, products]);
 
+  const store = payload?.store || null;
+
+  // Default to the shop's first zone so the cart shows a real delivery price
+  // straight away instead of "select an area to see the fee".
+  useEffect(() => {
+    const zones = store?.delivery?.zones;
+    if (Array.isArray(zones) && zones.length) setZone((current) => current || zones[0].name);
+  }, [store]);
+
+  const subtotal = useMemo(() => lines.reduce((sum, line) => sum + line.lineTotal, 0), [lines]);
+
+  const delivery = useMemo(
+    () => quoteDelivery(store, { subtotal, fulfillment, zone }),
+    [store, subtotal, fulfillment, zone]
+  );
+
   const value = useMemo(
     () => ({
       slug,
-      base: `/shop/${slug}`,
+      // `base` is a prefix to build links from and is "" on a subdomain store;
+      // `home` is that same root as a usable link target.
+      base: basePath,
+      home: basePath || "/",
       status,
       error,
-      store: payload?.store || null,
+      store,
       heroSlides: payload?.heroSlides || [],
       categories: payload?.categories || [],
       brands: payload?.brands || [],
       trustBadges: payload?.trustBadges || [],
       products,
       currency: payload?.store?.currency || "RWF",
+      // Fulfilment choice lives here rather than in the checkout page so the cart
+      // drawer and the checkout always quote the same delivery price.
+      delivery: {
+        ...delivery,
+        setFulfillment,
+        setZone,
+      },
       cart: {
         lines,
         itemCount: lines.reduce((sum, line) => sum + line.quantity, 0),
-        total: lines.reduce((sum, line) => sum + line.lineTotal, 0),
+        total: subtotal,
+        subtotal,
+        grandTotal: subtotal + delivery.fee,
         isOpen: cartOpen,
         open: openCart,
         close: closeCart,
@@ -139,7 +170,8 @@ export function StoreProvider({ slug, children }) {
       },
     }),
     [
-      slug, status, error, payload, products, lines, cartOpen, cart,
+      slug, basePath, status, error, payload, store, products, lines, cartOpen, cart,
+      subtotal, delivery,
       openCart, closeCart, addToCart, setQuantity, removeFromCart, clearCart,
     ]
   );

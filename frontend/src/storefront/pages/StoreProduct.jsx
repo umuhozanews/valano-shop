@@ -17,7 +17,7 @@ function productIdFromSlug(slug) {
 
 export default function StoreProduct() {
   const { productSlug } = useParams();
-  const { store, base, products, categories, currency, cart } = useStore();
+  const { store, base, home, products, categories, currency, cart } = useStore();
   const [quantity, setQuantity] = useState(1);
 
   const productId = productIdFromSlug(productSlug);
@@ -66,7 +66,7 @@ export default function StoreProduct() {
       />
 
       <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-1.5 pt-2 text-xs text-store-muted">
-        <Link to={base} className="hover:text-store-brand">Home</Link>
+        <Link to={home} className="hover:text-store-brand">Home</Link>
         <ChevronRight size={12} aria-hidden="true" />
         <Link to={`${base}/category/${categorySlug}`} className="hover:text-store-brand">
           {product.category}

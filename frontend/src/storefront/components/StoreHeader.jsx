@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { ChevronDown, Menu, Search, ShoppingCart, X } from "lucide-react";
+import { BadgeCheck, ChevronDown, Menu, Search, ShoppingCart, X } from "lucide-react";
 import { useStore } from "../StoreContext";
 import AnnouncementBar from "./AnnouncementBar";
 
@@ -21,7 +21,7 @@ function NavItem({ to, children, onClick }) {
 }
 
 export default function StoreHeader() {
-  const { store, base, categories, cart } = useStore();
+  const { store, base, home, categories, cart } = useStore();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [categoriesOpen, setCategoriesOpen] = useState(false);
@@ -66,7 +66,7 @@ export default function StoreHeader() {
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 to-transparent" aria-hidden="true" />
 
           <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 px-4 py-3 md:px-6">
-            <Link to={base} className="flex shrink-0 items-center gap-2.5" onClick={closeMenus}>
+            <Link to={home} className="flex shrink-0 items-center gap-2.5" onClick={closeMenus}>
               {store.logo ? (
                 <img src={store.logo} alt={store.name} className="h-11 w-auto max-w-[150px] object-contain" />
               ) : (
@@ -74,8 +74,23 @@ export default function StoreHeader() {
                   {store.name.charAt(0).toUpperCase()}
                 </span>
               )}
-              <span className="font-display max-w-[180px] truncate text-base font-extrabold tracking-tight text-store-fg sm:text-lg">
-                {store.name}
+              <span className="flex min-w-0 flex-col">
+                <span className="font-display flex items-center gap-1.5 text-base font-extrabold tracking-tight text-store-fg sm:text-lg">
+                  <span className="max-w-[180px] truncate">{store.name}</span>
+                  {store.verified && (
+                    <BadgeCheck
+                      size={16}
+                      className="shrink-0 text-store-brand"
+                      aria-label="Registered business"
+                      title="Registered business — issues official EBM receipts"
+                    />
+                  )}
+                </span>
+                {store.address && (
+                  <span className="hidden max-w-[200px] truncate text-[11px] text-store-muted sm:block">
+                    {store.address}
+                  </span>
+                )}
               </span>
             </Link>
 

@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/layout/ProtectedRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { useAuth } from "./context/AuthContext";
+import { storeSlugFromHost } from "./storefront/lib/host";
 
 const Loading = () => (
   <div className="flex h-screen items-center justify-center bg-background">
@@ -97,6 +98,21 @@ function AppRoot() {
 }
 
 export default function App() {
+  // On <slug>.inzira.rw the whole origin belongs to one shop, so the storefront
+  // takes over the root and the dashboard is reached on the app subdomain.
+  const hostSlug = storeSlugFromHost();
+  if (hostSlug) {
+    return (
+      <ErrorBoundary>
+        <Suspense fallback={<Loading />}>
+          <Routes>
+            <Route path="/*" element={<Storefront hostSlug={hostSlug} />} />
+          </Routes>
+        </Suspense>
+      </ErrorBoundary>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <Suspense fallback={<Loading />}>
@@ -163,8 +179,10 @@ export default function App() {
           <Route path="/app" element={<AppRoot />} />
 
           {/* Public SME storefronts — no auth required. The trailing splat lets the
-              storefront own its internal routes (product, category, checkout…). */}
-          <Route path="/shop/:slug/*"         element={<Storefront />} />
+              storefront own its internal routes (product, category, checkout…).
+              /shop stays mounted because links to it are already in the wild. */}
+          <Route path="/store/:slug/*"        element={<Storefront prefix="store" />} />
+          <Route path="/shop/:slug/*"         element={<Storefront prefix="shop" />} />
 
           {/* Public advisory share link — no auth required */}
           <Route path="/advisory/:token"      element={<AdvisoryPublic />} />

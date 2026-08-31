@@ -1,20 +1,29 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, Loader2, Minus, Plus, Trash2 } from "lucide-react";
+import { CheckCircle2, Loader2, MapPin, Minus, Plus, Store as StoreIcon, Trash2, Truck } from "lucide-react";
 import { useStore } from "../StoreContext";
 import { EmptyState, ProductImage } from "../components/Bits";
 import StoreSeo from "../components/StoreSeo";
-import { formatMoney, telLink, whatsappLink } from "../lib/format";
+import { formatMoney, orderManifest, telLink, whatsappLink } from "../lib/format";
+import { amountToFreeDelivery } from "../lib/delivery";
 import { placeStoreOrder } from "../lib/storeApi";
 
 const FIELD_CLASS =
   "w-full rounded-xl border border-store-line bg-store-card px-4 py-2.5 text-sm text-store-fg outline-none transition placeholder:text-store-muted focus:border-store-brand/50 focus:ring-2 focus:ring-store-brand/20";
 
-function Confirmation({ order }) {
+function Confirmation({ order, customer }) {
   const { store, base, currency } = useStore();
   const waHref = whatsappLink(
     store.whatsapp,
-    `Hello ${store.name}, I just placed order ${order.reference} on your website.`
+    orderManifest({
+      store,
+      lines: order.items,
+      subtotal: order.subtotal ?? order.total,
+      delivery: order.delivery,
+      customer,
+      reference: order.reference,
+      currency,
+    })
   );
 
   return (
@@ -24,7 +33,8 @@ function Confirmation({ order }) {
         Order received
       </h1>
       <p className="mt-3 text-sm leading-relaxed text-store-muted">
-        Thank you. {store.name} has your order and will contact you shortly to confirm payment and delivery.
+        Thank you. {store.name} has your order and will contact you shortly to confirm payment and
+        {order.delivery?.fulfillment === "pickup" ? " collection" : " delivery"}.
       </p>
 
       <div className="mt-6 rounded-2xl bg-store-soft p-5 text-left ring-1 ring-store-line/60">
@@ -43,11 +53,26 @@ function Confirmation({ order }) {
             </li>
           ))}
         </ul>
-        <div className="mt-3 flex items-center justify-between border-t border-store-line pt-3">
-          <span className="text-sm font-semibold text-store-fg">Total</span>
-          <span className="font-display text-lg font-extrabold text-store-brand">
-            {formatMoney(order.total, currency)}
-          </span>
+
+        <div className="mt-3 space-y-1.5 border-t border-store-line pt-3 text-sm">
+          <div className="flex items-center justify-between text-store-muted">
+            <span>Subtotal</span>
+            <span>{formatMoney(order.subtotal ?? order.total, currency)}</span>
+          </div>
+          <div className="flex items-center justify-between text-store-muted">
+            <span>
+              {order.delivery?.fulfillment === "pickup"
+                ? "Collection from shop"
+                : `Delivery${order.delivery?.zone ? ` — ${order.delivery.zone}` : ""}`}
+            </span>
+            <span>{order.delivery?.fee ? formatMoney(order.delivery.fee, currency) : "Free"}</span>
+          </div>
+          <div className="flex items-center justify-between pt-1.5">
+            <span className="text-sm font-semibold text-store-fg">Total</span>
+            <span className="font-display text-lg font-extrabold text-store-brand">
+              {formatMoney(order.total, currency)}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -59,7 +84,7 @@ function Confirmation({ order }) {
             rel="noopener noreferrer"
             className="rounded-full bg-store-brand px-6 py-2.5 text-sm font-bold text-store-brand-fg transition hover:opacity-90"
           >
-            Confirm on WhatsApp
+            Send details on WhatsApp
           </a>
         )}
         <Link
@@ -73,23 +98,97 @@ function Confirmation({ order }) {
   );
 }
 
+// Delivery or collection, then the area. Fees come from the shop's own settings
+// and are confirmed by the server when the order is placed.
+function FulfillmentPicker({ delivery, currency }) {
+  const options = [
+    { id: "delivery", label: "Deliver to me", icon: Truck },
+    ...(delivery.pickupAvailable ? [{ id: "pickup", label: "I will collect", icon: StoreIcon }] : []),
+  ];
+
+  return (
+    <>
+      <div className={`grid gap-3 ${options.length > 1 ? "sm:grid-cols-2" : ""}`}>
+        {options.map((option) => {
+          const Icon = option.icon;
+          const active = delivery.fulfillment === option.id;
+          return (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => delivery.setFulfillment(option.id)}
+              aria-pressed={active}
+              className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition ${
+                active
+                  ? "border-store-brand bg-store-brand/5 ring-1 ring-store-brand/30"
+                  : "border-store-line bg-store-card hover:border-store-brand/40"
+              }`}
+            >
+              <Icon size={18} className={active ? "text-store-brand" : "text-store-muted"} aria-hidden="true" />
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-store-fg">{option.label}</span>
+                <span className="block text-xs text-store-muted">
+                  {option.id === "pickup" ? "No delivery fee" : "Fee depends on your area"}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {delivery.fulfillment === "delivery" && delivery.zones.length > 0 && (
+        <div className="mt-4">
+          <label htmlFor="deliveryZone" className="mb-1.5 block text-xs font-semibold text-store-fg">
+            Delivery area <span className="text-store-brand">*</span>
+          </label>
+          <select
+            id="deliveryZone"
+            value={delivery.zone || ""}
+            onChange={(event) => delivery.setZone(event.target.value)}
+            className={FIELD_CLASS}
+          >
+            {delivery.zones.map((zone) => (
+              <option key={zone.name} value={zone.name}>
+                {zone.name} — {zone.fee ? formatMoney(zone.fee, currency) : "Free"}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function StoreCheckout() {
-  const { store, slug, base, cart, currency } = useStore();
-  const [form, setForm] = useState({ customerName: "", customerPhone: "", customerEmail: "", note: "" });
+  const { store, slug, base, cart, currency, delivery } = useStore();
+  const [form, setForm] = useState({
+    customerName: "", customerPhone: "", customerEmail: "", address: "", note: "",
+  });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [order, setOrder] = useState(null);
 
   const update = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
 
+  const isPickup = delivery.fulfillment === "pickup";
+  const shortfall = isPickup ? null : amountToFreeDelivery(store, cart.subtotal);
+
+  function validate() {
+    if (form.customerName.trim().length < 2) return "Please enter your full name.";
+    if (form.customerPhone.replace(/[^\d]/g, "").length < 9) return "Please enter a valid phone number.";
+    if (!isPickup && form.address.trim().length < 5) {
+      return "Please tell us where to deliver — a street, house number or landmark.";
+    }
+    if (!cart.lines.length) return "Your cart is empty.";
+    return null;
+  }
+
   async function submit(event) {
     event.preventDefault();
+    const problem = validate();
+    if (problem) return setError(problem);
+
     setError(null);
-
-    if (form.customerName.trim().length < 2) return setError("Please enter your full name.");
-    if (form.customerPhone.replace(/[^\d]/g, "").length < 9) return setError("Please enter a valid phone number.");
-    if (!cart.lines.length) return setError("Your cart is empty.");
-
     setSubmitting(true);
     try {
       const result = await placeStoreOrder(slug, {
@@ -97,6 +196,9 @@ export default function StoreCheckout() {
         customerPhone: form.customerPhone.trim(),
         customerEmail: form.customerEmail.trim() || undefined,
         note: form.note.trim() || undefined,
+        fulfillment: delivery.fulfillment,
+        deliveryZone: isPickup ? undefined : delivery.zone || undefined,
+        deliveryAddress: isPickup ? undefined : form.address.trim(),
         items: cart.lines.map((line) => ({ id: line.id, quantity: line.quantity })),
       });
       cart.clear();
@@ -112,7 +214,15 @@ export default function StoreCheckout() {
     return (
       <>
         <StoreSeo store={store} title="Order confirmed" />
-        <Confirmation order={order} />
+        <Confirmation
+          order={order}
+          customer={{
+            name: form.customerName.trim(),
+            phone: form.customerPhone.trim(),
+            address: form.address.trim(),
+            note: form.note.trim(),
+          }}
+        />
       </>
     );
   }
@@ -142,6 +252,25 @@ export default function StoreCheckout() {
 
   const phoneHref = telLink(store.phone);
 
+  // Some shoppers would rather finish the whole thing in chat, so the same order
+  // can be sent as one readable WhatsApp message instead of a web order.
+  const waHref = whatsappLink(
+    store.whatsapp,
+    orderManifest({
+      store,
+      lines: cart.lines,
+      subtotal: cart.subtotal,
+      delivery,
+      customer: {
+        name: form.customerName.trim(),
+        phone: form.customerPhone.trim(),
+        address: form.address.trim(),
+        note: form.note.trim(),
+      },
+      currency,
+    })
+  );
+
   return (
     <>
       <StoreSeo store={store} title="Checkout" />
@@ -154,7 +283,14 @@ export default function StoreCheckout() {
 
       <div className="mt-8 mb-6 grid gap-8 lg:grid-cols-[1fr_380px]">
         <form onSubmit={submit} className="rounded-2xl bg-store-card p-6 ring-1 ring-store-line/70">
-          <h2 className="font-display text-base font-bold text-store-fg">Your details</h2>
+          <h2 className="font-display text-base font-bold text-store-fg">How would you like it?</h2>
+          <div className="mt-4">
+            <FulfillmentPicker delivery={delivery} currency={currency} />
+          </div>
+
+          <h2 className="font-display mt-7 border-t border-store-line pt-6 text-base font-bold text-store-fg">
+            Your details
+          </h2>
 
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
@@ -181,12 +317,23 @@ export default function StoreCheckout() {
                 type="email" autoComplete="email" placeholder="you@example.com" className={FIELD_CLASS} />
             </div>
 
+            {!isPickup && (
+              <div className="sm:col-span-2">
+                <label htmlFor="address" className="mb-1.5 block text-xs font-semibold text-store-fg">
+                  Delivery address <span className="text-store-brand">*</span>
+                </label>
+                <input id="address" value={form.address} onChange={update("address")} required
+                  autoComplete="street-address" placeholder="Street, house number or nearest landmark"
+                  className={FIELD_CLASS} />
+              </div>
+            )}
+
             <div className="sm:col-span-2">
               <label htmlFor="note" className="mb-1.5 block text-xs font-semibold text-store-fg">
-                Delivery address or note <span className="font-normal text-store-muted">(optional)</span>
+                Note for the shop <span className="font-normal text-store-muted">(optional)</span>
               </label>
               <textarea id="note" value={form.note} onChange={update("note")} rows={3}
-                placeholder="Where should we deliver? Any special instructions?" className={FIELD_CLASS} />
+                placeholder="Anything else we should know?" className={FIELD_CLASS} />
             </div>
           </div>
 
@@ -206,9 +353,27 @@ export default function StoreCheckout() {
                 <Loader2 size={16} className="animate-spin" /> Sending order…
               </>
             ) : (
-              `Place order · ${formatMoney(cart.total, currency)}`
+              `Place order · ${formatMoney(cart.grandTotal, currency)}`
             )}
           </button>
+
+          {waHref && (
+            <a
+              href={waHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(event) => {
+                const problem = validate();
+                if (problem) {
+                  event.preventDefault();
+                  setError(problem);
+                }
+              }}
+              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-store-brand px-6 py-3 text-sm font-bold text-store-brand transition hover:bg-store-brand/5"
+            >
+              Or send this order on WhatsApp
+            </a>
+          )}
 
           {phoneHref && (
             <p className="mt-3 text-center text-xs text-store-muted">
@@ -256,13 +421,42 @@ export default function StoreCheckout() {
             ))}
           </ul>
 
-          <div className="mt-4 flex items-center justify-between border-t border-store-line pt-4">
-            <span className="text-sm font-semibold text-store-fg">Total</span>
-            <span className="font-display text-xl font-extrabold text-store-brand">
-              {formatMoney(cart.total, currency)}
-            </span>
+          <div className="mt-4 space-y-2 border-t border-store-line pt-4 text-sm">
+            <div className="flex items-center justify-between text-store-muted">
+              <span>Subtotal</span>
+              <span className="font-medium text-store-fg">{formatMoney(cart.subtotal, currency)}</span>
+            </div>
+            <div className="flex items-center justify-between text-store-muted">
+              <span className="flex min-w-0 items-center gap-1.5">
+                {isPickup ? <StoreIcon size={13} aria-hidden="true" /> : <MapPin size={13} aria-hidden="true" />}
+                <span className="truncate">
+                  {isPickup ? "Collection" : delivery.zone || "Delivery"}
+                </span>
+              </span>
+              <span className={`font-medium ${delivery.fee ? "text-store-fg" : "text-store-brand"}`}>
+                {delivery.fee ? formatMoney(delivery.fee, currency) : "Free"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between border-t border-store-line pt-3">
+              <span className="text-sm font-semibold text-store-fg">Total</span>
+              <span className="font-display text-xl font-extrabold text-store-brand">
+                {formatMoney(cart.grandTotal, currency)}
+              </span>
+            </div>
           </div>
-          <p className="mt-2 text-xs text-store-muted">{store.deliveryNote}</p>
+
+          {shortfall != null && (
+            <p className="mt-3 rounded-xl bg-store-brand/10 px-3 py-2.5 text-xs font-medium text-store-brand">
+              Add {formatMoney(shortfall, currency)} more to get free delivery.
+            </p>
+          )}
+          {delivery.freeApplied && !isPickup && (
+            <p className="mt-3 rounded-xl bg-store-brand/10 px-3 py-2.5 text-xs font-semibold text-store-brand">
+              You have earned free delivery on this order.
+            </p>
+          )}
+
+          <p className="mt-3 text-xs text-store-muted">{store.deliveryNote}</p>
         </aside>
       </div>
     </>

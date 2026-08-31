@@ -7,7 +7,7 @@ import StoreSeo from "../components/StoreSeo";
 
 export default function StoreCategory() {
   const { categorySlug } = useParams();
-  const { store, base, products, categories } = useStore();
+  const { store, base, home, products, categories } = useStore();
 
   const isAll = !categorySlug || categorySlug === "all";
   const category = isAll ? null : categories.find((entry) => entry.slug === categorySlug);
@@ -24,7 +24,7 @@ export default function StoreCategory() {
       />
 
       <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 pt-2 text-xs text-store-muted">
-        <Link to={base} className="hover:text-store-brand">Home</Link>
+        <Link to={home} className="hover:text-store-brand">Home</Link>
         <ChevronRight size={12} aria-hidden="true" />
         <span className="font-semibold text-store-fg">{title}</span>
       </nav>

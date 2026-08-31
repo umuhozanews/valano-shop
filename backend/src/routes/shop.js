@@ -12,6 +12,7 @@ const {
   backfillSlugs,
   resolveStore,
   buildStorePayload,
+  quoteDelivery,
 } = require("../utils/storefront");
 
 const MAX_PRODUCTS = 200;
@@ -73,14 +74,22 @@ router.post("/:slug/orders", orderRateLimiter, async (req, res, next) => {
       return res.status(404).json({ error: "Store not found", code: "STORE_NOT_FOUND" });
     }
 
-    const { customerName, customerPhone, customerEmail, note, items } = req.body || {};
+    const {
+      customerName, customerPhone, customerEmail, note, items,
+      fulfillment, deliveryZone, deliveryAddress,
+    } = req.body || {};
     const name = String(customerName || "").trim();
     const phone = String(customerPhone || "").trim();
+    const wantsPickup = String(fulfillment || "delivery").toLowerCase() === "pickup";
+    const address = String(deliveryAddress || "").trim();
 
     if (name.length < 2) return res.status(400).json({ error: "Please enter your name" });
     if (phone.replace(/[^\d]/g, "").length < 9) return res.status(400).json({ error: "Please enter a valid phone number" });
     if (!Array.isArray(items) || !items.length) return res.status(400).json({ error: "Your cart is empty" });
     if (items.length > MAX_ORDER_LINES) return res.status(400).json({ error: "Too many items in one order" });
+    if (!wantsPickup && address.length < 5) {
+      return res.status(400).json({ error: "Please tell us where to deliver (street, house or landmark)" });
+    }
 
     // Collapse the request into id → quantity so duplicate lines cannot be used
     // to bypass the line limit, then price everything from the database.
@@ -119,14 +128,24 @@ router.post("/:slug/orders", orderRateLimiter, async (req, res, next) => {
         lineTotal: unitPrice * quantity,
       };
     });
-    const total = orderLines.reduce((sum, line) => sum + line.lineTotal, 0);
+    const subtotal = orderLines.reduce((sum, line) => sum + line.lineTotal, 0);
+
+    // The browser sends a zone name only. The fee — and therefore the total the
+    // shopper owes — is decided here from the SME's own configuration.
+    const delivery = quoteDelivery(store, {
+      subtotal,
+      fulfillment: wantsPickup ? "pickup" : "delivery",
+      zone: deliveryZone,
+    });
+    const total = subtotal + delivery.fee;
     const reference = `WEB-${Date.now().toString(36).toUpperCase()}`;
 
     const { rows: [order] } = await pool.query(
       `INSERT INTO store_orders
          (owner_id, reference, customer_name, customer_phone, customer_email,
-          delivery_note, items, total_amount, status, source)
-       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,'pending','website')
+          delivery_note, items, total_amount, status, source,
+          fulfillment, delivery_address, delivery_zone, delivery_fee)
+       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,'pending','website',$9,$10,$11,$12)
        RETURNING id, reference, total_amount, created_at`,
       [
         store.owner_id,
@@ -137,6 +156,10 @@ router.post("/:slug/orders", orderRateLimiter, async (req, res, next) => {
         note ? String(note).slice(0, 1000) : null,
         JSON.stringify(orderLines),
         total,
+        delivery.fulfillment,
+        delivery.fulfillment === "pickup" ? null : address.slice(0, 500),
+        delivery.zone,
+        delivery.fee,
       ]
     );
 
@@ -146,12 +169,15 @@ router.post("/:slug/orders", orderRateLimiter, async (req, res, next) => {
       [
         store.owner_id,
         `New website order ${reference}`,
-        `${name} (${phone}) ordered ${orderLines.length} item(s) worth ${total.toLocaleString("en-RW")} RWF.`,
+        `${name} (${phone}) ordered ${orderLines.length} item(s) worth ${total.toLocaleString("en-RW")} RWF` +
+          `${delivery.fulfillment === "pickup" ? " for pickup" : ` for delivery to ${delivery.zone || address}`}.`,
       ]
     ).catch(() => {});
 
     res.status(201).json({
       reference: order.reference,
+      subtotal,
+      delivery,
       total: Number(order.total_amount),
       itemCount: orderLines.length,
       items: orderLines,

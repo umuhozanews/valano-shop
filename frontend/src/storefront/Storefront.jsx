@@ -54,7 +54,7 @@ function StoreUnavailable({ error }) {
 }
 
 function StorePageNotFound() {
-  const { base } = useStore();
+  const { home } = useStore();
   return (
     <div className="py-10">
       <EmptyState
@@ -63,7 +63,7 @@ function StorePageNotFound() {
         message="That page does not exist on this shop."
         action={
           <Link
-            to={base}
+            to={home}
             className="rounded-full bg-store-brand px-6 py-2.5 text-sm font-semibold text-store-brand-fg transition hover:opacity-90"
           >
             Back to shop home
@@ -104,11 +104,16 @@ function StoreShell() {
   );
 }
 
-export default function Storefront() {
-  const { slug } = useParams();
+// A storefront is reachable three ways — /store/:slug, the older /shop/:slug, and
+// a <slug>.inzira.rw subdomain — so the mount path is passed in rather than built
+// from the slug. Every internal link is relative to it.
+export default function Storefront({ prefix = "store", hostSlug = null }) {
+  const { slug: pathSlug } = useParams();
+  const slug = hostSlug || pathSlug;
+  const basePath = hostSlug ? "" : `/${prefix}/${slug}`;
 
   return (
-    <StoreProvider slug={slug}>
+    <StoreProvider slug={slug} basePath={basePath}>
       <StoreShell />
     </StoreProvider>
   );
