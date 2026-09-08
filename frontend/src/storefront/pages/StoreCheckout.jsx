@@ -29,7 +29,7 @@ function Confirmation({ order, customer }) {
   return (
     <div className="mx-auto max-w-xl py-10 text-center">
       <CheckCircle2 size={56} className="mx-auto text-store-brand" aria-hidden="true" />
-      <h1 className="font-display mt-5 text-2xl font-extrabold tracking-tight text-store-fg md:text-3xl">
+      <h1 className="font-store-serif mt-5 text-2xl font-bold tracking-tight text-store-fg md:text-3xl">
         Order received
       </h1>
       <p className="mt-3 text-sm leading-relaxed text-store-muted">
@@ -275,7 +275,7 @@ export default function StoreCheckout() {
     <>
       <StoreSeo store={store} title="Checkout" />
 
-      <h1 className="font-display pt-2 text-2xl font-extrabold tracking-tight text-store-fg md:text-3xl">Checkout</h1>
+      <h1 className="font-store-serif pt-2 text-2xl font-bold tracking-tight text-store-fg md:text-3xl">Checkout</h1>
       <p className="mt-2 text-sm text-store-muted">
         Leave your details and {store.name} will contact you to confirm payment and delivery. No online payment is
         needed now.
@@ -283,12 +283,12 @@ export default function StoreCheckout() {
 
       <div className="mt-8 mb-6 grid gap-8 lg:grid-cols-[1fr_380px]">
         <form onSubmit={submit} className="rounded-2xl bg-store-card p-6 ring-1 ring-store-line/70">
-          <h2 className="font-display text-base font-bold text-store-fg">How would you like it?</h2>
+          <h2 className="font-store-serif text-base font-bold text-store-fg">How would you like it?</h2>
           <div className="mt-4">
             <FulfillmentPicker delivery={delivery} currency={currency} />
           </div>
 
-          <h2 className="font-display mt-7 border-t border-store-line pt-6 text-base font-bold text-store-fg">
+          <h2 className="font-store-serif mt-7 border-t border-store-line pt-6 text-base font-bold text-store-fg">
             Your details
           </h2>
 
@@ -383,7 +383,7 @@ export default function StoreCheckout() {
         </form>
 
         <aside className="h-fit rounded-2xl bg-store-soft p-6 ring-1 ring-store-line/60">
-          <h2 className="font-display text-base font-bold text-store-fg">Order summary</h2>
+          <h2 className="font-store-serif text-base font-bold text-store-fg">Order summary</h2>
 
           <ul className="mt-4 divide-y divide-store-line">
             {cart.lines.map((line) => (

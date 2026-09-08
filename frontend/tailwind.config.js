@@ -39,6 +39,14 @@ export default {
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
         display: ["Public Sans", "Inter", "system-ui", "sans-serif"],
+
+        // Storefront brand pairing. Athelas and Moara are both commercial fonts
+        // that cannot be served from Google Fonts, so they are named first and
+        // backed by the closest open equivalents: Literata for Athelas's book
+        // serif, Anton for Moara's bold condensed display. Licensing the real
+        // webfonts later only means adding @font-face — no component changes.
+        "store-serif": ["Athelas", "Literata", "Source Serif 4", "Georgia", "serif"],
+        "store-display": ["Moara", "Anton", "Bebas Neue", "Impact", "sans-serif"],
       },
       fontSize: {
         display: ["24px", { fontWeight: "700", letterSpacing: "-0.02em" }],

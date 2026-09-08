@@ -43,7 +43,7 @@ export default function StoreFooter() {
             {store.logo && (
               <img src={store.logo} alt={store.name} className="h-10 w-auto max-w-[130px] object-contain" />
             )}
-            <span className="font-display text-lg font-extrabold tracking-tight">{store.name}</span>
+            <span className="font-store-display text-xl uppercase tracking-wide">{store.name}</span>
           </div>
           <p className="mt-4 max-w-xs text-sm opacity-80">{store.about}</p>
           {store.address && (

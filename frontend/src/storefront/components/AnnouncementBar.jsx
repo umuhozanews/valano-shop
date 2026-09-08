@@ -44,7 +44,7 @@ export default function AnnouncementBar() {
 
         {active && (
           <div key={index} className="store-fade-up flex min-w-0 items-center gap-2">
-            <span className="rounded-full bg-store-brand-fg/25 px-2 py-0.5 text-[10px] font-extrabold tracking-widest">
+            <span className="font-store-display rounded-full bg-store-brand-fg/25 px-2 py-0.5 text-[10px] tracking-widest">
               {active.tag}
             </span>
             {Icon && <Icon size={12} aria-hidden="true" />}

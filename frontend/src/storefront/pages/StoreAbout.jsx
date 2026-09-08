@@ -18,7 +18,7 @@ export default function StoreAbout() {
       <StoreSeo store={store} title="About Us" description={store.about} />
 
       <section className="mt-2 overflow-hidden rounded-3xl bg-store-accent px-7 py-12 md:px-14">
-        <h1 className="font-display max-w-2xl text-2xl font-extrabold leading-tight tracking-tight text-store-brand md:text-4xl">
+        <h1 className="font-store-serif max-w-2xl text-2xl font-bold leading-tight tracking-tight text-store-brand md:text-4xl">
           {store.headline || `About ${store.name}`}
         </h1>
         <p className="mt-4 max-w-2xl text-sm leading-relaxed text-store-fg/75 md:text-base">{store.about}</p>
@@ -35,12 +35,12 @@ export default function StoreAbout() {
 
       <section className="mt-8 grid gap-4 md:grid-cols-2">
         <div className="rounded-2xl bg-store-card p-6 ring-1 ring-store-line/70">
-          <h2 className="font-display text-base font-bold text-store-fg">Visit us</h2>
+          <h2 className="font-store-serif text-base font-bold text-store-fg">Visit us</h2>
           <p className="mt-2 text-sm text-store-muted">{store.address}</p>
           <p className="mt-1 text-sm text-store-muted">{store.hours}</p>
         </div>
         <div className="rounded-2xl bg-store-card p-6 ring-1 ring-store-line/70">
-          <h2 className="font-display text-base font-bold text-store-fg">Delivery</h2>
+          <h2 className="font-store-serif text-base font-bold text-store-fg">Delivery</h2>
           <p className="mt-2 text-sm text-store-muted">{store.deliveryNote}</p>
         </div>
       </section>

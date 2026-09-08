@@ -21,7 +21,7 @@ export default function StoreContact() {
       <StoreSeo store={store} title="Contact Us" description={`Get in touch with ${store.name}. ${store.address}`} />
 
       <section className="mt-2 overflow-hidden rounded-3xl bg-store-accent px-7 py-12 md:px-14">
-        <h1 className="font-display text-2xl font-extrabold tracking-tight text-store-brand md:text-4xl">Contact Us</h1>
+        <h1 className="font-store-serif text-2xl font-bold tracking-tight text-store-brand md:text-4xl">Contact Us</h1>
         <p className="mt-3 max-w-xl text-sm leading-relaxed text-store-fg/75">
           Questions about a product, price or delivery? Reach {store.name} on any of the channels below and we will get
           back to you.

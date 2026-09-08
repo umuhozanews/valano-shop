@@ -31,7 +31,7 @@ export default function StoreSearch() {
       <StoreSeo store={store} title={query ? `Search: ${query}` : "Search"} />
 
       <div className="pt-2">
-        <h1 className="font-display text-2xl font-extrabold tracking-tight text-store-fg md:text-3xl">
+        <h1 className="font-store-serif text-2xl font-bold tracking-tight text-store-fg md:text-3xl">
           {query ? `Results for "${query}"` : "Search"}
         </h1>
         <p className="mt-2 text-sm text-store-muted">

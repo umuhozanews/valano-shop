@@ -29,7 +29,7 @@ export default function StoreCategory() {
         <span className="font-semibold text-store-fg">{title}</span>
       </nav>
 
-      <h1 className="font-display mt-3 text-2xl font-extrabold tracking-tight text-store-fg md:text-3xl">{title}</h1>
+      <h1 className="font-store-serif mt-3 text-2xl font-bold tracking-tight text-store-fg md:text-3xl">{title}</h1>
       {!isAll && !category && (
         <p className="mt-2 text-sm text-store-muted">
           We could not find that category. Browse everything below instead.

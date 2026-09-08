@@ -29,7 +29,7 @@ export default function CartDrawer() {
 
       <div className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-store-card shadow-2xl">
         <div className="flex items-center justify-between border-b border-store-line px-5 py-4">
-          <h2 className="font-display flex items-center gap-2 text-base font-bold text-store-fg">
+          <h2 className="font-store-serif flex items-center gap-2 text-base font-bold text-store-fg">
             <ShoppingBag size={18} className="text-store-brand" />
             Your Cart
             {cart.itemCount > 0 && <span className="text-sm font-normal text-store-muted">({cart.itemCount})</span>}

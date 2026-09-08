@@ -120,7 +120,7 @@ export default function Catalog({ products, title = "All Products", enableCatego
 
       <section className="mt-8">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-display text-lg font-bold tracking-tight text-store-fg">
+          <h2 className="font-store-serif text-lg font-bold tracking-tight text-store-fg">
             {title}
             <span className="ml-2 text-sm font-normal text-store-muted">({visible.length})</span>
           </h2>

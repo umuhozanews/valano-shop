@@ -84,7 +84,7 @@ export default function StoreProduct() {
           {product.brand && (
             <span className="text-[11px] font-bold uppercase tracking-widest text-store-muted">{product.brand}</span>
           )}
-          <h1 className="font-display mt-1 text-2xl font-extrabold leading-tight tracking-tight text-store-fg md:text-3xl">
+          <h1 className="font-store-serif mt-1 text-2xl font-bold leading-tight tracking-tight text-store-fg md:text-3xl">
             {product.name}
           </h1>
           {product.nameRw && product.nameRw !== product.name && (

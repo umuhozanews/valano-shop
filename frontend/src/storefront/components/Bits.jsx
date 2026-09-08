@@ -4,7 +4,7 @@ export function SectionHeading({ title, action, subtitle }) {
   return (
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h2 className="font-display text-lg font-bold tracking-tight text-store-fg">{title}</h2>
+        <h2 className="font-store-serif text-lg font-bold tracking-tight text-store-fg">{title}</h2>
         {subtitle && <p className="mt-1 text-sm text-store-muted">{subtitle}</p>}
       </div>
       {action}

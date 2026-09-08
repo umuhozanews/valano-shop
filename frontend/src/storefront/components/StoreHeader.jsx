@@ -75,7 +75,7 @@ export default function StoreHeader() {
                 </span>
               )}
               <span className="flex min-w-0 flex-col">
-                <span className="font-display flex items-center gap-1.5 text-base font-extrabold tracking-tight text-store-fg sm:text-lg">
+                <span className="font-store-display flex items-center gap-1.5 text-lg uppercase tracking-wide text-store-fg sm:text-xl">
                   <span className="max-w-[180px] truncate">{store.name}</span>
                   {store.verified && (
                     <BadgeCheck

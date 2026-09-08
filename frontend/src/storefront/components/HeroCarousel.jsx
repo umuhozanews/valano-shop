@@ -41,11 +41,11 @@ export default function HeroCarousel() {
               <div className="grid h-full grid-cols-1 items-center gap-4 px-7 py-7 md:grid-cols-2 md:px-14 md:py-8">
                 <div className="flex flex-col justify-center">
                   {slide.badge && (
-                    <span className="mb-3 inline-block self-start rounded-full bg-store-brand px-4 py-1.5 text-xs font-extrabold tracking-widest text-store-brand-fg">
+                    <span className="font-store-display mb-3 inline-block self-start rounded-full bg-store-brand px-4 py-1.5 text-xs uppercase tracking-widest text-store-brand-fg">
                       {slide.badge}
                     </span>
                   )}
-                  <h1 className="font-display text-2xl font-extrabold leading-tight tracking-tight text-store-brand sm:text-3xl md:text-4xl">
+                  <h1 className="font-store-serif text-2xl font-bold leading-tight tracking-tight text-store-brand sm:text-3xl md:text-4xl">
                     {slide.title}
                   </h1>
                   {slide.subtitle && (

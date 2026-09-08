@@ -26,7 +26,7 @@ export default function TrustBadges() {
               className="flex flex-col items-center gap-2 rounded-2xl bg-store-soft p-5 text-center ring-1 ring-store-line/60"
             >
               <Icon size={24} className="text-store-brand" aria-hidden="true" />
-              <div className="text-sm font-semibold text-store-fg">{badge.title}</div>
+              <div className="font-store-display text-sm uppercase tracking-wide text-store-fg">{badge.title}</div>
               <div className="text-xs text-store-muted">{badge.detail}</div>
             </div>
           );
