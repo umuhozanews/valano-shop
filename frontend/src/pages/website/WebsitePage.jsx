@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Check, Copy, ExternalLink, Globe, Inbox, Loader2, MapPin, Palette, Plus, Receipt,
-  RefreshCw, ShoppingBag, Trash2, Truck,
+  RefreshCw, ShoppingBag, Smartphone, Sparkles, Trash2, Truck, UtensilsCrossed,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import PageWrapper from "../../components/layout/PageWrapper";
@@ -20,6 +20,38 @@ const SOCIAL_FIELDS = [
   { key: "instagram", label: "Instagram URL", placeholder: "https://instagram.com/yourshop" },
   { key: "tiktok", label: "TikTok URL", placeholder: "https://tiktok.com/@yourshop" },
   { key: "twitter", label: "X / Twitter URL", placeholder: "https://x.com/yourshop" },
+];
+
+// Available industry-tailored storefront layouts
+const TEMPLATE_OPTIONS = [
+  {
+    id: "modern_retail",
+    name: "Modern Retail & Minimarket",
+    description: "High-speed catalog with category pills, live search, and quick add-to-cart.",
+    badge: "Recommended",
+    icon: ShoppingBag,
+  },
+  {
+    id: "tech_gadgets",
+    name: "Tech & Electronics Flagship",
+    description: "Bento grid layout with hardware specs, warranty verification, and WhatsApp consultation.",
+    badge: "Electronics",
+    icon: Smartphone,
+  },
+  {
+    id: "food_cafe",
+    name: "Restaurant, Cafe & Bakery",
+    description: "Digital menu with meal categories, prep time badges, and kitchen order notes.",
+    badge: "Food & Drinks",
+    icon: UtensilsCrossed,
+  },
+  {
+    id: "fashion_boutique",
+    name: "Fashion & Beauty Boutique",
+    description: "Editorial lookbook with large visual imagery, brand showcases, and minimalist styling.",
+    badge: "Lifestyle",
+    icon: Sparkles,
+  },
 ];
 
 // Fallback for the named schemes the API returns, so the picker still works if
@@ -78,6 +110,7 @@ function emptyForm() {
   return {
     store_slug: "",
     store_published: true,
+    store_template: "modern_retail",
     store_headline: "",
     store_tagline: "",
     store_about: "",
@@ -107,6 +140,7 @@ function formFromApi(storefront) {
     ),
     store_published: storefront.store_published !== false,
     store_pickup_enabled: storefront.store_pickup_enabled !== false,
+    store_template: storefront.store_template || base.store_template || "modern_retail",
     store_brand_color: storefront.store_brand_color || base.store_brand_color,
     store_socials: { ...base.store_socials, ...(storefront.store_socials || {}) },
     store_delivery_zones: Array.isArray(storefront.store_delivery_zones) ? storefront.store_delivery_zones : [],
@@ -176,6 +210,52 @@ function DesignTab({ form, setForm, storeUrl, presets, saving, onSave }) {
               </span>
             </label>
           </div>
+        </div>
+      </Card>
+
+      <Card
+        title="Website Layout & Industry Template"
+        subtitle="Select the layout tailored for your business category and customer experience"
+      >
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {TEMPLATE_OPTIONS.map((tmpl) => {
+            const Icon = tmpl.icon;
+            const isSelected = (form.store_template || "modern_retail") === tmpl.id;
+            return (
+              <button
+                key={tmpl.id}
+                type="button"
+                onClick={() => setForm((current) => ({ ...current, store_template: tmpl.id }))}
+                className={`relative flex flex-col items-start rounded-card border p-3.5 text-left transition ${
+                  isSelected
+                    ? "border-primary bg-primary/5 ring-2 ring-primary/20 shadow-sm"
+                    : "border-border bg-surface hover:border-primary/40 hover:bg-background"
+                }`}
+              >
+                <div className="flex w-full items-center justify-between gap-2">
+                  <div
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${
+                      isSelected ? "bg-primary text-white shadow-sm" : "bg-neutral/10 text-text-secondary"
+                    }`}
+                  >
+                    <Icon size={16} />
+                  </div>
+                  {isSelected ? (
+                    <span className="flex items-center gap-1 rounded-badge bg-primary px-1.5 py-0.5 text-[10px] font-bold text-white">
+                      <Check size={10} className="stroke-[3]" /> Active
+                    </span>
+                  ) : (
+                    <span className="rounded-badge bg-border/60 px-1.5 py-0.5 text-[9px] font-semibold text-text-secondary">
+                      {tmpl.badge}
+                    </span>
+                  )}
+                </div>
+
+                <p className="mt-2.5 text-[13px] font-bold text-text-primary">{tmpl.name}</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-text-secondary">{tmpl.description}</p>
+              </button>
+            );
+          })}
         </div>
       </Card>
 

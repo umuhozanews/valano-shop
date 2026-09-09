@@ -9,6 +9,7 @@ const { authRateLimiter, blockFieldTampering } = require("../middleware/security
 const { logAudit } = require("../utils/helpers");
 const { isValidEmail, validatePasswordStrength } = require("../utils/validation");
 const { sendLoginAlert, sendWelcomeEmail, sendAdminSignupAlert, sendTestEmail } = require("../utils/mailer");
+const { autoProvisionStorefront } = require("../utils/storefront");
 
 const VALID_ROLES = ['sme_owner','manager','cashier','accountant','databridge_advisor','lender','pulse_admin','admin'];
 
@@ -311,6 +312,16 @@ router.post("/complete-setup", verifyToken, async (req, res, next) => {
       [req.user.id, cleanShopName, cleanDistrict, cleanPhone, cleanEmail || req.user.email, cleanCurrency, hasEbm, cleanTin || null]
     );
 
+    // Auto-generate storefront with sector-matched template, branding colors, copy & stock
+    await autoProvisionStorefront(req.user.id, {
+      shopName: cleanShopName,
+      sector: cleanSector,
+      district: cleanDistrict,
+      phone: cleanPhone,
+      email: cleanEmail || req.user.email,
+      currency: cleanCurrency,
+    }).catch(err => console.error("[STOREFRONT AUTO-PROVISION ERROR]", err?.message));
+
     // 3. Auto-link default advisor, admin, and lenders
     await pool.query(`
       INSERT INTO advisor_clients (advisor_user_id, sme_user_id, notes)
@@ -606,6 +617,16 @@ const handleRegister = async (req, res, next) => {
            tin_number=EXCLUDED.tin_number`,
         [user.id, orgOrBusinessName, language || 'en', hasEbm, cleanTin || null]
       );
+
+      // Auto-generate storefront with sector-matched template, branding colors, copy & stock
+      await autoProvisionStorefront(user.id, {
+        shopName: orgOrBusinessName,
+        sector: sectorStr,
+        district,
+        phone: rawPhone,
+        email: normalizedEmail,
+        currency: req.body.currency || "RWF",
+      }).catch(err => console.error("[STOREFRONT AUTO-PROVISION ERROR]", err?.message));
     }
 
     // Auto-connect Admin & Advisor to newly created account

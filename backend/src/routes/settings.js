@@ -10,6 +10,7 @@ const {
   ensureSlug,
   saveStorefrontSettings,
   storefrontSettingsView,
+  autoProvisionStorefront,
 } = require("../utils/storefront");
 
 // The dashboard needs an absolute link an SME can copy or share.
@@ -76,9 +77,19 @@ router.get("/", async (req, res, next) => {
     let storefront = null;
     if (ownerId) {
       await ensureStoreColumns().catch(() => {});
-      const slug = await ensureSlug(ownerId, mergedSettings.shop_name).catch(() => null);
+      const autoSettings = await autoProvisionStorefront(ownerId, {
+        shopName: mergedSettings.shop_name,
+        sector: userProfile?.sector,
+        district: mergedSettings.shop_address,
+        phone: mergedSettings.shop_phone,
+        email: mergedSettings.shop_email,
+        currency: mergedSettings.currency,
+      }).catch(() => null);
+
+      const activeSettings = autoSettings || settings || {};
+      const slug = activeSettings.store_slug || await ensureSlug(ownerId, mergedSettings.shop_name).catch(() => null);
       storefront = storefrontSettingsView(
-        { ...(settings || {}), store_slug: settings?.store_slug || slug },
+        { ...activeSettings, store_slug: slug },
         { baseUrl: publicBaseUrl(req) }
       );
     }

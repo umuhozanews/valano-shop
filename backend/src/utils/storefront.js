@@ -23,6 +23,38 @@ const THEME_PRESETS = {
   charcoal:  { label: "Charcoal", brand: "#1F2937", accent: "#E5E7EB" },
 };
 
+// Available website layout templates tailored for Rwandan SME verticals.
+const STORE_TEMPLATES = {
+  modern_retail: {
+    id: "modern_retail",
+    name: "Modern Retail & Minimarket",
+    description: "High-speed catalog with category pills, live search, and quick add-to-cart.",
+    badge: "Recommended",
+    icon: "shopping-bag",
+  },
+  tech_gadgets: {
+    id: "tech_gadgets",
+    name: "Tech & Electronics Flagship",
+    description: "Bento grid layout with hardware specs, warranty verification, and WhatsApp consultation.",
+    badge: "Electronics",
+    icon: "cpu",
+  },
+  food_cafe: {
+    id: "food_cafe",
+    name: "Restaurant, Cafe & Bakery",
+    description: "Digital menu with meal categories, prep time badges, and kitchen order notes.",
+    badge: "Food & Drinks",
+    icon: "utensils",
+  },
+  fashion_boutique: {
+    id: "fashion_boutique",
+    name: "Fashion & Beauty Boutique",
+    description: "Editorial lookbook with large visual imagery, brand showcases, and minimalist styling.",
+    badge: "Lifestyle",
+    icon: "sparkles",
+  },
+};
+
 // Zone fees are derived from the SME's base fee rather than hard-coded, so an
 // SME that only changes one number still gets a sensible Kigali/upcountry spread.
 const DEFAULT_ZONE_TEMPLATE = [
@@ -42,6 +74,7 @@ let _slugBackfillDone = false;
 // too. Mirrors the ensureTenantColumns() pattern used by the authed routes.
 const STORE_COLUMN_SQL = [
   "ALTER TABLE settings ADD COLUMN IF NOT EXISTS store_slug VARCHAR(60)",
+  "ALTER TABLE settings ADD COLUMN IF NOT EXISTS store_template VARCHAR(30) DEFAULT 'modern_retail'",
   "ALTER TABLE settings ADD COLUMN IF NOT EXISTS store_published BOOLEAN DEFAULT true",
   "ALTER TABLE settings ADD COLUMN IF NOT EXISTS store_headline TEXT",
   "ALTER TABLE settings ADD COLUMN IF NOT EXISTS store_tagline TEXT",
@@ -150,38 +183,6 @@ async function backfillSlugs() {
   }
 }
 
-// Resolves a public URL segment to an SME. Accepts the slug, a numeric owner id,
-// or the "store-<id>" form so links keep working if a slug is later renamed.
-async function resolveStore(slugOrId) {
-  const raw = String(slugOrId || "").trim().toLowerCase();
-  if (!raw) return null;
-
-  const bySlug = await pool.query(
-    `SELECT s.*, u.name AS owner_name, u.email AS owner_email,
-            u.phone AS owner_phone, u.district AS owner_district
-       FROM settings s
-       JOIN users u ON u.id = s.owner_id
-      WHERE s.store_slug = $1
-      LIMIT 1`,
-    [raw]
-  );
-  if (bySlug.rows.length) return bySlug.rows[0];
-
-  const idMatch = raw.match(/^(?:store-)?(\d+)$/);
-  if (!idMatch) return null;
-
-  const byOwner = await pool.query(
-    `SELECT s.*, u.name AS owner_name, u.email AS owner_email,
-            u.phone AS owner_phone, u.district AS owner_district
-       FROM settings s
-       JOIN users u ON u.id = s.owner_id
-      WHERE s.owner_id = $1
-      LIMIT 1`,
-    [Number(idMatch[1])]
-  );
-  return byOwner.rows[0] || null;
-}
-
 function toNumber(value) {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
@@ -193,6 +194,492 @@ function normalizePhone(value) {
   if (digits.startsWith("250")) return digits;
   if (digits.startsWith("0")) return `250${digits.slice(1)}`;
   return digits;
+}
+
+// ── Sector Intelligence & Auto-Storefront Generation ────────────────────────
+function detectSectorProfile(sector = "", shopName = "") {
+  const combined = `${sector || ""} ${shopName || ""}`.toLowerCase();
+
+  // Food & Cafe keywords
+  if (
+    /food|restaurant|cafe|coffee|bakery|bar|bistro|grill|kitchen|eat|snack|beverage|catering|dish|meal|pizza|burger/i.test(
+      combined
+    )
+  ) {
+    return {
+      template: "food_cafe",
+      brandColor: "#C2410C", // Warm Terracotta / Dark Amber
+      accentColor: "#FFEDD5", // Soft Apricot
+      headlinePrefix: "Fresh Gourmet Dishes & Artisan Coffee at",
+      tagline: "Freshly prepared meals and drinks delivered swiftly across Kigali.",
+      announcement: "⚡ Fresh kitchen orders! Fast 25–40 min delivery across Kigali on WhatsApp & MoMo.",
+      about:
+        "Welcome to our kitchen! We pride ourselves on serving freshly prepared, delicious meals, artisan coffees, and refreshing beverages crafted from quality ingredients for our Kigali community.",
+      category: "Main Courses",
+    };
+  }
+
+  // Tech & Electronics keywords
+  if (
+    /electronic|phone|tech|computer|laptop|gadget|hardware|appliance|mobile|screen|audio|device|smart|apple|samsung/i.test(
+      combined
+    )
+  ) {
+    return {
+      template: "tech_gadgets",
+      brandColor: "#0D9488", // Deep Teal / Cyan
+      accentColor: "#CCFBF1", // Soft Mint
+      headlinePrefix: "Verified Original Hardware & Flagship Devices at",
+      tagline: "100% genuine sealed electronics with official 12-month Rwanda warranty.",
+      announcement: "⚡ 100% Original Sealed Hardware • Official Rwanda Warranty • Same-Day Kigali Delivery!",
+      about:
+        "Your trusted destination for original smartphones, high-performance laptops, accessories, and certified electronics in Rwanda. Every unit is tested, RURA-approved, and backed by a transparent warranty.",
+      category: "Smartphones",
+    };
+  }
+
+  // Fashion & Boutique keywords
+  if (
+    /fashion|boutique|cloth|apparel|shoe|sneaker|wear|dress|beauty|cosmetic|jewelry|luxury|style|tailor|suit|gown/i.test(
+      combined
+    )
+  ) {
+    return {
+      template: "fashion_boutique",
+      brandColor: "#831843", // Deep Rose Plum
+      accentColor: "#FCE7F3", // Soft Blush
+      headlinePrefix: "Curated Contemporary Fashion & Styling at",
+      tagline: "Exclusive apparel, footwear, and timeless fashion statements in Kigali.",
+      announcement: "✨ New Season Collection is Live! Same-day Kigali doorstep fitting & exchange available.",
+      about:
+        "We curate modern, comfortable, and elegant fashion pieces tailored for the contemporary lifestyle. Discover premium fabrics, bespoke tailoring, and trendsetting styles with convenient same-day doorstep fitting.",
+      category: "Apparel",
+    };
+  }
+
+  // Modern Retail (Default for supermarkets, minimarkets, groceries, pharmacies, and general stores)
+  return {
+    template: "modern_retail",
+    brandColor: "#006C49", // Rwandan Forest Emerald
+    accentColor: "#C6F24E", // Lime
+    headlinePrefix: "Quality Daily Essentials & Groceries at",
+    tagline: "Honest everyday prices with reliable same-day delivery to your door.",
+    announcement: "🛒 Order directly online! Fast same-day home and office delivery across Rwanda.",
+    about:
+      "We serve families and businesses across Rwanda with carefully selected, high-quality daily essentials, groceries, and household goods at honest, transparent prices.",
+    category: "Groceries",
+  };
+}
+
+function getStarterProductsForSector(template, ownerId) {
+  const now = Date.now();
+  if (template === "food_cafe") {
+    return [
+      {
+        name: "Ifi Yokeje / Charcoal Grilled Whole Tilapia",
+        name_rw: "Ifi Yokeje y'i Nyanza",
+        category: "Grills & Mains",
+        unit: "plate",
+        barcode: `FOOD${now}1`,
+        quantity: 15,
+        cost_price_rwf: 5000,
+        sell_price_rwf: 7500,
+        compare_price_rwf: 8500,
+        description: "Fresh Lake Kivu whole Tilapia slow-grilled with garlic herb marinade, served with roasted plantains and chili.",
+        is_published: true,
+        is_featured: true,
+        owner_id: ownerId,
+      },
+      {
+        name: "Inyama y'Ingurube / Pork Brochettes (Pair)",
+        name_rw: "Ururo ry'Ingurube",
+        category: "Brochettes",
+        unit: "stick",
+        barcode: `FOOD${now}2`,
+        quantity: 25,
+        cost_price_rwf: 1500,
+        sell_price_rwf: 2500,
+        compare_price_rwf: 3000,
+        description: "Flame-grilled tender pork brochettes basted in a rich aromatic marinade with grilled onions and peppers.",
+        is_published: true,
+        is_featured: true,
+        owner_id: ownerId,
+      },
+      {
+        name: "Specialty Huye Mountain Arabica Coffee",
+        name_rw: "Ikawa y'i Huye",
+        category: "Hot Beverages",
+        unit: "cup",
+        barcode: `FOOD${now}3`,
+        quantity: 40,
+        cost_price_rwf: 1200,
+        sell_price_rwf: 3000,
+        description: "Single-origin 100% Bourbon Arabica washed coffee freshly roasted and brewed to perfection.",
+        is_published: true,
+        is_featured: false,
+        owner_id: ownerId,
+      },
+      {
+        name: "Fresh Tropical Mango & Passion Juice",
+        name_rw: "Umutobe w'Imyembe n'Ibitoki",
+        category: "Cold Drinks",
+        unit: "glass",
+        barcode: `FOOD${now}4`,
+        quantity: 30,
+        cost_price_rwf: 1000,
+        sell_price_rwf: 2500,
+        description: "100% natural, freshly pressed Rwandan mango and passion fruit with crushed ice. No added sugar.",
+        is_published: true,
+        is_featured: false,
+        owner_id: ownerId,
+      },
+    ];
+  }
+
+  if (template === "tech_gadgets") {
+    return [
+      {
+        name: "iPhone 15 Pro Max Titanium (256GB)",
+        name_rw: null,
+        brand: "Apple",
+        category: "Smartphones",
+        unit: "pcs",
+        barcode: `TECH${now}1`,
+        quantity: 4,
+        cost_price_rwf: 1280000,
+        sell_price_rwf: 1450000,
+        compare_price_rwf: 1580000,
+        description: "Grade-A Sealed Original Hardware • A17 Pro Silicon • RURA & IMEI Verified with 12 Months Warranty.",
+        is_published: true,
+        is_featured: true,
+        owner_id: ownerId,
+      },
+      {
+        name: "Samsung Galaxy S24 Ultra 5G AI (512GB)",
+        name_rw: null,
+        brand: "Samsung",
+        category: "Smartphones",
+        unit: "pcs",
+        barcode: `TECH${now}2`,
+        quantity: 5,
+        cost_price_rwf: 1220000,
+        sell_price_rwf: 1380000,
+        compare_price_rwf: 1500000,
+        description: "Galaxy AI Integrated • Titanium Frame • 200MP Quad Tele • 12 Months Official Samsung Warranty.",
+        is_published: true,
+        is_featured: true,
+        owner_id: ownerId,
+      },
+      {
+        name: "Apple AirPods Pro 2nd Gen (USB-C MagSafe)",
+        name_rw: null,
+        brand: "Apple",
+        category: "Audio",
+        unit: "pcs",
+        barcode: `TECH${now}3`,
+        quantity: 8,
+        cost_price_rwf: 230000,
+        sell_price_rwf: 280000,
+        compare_price_rwf: 320000,
+        description: "Active Noise Cancellation • Adaptive Audio • Spatial Sound with MagSafe Charging Case.",
+        is_published: true,
+        is_featured: false,
+        owner_id: ownerId,
+      },
+      {
+        name: "Anker 65W GaN Fast Charger (3 Ports)",
+        name_rw: null,
+        brand: "Anker",
+        category: "Accessories",
+        unit: "pcs",
+        barcode: `TECH${now}4`,
+        quantity: 12,
+        cost_price_rwf: 38000,
+        sell_price_rwf: 55000,
+        description: "High-speed multi-device GaN wall charger for MacBooks, laptops, iPhones, and Androids.",
+        is_published: true,
+        is_featured: false,
+        owner_id: ownerId,
+      },
+    ];
+  }
+
+  if (template === "fashion_boutique") {
+    return [
+      {
+        name: "Tailored Pure Linen Summer Shirt",
+        name_rw: null,
+        brand: "Kigali Atelier",
+        category: "Men's Apparel",
+        unit: "pcs",
+        barcode: `FASH${now}1`,
+        quantity: 10,
+        cost_price_rwf: 22000,
+        sell_price_rwf: 35000,
+        compare_price_rwf: 42000,
+        description: "Breathable relaxed-fit pure linen shirt with pearl buttons. Tailored with care in Rwanda.",
+        is_published: true,
+        is_featured: true,
+        owner_id: ownerId,
+      },
+      {
+        name: "Contemporary Pleated Silk Midi Dress",
+        name_rw: null,
+        brand: "Maison Rwanda",
+        category: "Women's Apparel",
+        unit: "pcs",
+        barcode: `FASH${now}2`,
+        quantity: 8,
+        cost_price_rwf: 28000,
+        sell_price_rwf: 45000,
+        compare_price_rwf: 52000,
+        description: "Flattering silhouette dress crafted from luxurious emerald silk blend fabric.",
+        is_published: true,
+        is_featured: true,
+        owner_id: ownerId,
+      },
+      {
+        name: "Handcrafted Rwandan Leather Weekend Bag",
+        name_rw: null,
+        brand: "Kigali Leather Co.",
+        category: "Bags & Accessories",
+        unit: "pcs",
+        barcode: `FASH${now}3`,
+        quantity: 6,
+        cost_price_rwf: 42000,
+        sell_price_rwf: 65000,
+        description: "Full-grain vegetable-tanned local cowhide leather with heavy-duty brass hardware.",
+        is_published: true,
+        is_featured: false,
+        owner_id: ownerId,
+      },
+      {
+        name: "Minimalist Leather Low-Top Sneakers",
+        name_rw: null,
+        brand: "Kigali Kicks",
+        category: "Footwear",
+        unit: "pair",
+        barcode: `FASH${now}4`,
+        quantity: 12,
+        cost_price_rwf: 32000,
+        sell_price_rwf: 48000,
+        compare_price_rwf: 55000,
+        description: "Clean white genuine leather sneakers with cushioned insoles for all-day comfort.",
+        is_published: true,
+        is_featured: false,
+        owner_id: ownerId,
+      },
+    ];
+  }
+
+  // Modern Retail / Supermarket
+  return [
+    {
+      name: "Super Pure Basmati Rice (5kg Bag)",
+      name_rw: "Umuceri wa Basmati",
+      category: "Grains & Pantry",
+      unit: "bag",
+      barcode: `RET${now}1`,
+      quantity: 30,
+      cost_price_rwf: 9500,
+      sell_price_rwf: 12500,
+      description: "Premium aged long-grain aromatic Basmati rice, perfectly sorted and dust-free.",
+      is_published: true,
+      is_featured: true,
+      owner_id: ownerId,
+    },
+    {
+      name: "Inyange Whole Fresh Pasteurized Milk (1L x 6)",
+      name_rw: "Amata ya Inyange",
+      category: "Dairy & Eggs",
+      unit: "pack",
+      barcode: `RET${now}2`,
+      quantity: 20,
+      cost_price_rwf: 4800,
+      sell_price_rwf: 6000,
+      description: "100% natural whole Rwandan cow milk, pasteurized for freshness and nutrition.",
+      is_published: true,
+      is_featured: true,
+      owner_id: ownerId,
+    },
+    {
+      name: "Golden Drop Refined Sunflower Cooking Oil (3L)",
+      name_rw: "Amavuta yo Guteka",
+      category: "Cooking Essentials",
+      unit: "bottle",
+      barcode: `RET${now}3`,
+      quantity: 18,
+      cost_price_rwf: 6800,
+      sell_price_rwf: 8500,
+      description: "Triple-filtered healthy cholesterol-free cooking oil fortified with vitamins A & D.",
+      is_published: true,
+      is_featured: false,
+      owner_id: ownerId,
+    },
+    {
+      name: "Inyange Mango & Orange Blend Juice (1L)",
+      name_rw: "Umutobe wa Inyange",
+      category: "Beverages",
+      unit: "bottle",
+      barcode: `RET${now}4`,
+      quantity: 25,
+      cost_price_rwf: 1800,
+      sell_price_rwf: 2400,
+      description: "Delicious rich mango-orange blend nectar made from real local fruit pulp.",
+      is_published: true,
+      is_featured: false,
+      owner_id: ownerId,
+    },
+  ];
+}
+
+async function autoProvisionStorefront(ownerId, options = {}) {
+  await ensureStoreColumns();
+
+  const id = Number(ownerId);
+  if (!Number.isInteger(id) || id <= 0) return null;
+
+  let user = null;
+  const userQuery = await pool.query(
+    "SELECT id, name, email, phone, district, sector, currency FROM users WHERE id = $1 LIMIT 1",
+    [id]
+  ).catch(() => ({ rows: [] }));
+  user = userQuery.rows[0] || {};
+
+  const shopName = String(options.shopName || user.name || "Inzira Store").trim();
+  const sector = String(options.sector || user.sector || "").trim();
+  const district = String(options.district || user.district || "Kigali").trim();
+  const phone = normalizePhone(options.phone || user.phone || "");
+  const email = String(options.email || user.email || "").trim();
+  const currency = String(options.currency || user.currency || "RWF").trim().toUpperCase();
+
+  const profile = detectSectorProfile(sector, shopName);
+  const headline = `${profile.headlinePrefix} ${shopName}`;
+  const slug = await generateSlug(shopName, id);
+
+  await pool.query(
+    `INSERT INTO settings (
+       owner_id, shop_name, shop_address, shop_phone, shop_email, currency,
+       store_slug, store_template, store_brand_color, store_accent_color,
+       store_headline, store_tagline, store_about, store_announcement,
+       store_whatsapp, store_hours, store_delivery_fee, store_min_free_delivery,
+       store_pickup_enabled, store_published
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, true, true)
+     ON CONFLICT (owner_id) DO UPDATE SET
+       store_slug = COALESCE(settings.store_slug, EXCLUDED.store_slug),
+       store_template = COALESCE(settings.store_template, EXCLUDED.store_template),
+       store_brand_color = COALESCE(settings.store_brand_color, EXCLUDED.store_brand_color),
+       store_accent_color = COALESCE(settings.store_accent_color, EXCLUDED.store_accent_color),
+       store_headline = COALESCE(settings.store_headline, EXCLUDED.store_headline),
+       store_tagline = COALESCE(settings.store_tagline, EXCLUDED.store_tagline),
+       store_about = COALESCE(settings.store_about, EXCLUDED.store_about),
+       store_announcement = COALESCE(settings.store_announcement, EXCLUDED.store_announcement),
+       store_whatsapp = COALESCE(settings.store_whatsapp, EXCLUDED.store_whatsapp),
+       store_hours = COALESCE(settings.store_hours, EXCLUDED.store_hours),
+       store_delivery_fee = COALESCE(settings.store_delivery_fee, EXCLUDED.store_delivery_fee),
+       store_min_free_delivery = COALESCE(settings.store_min_free_delivery, EXCLUDED.store_min_free_delivery),
+       shop_address = COALESCE(settings.shop_address, EXCLUDED.shop_address),
+       shop_phone = COALESCE(settings.shop_phone, EXCLUDED.shop_phone),
+       currency = COALESCE(settings.currency, EXCLUDED.currency)`,
+    [
+      id, shopName, district, phone || null, email || null, currency,
+      slug, profile.template, profile.brandColor, profile.accentColor,
+      headline, profile.tagline, profile.about, profile.announcement,
+      phone || null, "Mon–Sat, 8:00 AM – 8:30 PM", 1500, 35000
+    ]
+  ).catch(() => {});
+
+  // Fetch or seed stock items
+  const { rows: countRows } = await pool.query(
+    "SELECT COUNT(*) AS total FROM stock_items WHERE owner_id = $1 AND is_active = true",
+    [id]
+  ).catch(() => ({ rows: [{ total: 0 }] }));
+
+  const currentCount = parseInt(countRows[0]?.total || 0, 10);
+
+  if (currentCount === 0) {
+    const starterItems = getStarterProductsForSector(profile.template, id);
+    for (const item of starterItems) {
+      await pool.query(
+        `INSERT INTO stock_items (
+           name, name_rw, category, unit, barcode, quantity, cost_price_rwf,
+           sell_price_rwf, compare_price_rwf, description, brand, is_published,
+           is_featured, low_stock_threshold, owner_id
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true, $12, 3, $13)
+         ON CONFLICT (barcode) DO NOTHING`,
+        [
+          item.name, item.name_rw || null, item.category, item.unit || "pcs",
+          item.barcode, item.quantity, item.cost_price_rwf, item.sell_price_rwf,
+          item.compare_price_rwf || null, item.description, item.brand || null,
+          item.is_featured || false, id
+        ]
+      ).catch(() => {});
+    }
+  }
+
+  const { rows: [finalSettings] } = await pool.query(
+    "SELECT * FROM settings WHERE owner_id = $1 LIMIT 1",
+    [id]
+  ).catch(() => ({ rows: [] }));
+
+  return finalSettings || null;
+}
+
+// Resolves a public URL segment to an SME. Accepts the slug, a numeric owner id,
+// or the "store-<id>" form so links keep working if a slug is later renamed.
+async function resolveStore(slugOrId) {
+  const raw = String(slugOrId || "").trim().toLowerCase();
+  if (!raw) return null;
+
+  let store = null;
+
+  const bySlug = await pool.query(
+    `SELECT s.*, u.name AS owner_name, u.email AS owner_email,
+            u.phone AS owner_phone, u.district AS owner_district, u.sector AS owner_sector
+       FROM settings s
+       JOIN users u ON u.id = s.owner_id
+      WHERE s.store_slug = $1
+      LIMIT 1`,
+    [raw]
+  );
+  if (bySlug.rows.length) {
+    store = bySlug.rows[0];
+  } else {
+    const idMatch = raw.match(/^(?:store-)?(\d+)$/);
+    if (idMatch) {
+      const byOwner = await pool.query(
+        `SELECT s.*, u.name AS owner_name, u.email AS owner_email,
+                u.phone AS owner_phone, u.district AS owner_district, u.sector AS owner_sector
+           FROM settings s
+           JOIN users u ON u.id = s.owner_id
+          WHERE s.owner_id = $1
+          LIMIT 1`,
+        [Number(idMatch[1])]
+      );
+      if (byOwner.rows.length) store = byOwner.rows[0];
+    }
+  }
+
+  if (!store) return null;
+
+  // Auto-heal if store is missing key auto-generated fields
+  if (!store.store_template || !store.store_brand_color || !store.store_headline) {
+    const updated = await autoProvisionStorefront(store.owner_id, {
+      shopName: store.shop_name || store.owner_name,
+      sector: store.owner_sector,
+      district: store.shop_address || store.owner_district,
+      phone: store.shop_phone || store.owner_phone,
+      email: store.shop_email || store.owner_email,
+      currency: store.currency,
+    }).catch(() => null);
+    if (updated) {
+      return { ...store, ...updated };
+    }
+  }
+
+  return store;
 }
 
 function parseJsonColumn(value, fallback) {
@@ -437,6 +924,7 @@ function buildStorePayload(store, productRows) {
         brand: store.store_brand_color || DEFAULT_BRAND_COLOR,
         accent: store.store_accent_color || DEFAULT_ACCENT_COLOR,
       },
+      template: store.store_template || "modern_retail",
     },
     heroSlides: deriveHeroSlides(store, products),
     categories: deriveCategories(products),
@@ -574,6 +1062,13 @@ async function saveStorefrontSettings(ownerId, body = {}) {
   if ("store_pickup_enabled" in body) {
     push("store_pickup_enabled", body.store_pickup_enabled !== false && body.store_pickup_enabled !== "false");
   }
+  if ("store_template" in body) {
+    const validTemplates = Object.keys(STORE_TEMPLATES);
+    const chosen = String(body.store_template || "").trim().toLowerCase();
+    if (validTemplates.includes(chosen)) {
+      push("store_template", chosen);
+    }
+  }
 
   for (const key of ["store_delivery_fee", "store_min_free_delivery"]) {
     if (!(key in body)) continue;
@@ -650,6 +1145,8 @@ function storefrontSettingsView(settingsRow, { baseUrl } = {}) {
     // actually charging rather than an empty grid it has to fill in first.
     store_delivery_zones: deliveryZones(row),
     theme_presets: Object.entries(THEME_PRESETS).map(([id, preset]) => ({ id, ...preset })),
+    store_template: row.store_template || "modern_retail",
+    available_templates: Object.values(STORE_TEMPLATES),
   };
 }
 
@@ -657,6 +1154,7 @@ module.exports = {
   DEFAULT_BRAND_COLOR,
   DEFAULT_ACCENT_COLOR,
   THEME_PRESETS,
+  STORE_TEMPLATES,
   StorefrontValidationError,
   quoteDelivery,
   deliveryZones,
@@ -672,4 +1170,7 @@ module.exports = {
   storefrontSettingsView,
   normalizePhone,
   parseJsonColumn,
+  autoProvisionStorefront,
+  detectSectorProfile,
+  getStarterProductsForSector,
 };
